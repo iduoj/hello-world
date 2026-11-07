@@ -174,7 +174,9 @@
     return out;
   };
   P._loop = function (now) {
+    if (!this.canvas.isConnected && this._wasConnected) return; // canvas discarded: stop the loop
     requestAnimationFrame(this._loop);
+    if (this.canvas.isConnected) this._wasConnected = true;
     if (!this.canvas.isConnected || this.canvas.offsetParent === null) return;
     this.draw(now / 1000);
   };

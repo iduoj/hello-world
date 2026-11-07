@@ -656,3 +656,23 @@ details.more > .body { padding: 0 14px 14px; display: flex; flex-direction: colu
   .tabs { order: 3; }
 }
 .card .meta .tag { white-space: normal; }
+
+/* CICU cases */
+.cicu-timeline { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 4px; }
+.cicu-tl-item {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.78rem;
+  padding: 4px 9px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--ink-2);
+  max-width: 260px;
+}
+.cicu-tl-item .dot { width: 9px; height: 9px; border-radius: 50%; flex: none; }
+.cicu-tl-item .tl-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cicu-tl-item.now { border-color: var(--accent); color: var(--ink); font-weight: 600; }
+.cicu-tl-item .mono { white-space: nowrap; }

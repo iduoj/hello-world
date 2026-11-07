@@ -128,6 +128,47 @@ Research was done with web search in November 2026. Several primary sites were b
 - **"JL crush":** no technique by that name was found. It is presumed to mean DK crush.
 - **Ostial techniques:** 1–2 mm aortic protrusion, flaring, Szabo, crossover **[standard teaching]**.
 
+## CICU cases
+Two more research passes (November 2026) checked the following.
+- **Shock definitions:** SHOCK trial criteria (SBP <90 for >30 min or vasopressors, hypoperfusion, CI ≤2.2 with PCWP ≥15) and IABP-SHOCK II criteria. SCAI SHOCK stages (2019, 2022 update).
+- **CPO:** Fincke 2004; ≤0.53 W carried about 58% mortality, and many use <0.6 W.
+- **PAPi:** ≤0.9 after proximal RCA infarct (Korabathina 2012, n=20); <1.85 after LVAD (Morine 2016).
+- **Trials:**
+  - SHOCK: 30-day mortality 46.7% vs 56.0%, NS; 6-month 50.3% vs 63.1%.
+  - CULPRIT-SHOCK: 30-day death or RRT 45.9% vs 55.4%; the 1-year mortality difference was NS.
+  - IABP-SHOCK II: 39.7% vs 41.3%.
+  - ECLS-SHOCK: 47.8% vs 49.0%; bleeding 23.4% vs 9.6%.
+  - DanGer Shock: 45.8% vs 58.5%; safety composite 24.0% vs 6.2%; RRT 41.9% vs 26.7%.
+  - SOAP II: arrhythmias 24.1% vs 12.4%. The cardiogenic shock subgroup result is exploratory (interaction P=0.87).
+  - DOREMI: no difference.
+  - COMMIT: cardiogenic shock 5.0% vs 3.9%.
+- **2025 ACC/AHA ACS guideline:**
+  - Culprit revascularization: Class 1.
+  - Routine non-culprit PCI at the index procedure in shock: 3: Harm.
+  - Microaxial pump in selected STEMI shock: 2a.
+  - Routine IABP and routine VA-ECMO: 3: No Benefit. These two come from secondary summaries; the full text was not readable here.
+- **Post-MI care:**
+  - EPHESUS; EMPACT-MI (primary endpoint NS, fewer HF hospitalizations); DAPA-MI.
+  - VEST: primary endpoint negative.
+  - ICD timing (≥40 days after MI, ≥90 days after revascularization).
+  - 2022 AHA LV thrombus statement: about 3 months of anticoagulation; DOAC reasonable.
+- **Mechanical complications:**
+  - Damluji 2021 AHA statement, read via its summary.
+  - Papillary muscle rupture: emergency MV replacement is the treatment of choice; TEER for high surgical risk.
+  - VSR timing: STS data show 54% vs 18% operative mortality for repair ≤7 vs >7 days, with survivor bias. 87% of European centres prefer delayed repair bridged on MCS.
+  - Free-wall rupture: up to a third are subacute; CAUTION cohort operative mortality 36%.
+- **AS:**
+  - 2020 ACC/AHA severe AS criteria and stage D2 (dobutamine stress echo "reasonable").
+  - Khot 2003: CI 1.60 → 2.22 at 6 h → 2.52 at 24 h; MAP titrated to 60–70; patients on pressors or with MAP <60 were excluded. The case was written to match.
+  - BAV as a bridge: 2b.
+  - Vasopressor choice in AS is expert opinion only.
+- **VT storm:** 2017 AHA/ACC/HRS and 2022 ESC (ablation for drug-refractory storm); VANISH 59.1% vs 68.5%; PROCAMIO (tolerated wide-QRS tachycardia, not storm); propranolol vs metoprolol (Chatzidou 2018).
+- **Type A dissection:** 2022 ACC/AHA targets are SBP <120 and **HR 60–80**; beta-blocker before vasodilator; immediate surgery Class 1.
+- **PE:**
+  - ESC 2019: systemic lysis Class I for high-risk PE; alteplase 100 mg over 2 h (an accelerated 0.6 mg/kg regimen also exists).
+  - New 2026 AHA/ACC PE guideline with clinical categories A–E. Secondary sources conflict on the class of advanced therapies in category E.
+- **Not verified:** exact fluid volumes in RV infarction, the size of the 30–45% pseudoaneurysm rupture risk, and the exact 2025 guideline wording for the microaxial pump.
+
 ## Suggested follow-up checks
 1. Fifth UDMI (2026) ECG thresholds.
 2. Full-text EBC 2026 left-main imaging consensus numbers.
