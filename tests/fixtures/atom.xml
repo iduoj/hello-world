@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <title>Atom Blog</title>
+  <entry>
+    <title>Hello Atom</title>
+    <link rel="alternate" href="https://blog.example.com/hello"/>
+    <summary type="html">&lt;p&gt;An &lt;em&gt;atom&lt;/em&gt; summary.&lt;/p&gt;</summary>
+  </entry>
+</feed>

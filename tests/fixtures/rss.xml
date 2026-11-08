@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:media="http://search.yahoo.com/mrss/" xmlns:content="http://purl.org/rss/1.0/modules/content/">
+  <channel>
+    <title>Example News</title>
+    <item>
+      <title>Bridge Reopens After &lt;Repairs&gt;</title>
+      <link>https://example.com/bridge</link>
+      <description><![CDATA[<p>The <b>bridge</b> reopened on Monday &amp; traffic resumed.</p><img src="https://example.com/inline.jpg">]]></description>
+      <media:content url="https://example.com/bridge.jpg" medium="image" />
+    </item>
+    <item>
+      <title>Second Story</title>
+      <link>https://example.com/second</link>
+      <description>Plain description.</description>
+      <content:encoded><![CDATA[<img src="https://example.com/second.jpg"><p>Body</p>]]></content:encoded>
+    </item>
+    <item>
+      <title>Local file image is ignored</title>
+      <description><![CDATA[<img src="file:///etc/passwd">]]></description>
+    </item>
+  </channel>
+</rss>
