@@ -22,8 +22,8 @@ def demo_html(**paper):
 
 
 def test_demo_renders_masthead_and_sections():
-    ed, html = demo_html(name="The Karen Times")
-    assert "The Karen Times" in html
+    ed, html = demo_html()
+    assert "Barker Road Times" in html
     assert ed.headline == "Dentist at 2:30. Dinner with Maya at 7."
     for section in ("The Day Ahead", "On the Docket", "Weather", "Tomorrow"):
         assert section in html

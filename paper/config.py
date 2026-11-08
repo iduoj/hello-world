@@ -15,7 +15,7 @@ except ModuleNotFoundError:  # Python < 3.11
 
 DEFAULTS: dict[str, Any] = {
     "paper": {
-        "name": "The Morning Times",
+        "name": "Barker Road Times",
         "tagline": "All the News That's Fit to Wake Up To",
         "city": "",
         "timezone": "",  # IANA name, e.g. "America/New_York"; blank = this computer's zone

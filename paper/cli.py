@@ -158,7 +158,7 @@ def main(argv: list[str] | None = None) -> int:
         return 2
 
     if args.demo and not use_file:
-        cfg["paper"].update(name="The Morning Times", city="Brooklyn, NY")
+        cfg["paper"].update(city="Brooklyn, NY")
 
     ed = build_edition(cfg, day, tz, use_demo=args.demo)
 

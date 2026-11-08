@@ -2,7 +2,7 @@
 # so your private calendar links and tokens stay on your machine.
 
 [paper]
-name = "The Morning Times"            # e.g. "The Karen Times"
+name = "Barker Road Times"
 tagline = "All the News That's Fit to Wake Up To"
 city = "Brooklyn, NY"                 # shown in the dateline; also used to look up weather if no lat/lon
 timezone = "America/New_York"         # IANA name; leave blank to use this computer's time zone

@@ -1,4 +1,4 @@
-# The Morning Paper
+# Barker Road Times
 
 Print a one-page newspaper of **your** day every morning, so the first thing you read
 isn't your phone. Your calendar becomes the headline (“Dentist at 2:30. Dinner with Maya at 7.”),
@@ -41,7 +41,7 @@ cp config.example.toml config.toml
 
 Then edit `config.toml` (it's git-ignored, so your private links stay local):
 
-1. **Name your paper.** `name = "The Karen Times"`, plus your city and time zone.
+1. **Name your paper.** It's `name = "Barker Road Times"`; change it any time. Add your city and time zone.
 2. **Weather.** Put in your latitude/longitude (right-click any spot in Google Maps to copy them).
 3. **Calendar.** Paste each calendar's private iCal link into `ics_urls`:
    - Google: Calendar settings → your calendar → *Integrate calendar* → **Secret address in iCal format**
