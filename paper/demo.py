@@ -15,16 +15,16 @@ def events(day: date, tz: tzinfo) -> tuple[list[Event], list[Event]]:
     tomorrow = day + timedelta(days=1)
     today = [
         Event("Mom's birthday", day, day + timedelta(days=1), all_day=True, recurring=True),
-        Event("Morning run", _at(day, 7, 0, tz), _at(day, 7, 45, tz), "Prospect Park loop", recurring=True),
+        Event("Morning run", _at(day, 7, 0, tz), _at(day, 7, 45, tz), "Lake Fairlee loop", recurring=True),
         Event("Team standup", _at(day, 9, 30, tz), _at(day, 9, 45, tz), recurring=True),
-        Event("Dentist", _at(day, 14, 30, tz), _at(day, 15, 30, tz), "Dr. Patel, 210 5th Ave"),
+        Event("Dentist", _at(day, 14, 30, tz), _at(day, 15, 30, tz), "Dr. Patel, Main St."),
         Event("Pick up dry cleaning", _at(day, 17, 15, tz), _at(day, 17, 30, tz)),
-        Event("Dinner with Maya", _at(day, 19, 0, tz), _at(day, 21, 0, tz), "Lilia, Williamsburg"),
+        Event("Dinner with Maya", _at(day, 19, 0, tz), _at(day, 21, 0, tz), "Hanover, NH"),
     ]
     tmrw = [
         Event("Yoga", _at(tomorrow, 7, 30, tz), _at(tomorrow, 8, 30, tz), recurring=True),
         Event("Quarterly planning", _at(tomorrow, 10, 0, tz), _at(tomorrow, 12, 0, tz), "Room 4B"),
-        Event("Flight to Denver", _at(tomorrow, 18, 5, tz), _at(tomorrow, 21, 0, tz), "JFK Terminal 4"),
+        Event("Flight to Denver", _at(tomorrow, 18, 5, tz), _at(tomorrow, 21, 0, tz), "Lebanon Airport"),
     ]
     return today, tmrw
 

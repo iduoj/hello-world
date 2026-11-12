@@ -4,7 +4,7 @@
 [paper]
 name = "Barker Road Times"
 tagline = "All the News That's Fit to Wake Up To"
-city = "Brooklyn, NY"                 # shown in the dateline; also used to look up weather if no lat/lon
+city = "Post Mills, VT"               # shown in the dateline; also used to look up weather if no lat/lon
 timezone = "America/New_York"         # IANA name; leave blank to use this computer's time zone
 paper_size = "Letter"                 # "Letter" or "A4"
 founded = 2026-01-01                  # first issue; drives "Vol. I · No. 312"
@@ -12,8 +12,8 @@ price = "One Cup of Coffee"
 
 [weather]                             # Open-Meteo: free, no account needed
 enabled = true
-latitude = 40.6782                    # find yours: right-click a spot in Google Maps
-longitude = -73.9442
+latitude = 43.8856                    # Post Mills, VT (right-click in Google Maps for another spot)
+longitude = -72.2606
 units = "imperial"                    # or "metric"
 
 [calendar]

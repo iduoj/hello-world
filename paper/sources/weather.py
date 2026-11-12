@@ -55,7 +55,7 @@ def icon(code: int | None) -> str:
 
 
 def geocode(name: str) -> tuple[float, float]:
-    """Best-effort lookup of a place name ("Brooklyn, NY" -> Brooklyn)."""
+    """Best-effort lookup of a place name ("Post Mills, VT" -> Post Mills)."""
     query = name.split(",")[0].strip()
     data = fetch_json(GEOCODE_URL, params={"name": query, "count": 1, "language": "en", "format": "json"})
     results = data.get("results") or []
