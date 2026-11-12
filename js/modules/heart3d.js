@@ -74,6 +74,34 @@
   }
   const APEX = B.clone().add(L.clone().multiplyScalar(LH + 0.2));
 
+  /* deterministic value noise (surface texture, fat distribution) */
+  function hash3(x, y, z) { const s = Math.sin(x * 127.1 + y * 311.7 + z * 74.7) * 43758.5453; return s - Math.floor(s); }
+  function vnoise(x, y, z) {
+    const xi = Math.floor(x), yi = Math.floor(y), zi = Math.floor(z);
+    let xf = x - xi, yf = y - yi, zf = z - zi;
+    xf = xf * xf * (3 - 2 * xf); yf = yf * yf * (3 - 2 * yf); zf = zf * zf * (3 - 2 * zf);
+    const l = (a, b, t) => a + (b - a) * t;
+    return l(l(l(hash3(xi, yi, zi), hash3(xi + 1, yi, zi), xf), l(hash3(xi, yi + 1, zi), hash3(xi + 1, yi + 1, zi), xf), yf),
+      l(l(hash3(xi, yi, zi + 1), hash3(xi + 1, yi, zi + 1), xf), l(hash3(xi, yi + 1, zi + 1), hash3(xi + 1, yi + 1, zi + 1), xf), yf), zf);
+  }
+  function fbm(x, y, z) { return 0.55 * vnoise(x, y, z) + 0.3 * vnoise(x * 2.1 + 3.1, y * 2.1, z * 2.1) + 0.15 * vnoise(x * 4.3, y * 4.3 + 1.7, z * 4.3); }
+
+  // radial "outward" direction from the long axis, and projection of a world point back onto the epicardium
+  function outward(p) {
+    const rel = p.clone().sub(B);
+    const rad = rel.sub(L.clone().multiplyScalar(rel.dot(L)));
+    return rad.lengthSq() < 1e-6 ? L.clone() : rad.normalize();
+  }
+  function toSurface(p, h) {
+    const rel = p.clone().sub(B);
+    const u = rel.dot(L) / LH;
+    const rad = rel.sub(L.clone().multiplyScalar(u * LH));
+    let g = Math.atan2(rad.dot(LAT), rad.dot(P)) / DEG - GA;
+    g = ((g + 120) % 360 + 360) % 360 - 120;          // (-120, 240]
+    const psi = g >= 0 ? g * 180 / 240 : g * 180 / 120;
+    return S(Math.min(0.985, Math.max(-0.03, u)), psi, h);
+  }
+
   /* ---------- great vessels (world points) ---------- */
   const AO0 = B.clone().add(L.clone().multiplyScalar(-0.6)).add(P.clone().multiplyScalar(0.9)).add(LAT.clone().multiplyScalar(0.35));
   const aoPts = [
@@ -177,6 +205,74 @@
     return best;
   }
 
+  // mild tortuosity: real epicardial arteries are never ruler-straight
+  function wiggleCurve(d) {
+    const big = d.r0 > 0.15;
+    const amp = d.wig != null ? d.wig : /^(LM|AVN|AVNL)$/.test(d.id) ? 0 : /^(S\d|IS\d|LS\d)$/.test(d.id) ? 0.035 : big ? 0.06 : 0.12;
+    if (!amp || d.len < 1.2) return;
+    let seed = 7; for (let i = 0; i < d.id.length; i++) seed = (seed * 31 + d.id.charCodeAt(i)) >>> 0;
+    const rnd = CL.rng(seed);
+    const ph1 = rnd() * 6.283, ph2 = rnd() * 6.283, lam1 = 1.7 + rnd() * 1.3, lam2 = 0.75 + rnd() * 0.5;
+    const n = Math.max(10, Math.round(d.len * 3.2));
+    const pts = [];
+    for (let i = 0; i <= n; i++) {
+      const t = i / n, p = d.curve.getPointAt(t), tan = d.curve.getTangentAt(t);
+      const side = new T.Vector3().crossVectors(tan, outward(p)).normalize();
+      const sLen = t * d.len;
+      const env = CL.smooth(0, 0.9, sLen) * CL.smooth(0, 0.5, d.len - sLen);
+      const a = amp * (0.45 + 0.9 * t) * env * (Math.sin(6.283 * sLen / lam1 + ph1) + 0.5 * Math.sin(6.283 * sLen / lam2 + ph2));
+      pts.push(p.add(side.multiplyScalar(a)));
+    }
+    d.curve = new T.CatmullRomCurve3(pts, false, 'centripetal', 0.5);
+    d.len = d.curve.getLength();
+  }
+  // small unnamed side branches (side 0 = automatically toward the apex): [fraction along parent, side, length cm]
+  const TWIGS = {
+    LAD: [[0.3, -1, 2.0], [0.5, -1, 1.7], [0.6, 1, 1.9], [0.72, -1, 1.4], [0.79, 1, 1.5]],
+    D1: [[0.34, 1, 2.1], [0.55, -1, 1.9], [0.75, 1, 1.5], [0.93, -1, 1.1]], D2: [[0.4, -1, 1.7], [0.68, 1, 1.4], [0.93, -1, 1.0]],
+    LCx: [[0.5, 0, 1.5]],
+    OM1: [[0.3, 1, 2.1], [0.5, -1, 2.1], [0.72, 1, 1.6], [0.93, -1, 1.1]], OM2: [[0.35, -1, 1.9], [0.6, 1, 1.7], [0.92, -1, 1.0]], OM3: [[0.5, 1, 1.3], [0.9, -1, 0.9]],
+    Ramus: [[0.35, 1, 1.9], [0.6, -1, 1.7], [0.92, 1, 1.0]],
+    RCA: [[0.3, 0, 1.8], [0.47, 0, 1.6], [0.84, 0, 1.4]],
+    RV1: [[0.5, 1, 1.4], [0.9, -1, 0.9]], AM: [[0.35, 1, 1.7], [0.6, -1, 1.5], [0.92, 1, 1.0]],
+    PDA: [[0.3, 1, 1.5], [0.55, -1, 1.4], [0.76, 1, 1.1], [0.94, -1, 0.8]],
+    RPL: [[0.75, 0, 1.5]], PL1: [[0.4, 1, 1.4], [0.7, -1, 1.2], [0.93, 1, 0.8]], PL2: [[0.45, -1, 1.2], [0.9, 1, 0.8]],
+    LPDA: [[0.3, 1, 1.5], [0.55, -1, 1.4], [0.8, 1, 1.0]], LPL1: [[0.45, 1, 1.3], [0.9, -1, 0.8]], LPL2: [[0.6, -1, 1.0]],
+  };
+  function makeTwigs(defs, byId) {
+    const out = [];
+    Object.keys(TWIGS).forEach((pid) => {
+      const par = byId[pid];
+      if (!par) return;
+      TWIGS[pid].forEach((spec, k) => {
+        const t = spec[0], len = spec[2];
+        let seed = 11 + k * 97; for (let i = 0; i < pid.length; i++) seed = (seed * 33 + pid.charCodeAt(i)) >>> 0;
+        const rnd = CL.rng(seed);
+        const p0 = par.curve.getPointAt(t), tan = par.curve.getTangentAt(t);
+        const side = new T.Vector3().crossVectors(tan, outward(p0)).normalize();
+        const sign = spec[1] !== 0 ? spec[1] : (side.dot(L) >= 0 ? 1 : -1);
+        let dir = tan.clone().multiplyScalar(spec[1] === 0 ? 0.25 : 0.62).add(side.clone().multiplyScalar(0.78 * sign)).normalize();
+        const pts = [p0.clone()];
+        let p = p0.clone();
+        const step = 0.32, n = Math.max(3, Math.round(len / step));
+        for (let i = 1; i <= n; i++) {
+          const sd = new T.Vector3().crossVectors(dir, outward(p)).normalize();
+          dir.add(L.clone().multiplyScalar(0.09)).add(sd.multiplyScalar((rnd() - 0.5) * 0.42)).normalize();
+          p = toSurface(p.clone().add(dir.clone().multiplyScalar(step)), 0.13);
+          pts.push(p);
+        }
+        const rPar = par.r0 + (par.r1 - par.r0) * Math.pow(t, 0.9);
+        const segId = (par.segs.find((x) => t <= x[2] + 1e-6) || par.segs[par.segs.length - 1])[0];
+        const d = { id: pid + '~' + k, tree: par.tree, parent: pid, at: t, pts, r0: Math.min(0.05, Math.max(0.022, rPar * 0.5)), r1: 0.012, segs: [[segId, 0, 1]], twig: true, root: par.root, wig: 0 };
+        d.arcStart = par.arcStart + par.len * t;
+        d.curve = new T.CatmullRomCurve3(pts, false, 'centripetal', 0.5);
+        d.len = d.curve.getLength();
+        out.push(d);
+      });
+    });
+    return out;
+  }
+
   function buildTree(dom, ramus) {
     const defs = treeDef(dom, ramus);
     const byId = {};
@@ -196,6 +292,7 @@
       }
       d.curve = new T.CatmullRomCurve3(d.pts, false, 'centripetal', 0.5);
       d.len = d.curve.getLength();
+      wiggleCurve(d);
     });
     // segment boundaries that depend on branch positions
     defs.forEach((d) => {
@@ -215,6 +312,7 @@
         d.segs = [['rca-p', 0, tAM / 2], ['rca-m', tAM / 2, tAM], ['rca-d', tAM, 1]];
       }
     });
+    makeTwigs(defs, byId).forEach((d) => { defs.push(d); byId[d.id] = d; });
     // descendant map for lesion propagation
     defs.forEach((d) => { d.children = defs.filter((c) => c.parent === d.id); });
     return { list: defs, byId };
@@ -265,8 +363,8 @@
   }
 
   function heartGeometry() {
-    const nu = 70, np = 96;
-    const pos = [], idx = [];
+    const nu = 110, np = 160;
+    const pos = [], idx = [], up = [];
     const u0 = -0.11;
     for (let i = 0; i <= nu; i++) {
       const u = u0 + (1.0 - u0) * (i / nu);
@@ -275,8 +373,13 @@
         let r;
         if (u < 0) r = surfR(0, psi) * Math.sqrt(Math.max(0, 1 - Math.pow(u / u0, 2)));
         else r = surfR(u, psi);
-        const p = B.clone().add(L.clone().multiplyScalar(u * LH)).add(dirAt(psi).multiplyScalar(r));
+        const dir = dirAt(psi);
+        const p = B.clone().add(L.clone().multiplyScalar(u * LH)).add(dir.clone().multiplyScalar(r));
+        // organic surface: low-amplitude relief so highlights break up like real tissue
+        const nz = fbm(p.x * 0.85, p.y * 0.85, p.z * 0.85) - 0.5;
+        p.add(dir.multiplyScalar(nz * 0.1 * (u < 0 ? 0.3 : 1)));
         pos.push(p.x, p.y, p.z);
+        up.push(u, psi);
       }
     }
     for (let i = 0; i < nu; i++) for (let j = 0; j < np; j++) {
@@ -285,8 +388,18 @@
     }
     const g = new T.BufferGeometry();
     g.setAttribute('position', new T.Float32BufferAttribute(pos, 3));
+    g.setAttribute('color', new T.Float32BufferAttribute(new Float32Array(pos.length).fill(0.5), 3));
     g.setIndex(idx);
     g.computeVertexNormals();
+    // weld the normals along the psi = 0 / 2π seam
+    const nrm = g.getAttribute('normal');
+    for (let i = 0; i <= nu; i++) {
+      const a = i * (np + 1), b = a + np;
+      const x = nrm.getX(a) + nrm.getX(b), y = nrm.getY(a) + nrm.getY(b), z = nrm.getZ(a) + nrm.getZ(b);
+      const l = Math.hypot(x, y, z) || 1;
+      nrm.setXYZ(a, x / l, y / l, z / l); nrm.setXYZ(b, x / l, y / l, z / l);
+    }
+    g.userData.up = up;
     return g;
   }
 
@@ -299,12 +412,30 @@
   }
 
   /* ---------- shaders ---------- */
+  // cardiac + respiratory motion shared by every fluoro material:
+  // the AV plane descends toward the apex, the walls move in, the heart twists slightly, and the whole heart rides the diaphragm
+  const MOVE_GLSL = `
+    uniform float uBeat; uniform float uMove; uniform float uResp; uniform float uRespW;
+    uniform vec3 uHAxis; uniform vec3 uHBase; uniform float uHLen;
+    vec3 heartMove(vec3 p) {
+      vec3 rel = p - uHBase;
+      float ul = dot(rel, uHAxis);
+      float u = ul / uHLen;
+      vec3 radial = rel - uHAxis * ul;
+      float uc = clamp(u, 0.0, 1.0);
+      float s = uBeat * uMove * smoothstep(-0.12, 0.04, u);
+      float a = s * 0.11 * (uc - 0.3);
+      vec3 rot = radial * cos(a) + cross(uHAxis, radial) * sin(a);
+      vec3 q = uHBase + uHAxis * (ul + s * 1.1 * (1.0 - uc)) + rot * (1.0 - s * (0.07 + 0.07 * sin(uc * 3.1416)));
+      q.y += uResp * uRespW;
+      return q;
+    }`;
   const fluoroVS = `
     attribute float aRad; attribute float aArr; attribute float aClr;
-    uniform float uBeat; uniform vec3 uCenter; uniform float uMove;
+    ${MOVE_GLSL}
     varying float vRad; varying vec3 vN; varying vec3 vV; varying float vArr; varying float vClr;
     void main() {
-      vec3 p = uCenter + (position - uCenter) * (1.0 - uBeat * uMove);
+      vec3 p = heartMove(position);
       vec4 mv = modelViewMatrix * vec4(p, 1.0);
       vN = normalize(normalMatrix * normal);
       vV = normalize(-mv.xyz);
@@ -324,10 +455,10 @@
     }`;
   const hiVS = `
     attribute float aSeg;
-    uniform float uBeat; uniform vec3 uCenter; uniform float uMove;
+    ${MOVE_GLSL}
     varying float vSeg; varying vec3 vN; varying vec3 vV;
     void main() {
-      vec3 p = uCenter + (position - uCenter) * (1.0 - uBeat * uMove);
+      vec3 p = heartMove(position);
       vec4 mv = modelViewMatrix * vec4(p, 1.0);
       vN = normalize(normalMatrix * normal); vV = normalize(-mv.xyz);
       vSeg = aSeg;
@@ -342,10 +473,10 @@
       gl_FragColor = vec4(uColor, (0.35 + 0.3 * ndv) * uPulse);
     }`;
   const softVS = `
-    uniform float uBeat; uniform vec3 uCenter; uniform float uMove;
+    ${MOVE_GLSL}
     varying vec3 vN; varying vec3 vV;
     void main() {
-      vec3 p = uCenter + (position - uCenter) * (1.0 - uBeat * uMove);
+      vec3 p = heartMove(position);
       vec4 mv = modelViewMatrix * vec4(p, 1.0);
       vN = normalize(normalMatrix * normal); vV = normalize(-mv.xyz);
       gl_Position = projectionMatrix * mv;
@@ -358,12 +489,48 @@
       float tau = uK * uThick * pow(ndv, 0.8) * uIntensity;
       gl_FragColor = vec4(vec3(exp(-tau)), 1.0);
     }`;
+  // bone: a dense cortical shell around lucent marrow, so edges are darker than the middle ("tram-track" ribs)
+  const boneFS = `
+    uniform float uShell; uniform float uMarrow; uniform float uThick;
+    varying vec3 vN; varying vec3 vV;
+    void main() {
+      float ndv = abs(dot(normalize(vN), normalize(vV)));
+      float tau = uShell * min(1.0 / max(ndv, 0.3), 3.2) + uMarrow * uThick * ndv;
+      gl_FragColor = vec4(vec3(exp(-tau)), 1.0);
+    }`;
   const bgVS = `varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }`;
-  const bgFS = `varying vec2 vUv; void main(){
-      vec2 c = vUv - 0.5;
-      float vig = 1.0 - 0.55 * dot(c, c);
-      float g = 0.84 * vig;
-      gl_FragColor = vec4(vec3(g, g, g * 0.985), 1.0);
+  // lung field: bright, with faint low-frequency mottling that shifts as the C-arm moves
+  const bgFS = `varying vec2 vUv; uniform vec2 uShift;
+    float h(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+    float vn(vec2 p){ vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
+      return mix(mix(h(i), h(i + vec2(1.0, 0.0)), f.x), mix(h(i + vec2(0.0, 1.0)), h(i + vec2(1.0, 1.0)), f.x), f.y); }
+    void main(){
+      vec2 p = vUv * vec2(3.2, 2.4) + uShift;
+      float n = 0.55 * vn(p) + 0.3 * vn(p * 2.3 + 4.0) + 0.15 * vn(p * 5.1);
+      float g = 0.80 + 0.09 * (n - 0.5);
+      gl_FragColor = vec4(vec3(g), 1.0);
+    }`;
+  // detector model: blur (MTF), edge enhancement, quantum mottle, tone curve, vignette
+  const postFS = `varying vec2 vUv; uniform sampler2D tDiffuse; uniform vec2 uRes; uniform float uTime; uniform float uPx;
+    float h(vec2 p){ p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x * p.y); }
+    vec3 tx(vec2 o){ return texture2D(tDiffuse, vUv + o).rgb; }
+    void main(){
+      vec2 px = vec2(uPx) / uRes;
+      vec3 c = tx(vec2(0.0)) * 0.25;
+      c += (tx(vec2(px.x, 0.0)) + tx(vec2(-px.x, 0.0)) + tx(vec2(0.0, px.y)) + tx(vec2(0.0, -px.y))) * 0.125;
+      c += (tx(px) + tx(-px) + tx(vec2(px.x, -px.y)) + tx(vec2(-px.x, px.y))) * 0.0625;
+      vec2 w = px * 4.5;
+      vec3 wide = (tx(vec2(w.x, 0.0)) + tx(vec2(-w.x, 0.0)) + tx(vec2(0.0, w.y)) + tx(vec2(0.0, -w.y)) + tx(w * 0.7) + tx(-w * 0.7) + tx(vec2(w.x, -w.y) * 0.7) + tx(vec2(-w.x, w.y) * 0.7)) * 0.125;
+      c += 0.3 * (c - wide);
+      float t = floor(uTime * 15.0);
+      vec2 np = gl_FragCoord.xy / uPx;
+      float n = h(floor(np) + t * 17.13) + h(floor(np * 0.5) + t * 29.7) + h(floor(np * 0.25) + t * 7.9) - 1.5;
+      float lum = dot(c, vec3(0.3333));
+      c += n * (0.022 + 0.03 * sqrt(max(lum, 0.0)));
+      c = mix(c, c * c * (3.0 - 2.0 * c), 0.45);
+      vec2 d = vUv - 0.5;
+      c *= 1.0 - 0.62 * dot(d, d);
+      gl_FragColor = vec4(clamp(c, 0.0, 1.0), 1.0);
     }`;
 
   function multiplyBlend(mat) {
@@ -411,8 +578,6 @@
     this.wrap.appendChild(this.canvas);
     this.overlay = CL.h('div', { class: 'stage-overlay' });
     this.wrap.appendChild(this.overlay);
-    this.grain = CL.h('canvas', { class: 'grain', width: 160, height: 160, style: { position: 'absolute', inset: '0', width: '100%', height: '100%', pointerEvents: 'none', mixBlendMode: 'overlay', opacity: '0.35', imageRendering: 'auto' } });
-    this.wrap.appendChild(this.grain);
     this.hud = {
       tl: CL.h('div', { class: 'hud tl' }),
       tr: CL.h('div', { class: 'hud tr' }),
@@ -423,25 +588,44 @@
 
     // lights (anatomy mode)
     this.lights = new T.Group();
-    const hemi = new T.HemisphereLight(0xfff4ec, 0x30262a, 0.75);
-    this.key = new T.DirectionalLight(0xffffff, 0.85);
-    const rim = new T.DirectionalLight(0x9fb8ff, 0.35);
+    const hemi = new T.HemisphereLight(0xfff1e6, 0x2a2024, 0.62);
+    this.key = new T.DirectionalLight(0xfff6ee, 0.95);
+    this.fill = new T.DirectionalLight(0xffe2d2, 0.28);
+    const rim = new T.DirectionalLight(0x9fb8ff, 0.4);
     rim.position.set(-20, 10, -30);
-    this.lights.add(hemi, this.key, rim);
+    this.lights.add(hemi, this.key, this.fill, rim);
     this.scene.add(this.lights);
 
     // shared uniforms
     this.U = {
-      uBeat: { value: 0 }, uCenter: { value: CENTER.clone() }, uMove: { value: 1 },
-      uTime: { value: 0 },
+      uBeat: { value: 0 }, uResp: { value: 0 }, uTime: { value: 0 },
+      uHAxis: { value: L.clone() }, uHBase: { value: B.clone() }, uHLen: { value: LH },
     };
 
     // background quad for fluoro
-    const bg = new T.Mesh(new T.PlaneGeometry(2, 2), new T.ShaderMaterial({ vertexShader: bgVS, fragmentShader: bgFS, depthTest: false, depthWrite: false }));
+    const bg = new T.Mesh(new T.PlaneGeometry(2, 2), new T.ShaderMaterial({ uniforms: { uShift: { value: new T.Vector2() } }, vertexShader: bgVS, fragmentShader: bgFS, depthTest: false, depthWrite: false }));
     bg.frustumCulled = false;
     bg.renderOrder = -100;
     this.bg = bg;
     this.scene.add(bg);
+
+    // fluoro post-processing (detector model) and the anatomy-mode backdrop
+    this.rt = new T.WebGLRenderTarget(4, 4, { minFilter: T.LinearFilter, magFilter: T.LinearFilter, format: T.RGBAFormat });
+    this.rt.texture.encoding = T.sRGBEncoding;
+    this.post = new T.Mesh(new T.PlaneGeometry(2, 2), new T.ShaderMaterial({
+      uniforms: { tDiffuse: { value: this.rt.texture }, uRes: { value: new T.Vector2(4, 4) }, uTime: { value: 0 }, uPx: { value: 1 } },
+      vertexShader: bgVS, fragmentShader: postFS, depthTest: false, depthWrite: false,
+    }));
+    this.post.frustumCulled = false;
+    this.postScene = new T.Scene();
+    this.postScene.add(this.post);
+    this.postCam = new T.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+    const bc = document.createElement('canvas'); bc.width = bc.height = 256;
+    const bx = bc.getContext('2d');
+    const grd = bx.createRadialGradient(128, 118, 10, 128, 128, 190);
+    grd.addColorStop(0, '#26333b'); grd.addColorStop(0.55, '#121a1f'); grd.addColorStop(1, '#05080a');
+    bx.fillStyle = grd; bx.fillRect(0, 0, 256, 256);
+    this.backdrop = new T.CanvasTexture(bc);
 
     this._buildStatic();
     this._buildTree();
@@ -456,12 +640,23 @@
     requestAnimationFrame(this._loop);
   };
 
-  Engine.prototype._softMat = function (k, thick, move) {
+  // per-material motion uniforms: move = follows the heartbeat, respW = how much it rides with breathing
+  Engine.prototype._mv = function (move, respW) {
+    const U = this.U;
+    return { uBeat: U.uBeat, uMove: { value: move }, uResp: U.uResp, uRespW: { value: respW }, uHAxis: U.uHAxis, uHBase: U.uHBase, uHLen: U.uHLen };
+  };
+  Engine.prototype._softMat = function (k, thick, move, respW) {
     const m = new T.ShaderMaterial({
-      uniforms: { uBeat: this.U.uBeat, uCenter: this.U.uCenter, uMove: { value: move ? 1 : 0 }, uK: { value: k }, uThick: { value: thick }, uIntensity: { value: 1 } },
+      uniforms: Object.assign({ uK: { value: k }, uThick: { value: thick }, uIntensity: { value: 1 } }, this._mv(move ? 1 : 0, respW == null ? (move ? 1 : 0) : respW)),
       vertexShader: softVS, fragmentShader: softFS, side: T.FrontSide,
     });
     return multiplyBlend(m);
+  };
+  Engine.prototype._boneMat = function (shell, marrow, thick, respW) {
+    return multiplyBlend(new T.ShaderMaterial({
+      uniforms: Object.assign({ uShell: { value: shell }, uMarrow: { value: marrow }, uThick: { value: thick } }, this._mv(0, respW || 0)),
+      vertexShader: softVS, fragmentShader: boneFS, side: T.FrontSide,
+    }));
   };
 
   Engine.prototype._buildStatic = function () {
@@ -469,10 +664,18 @@
     this.anat = new T.Group();   // anatomy-only meshes
     this.fluoroOnly = new T.Group();
     sc.add(this.anat, this.fluoroOnly);
+    const lin = (hex) => new T.Color(hex).convertSRGBToLinear();
+    const tissue = (hex, rough) => new T.MeshPhysicalMaterial({ color: lin(hex), roughness: rough || 0.6, metalness: 0, clearcoat: 0.3, clearcoatRoughness: 0.4, transparent: true, opacity: 0.96 });
+    const tube = (pts, r, mat, seg) => {
+      const grp = new T.Group();
+      grp.add(new T.Mesh(new T.TubeGeometry(new T.CatmullRomCurve3(pts, false, 'centripetal'), seg || 40, r, 20, false), mat));
+      [pts[0], pts[pts.length - 1]].forEach((e) => { const cap = new T.SphereGeometry(r * 0.985, 20, 14); cap.translate(e.x, e.y, e.z); grp.add(new T.Mesh(cap, mat)); });
+      return grp;
+    };
 
-    // heart
+    // ventricles: muscle and epicardial fat are painted per vertex in _colorHeart()
     const hg = heartGeometry();
-    this.heartMat = new T.MeshStandardMaterial({ color: 0xb59a86, roughness: 0.8, metalness: 0.0, transparent: true, opacity: this.opts.heartOpacity, side: T.FrontSide });
+    this.heartMat = new T.MeshPhysicalMaterial({ vertexColors: true, roughness: 0.58, metalness: 0.0, clearcoat: 0.35, clearcoatRoughness: 0.38, transparent: true, opacity: this.opts.heartOpacity, side: T.FrontSide });
     this.heart = new T.Mesh(hg, this.heartMat);
     this.heart.renderOrder = 1;
     this.anat.add(this.heart);
@@ -480,54 +683,98 @@
     this.fluoroOnly.add(this.heartF);
 
     // atria, appendages, great vessels (anatomy)
-    const atriaMat = new T.MeshStandardMaterial({ color: 0x9a8072, roughness: 0.85, transparent: true, opacity: 0.95 });
-    const veinMat = new T.MeshStandardMaterial({ color: 0x7d8aa6, roughness: 0.7, transparent: true, opacity: 0.95 });
-    const aoMat = new T.MeshStandardMaterial({ color: 0xe9dcd6, roughness: 0.6, transparent: true, opacity: 0.95 });
+    const atriaMat = tissue(0xa9655c, 0.7);
+    const veinMat = tissue(0x6d7fae, 0.55);
+    const cavaMat = tissue(0x5d70a6, 0.55);
+    const aoMat = tissue(0xcf8a80, 0.5);
+    const pvMat = tissue(0xc98078, 0.55);
     const orient = new T.Matrix4().lookAt(V(0, 0, 0), L, A);
+    const lumpy = (g, amp) => { const pa = g.getAttribute('position'); for (let i = 0; i < pa.count; i++) { const x = pa.getX(i), y = pa.getY(i), z = pa.getZ(i); const k = 1 + (fbm(x * 0.9, y * 0.9, z * 0.9) - 0.5) * amp; const c = g.userData.c; pa.setXYZ(i, c.x + (x - c.x) * k, c.y + (y - c.y) * k, c.z + (z - c.z) * k); } g.computeVertexNormals(); return g; };
+    const organ = (c, rx, ry, rz, amp) => { const g = blob(c, rx, ry, rz, orient); g.userData.c = c; return lumpy(g, amp); };
     this.atria = [
-      new T.Mesh(blob(RA_C, 2.1, 2.2, 2.3, orient), atriaMat),
-      new T.Mesh(blob(LA_C, 2.3, 1.9, 2.2, orient), atriaMat),
-      new T.Mesh(blob(S(-0.17, 52, 0.55), 1.0, 0.6, 1.6, orient), atriaMat), // LAA
-      new T.Mesh(blob(S(-0.14, -60, 0.55), 1.0, 0.65, 1.5, orient), atriaMat), // RAA
+      new T.Mesh(organ(RA_C, 2.1, 2.2, 2.3, 0.16), atriaMat),
+      new T.Mesh(organ(LA_C, 2.3, 1.9, 2.2, 0.14), atriaMat),
+      new T.Mesh(organ(S(-0.17, 52, 0.55), 1.0, 0.6, 1.6, 0.4), atriaMat), // LAA
+      new T.Mesh(organ(S(-0.14, -60, 0.55), 1.0, 0.65, 1.5, 0.4), atriaMat), // RAA
     ];
     this.atria.forEach((m) => this.anat.add(m));
-    const aoShort = new T.CatmullRomCurve3(aoPts.slice(0, 7), false, 'centripetal');
-    const aorta = new T.Mesh(new T.TubeGeometry(aoShort, 110, 1.25, 28, false), aoMat);
-    this.anat.add(aorta);
-    const root = new T.Mesh(blob(AO0.clone().add(AO_AXIS.clone().multiplyScalar(0.55)), ROOT_R, ROOT_R, 1.05, new T.Matrix4().lookAt(V(0, 0, 0), AO_AXIS, AO_ANT)), aoMat);
-    this.anat.add(root);
-    const paCurve = new T.CatmullRomCurve3(paPts, false, 'centripetal');
-    this.anat.add(new T.Mesh(new T.TubeGeometry(paCurve, 60, 1.15, 24, false), veinMat));
-    const svc = new T.CatmullRomCurve3([RA_C.clone().add(V(0.1, 1.2, -0.4)), RA_C.clone().add(V(0.2, 4.0, -0.9)), RA_C.clone().add(V(0.2, 8.0, -1.2))]);
-    this.anat.add(new T.Mesh(new T.TubeGeometry(svc, 30, 0.85, 20, false), veinMat));
-    const ivc = new T.CatmullRomCurve3([RA_C.clone().add(V(0.0, -1.4, -0.8)), RA_C.clone().add(V(0.3, -4.5, -1.8)), RA_C.clone().add(V(0.6, -9, -2.2))]);
-    this.anat.add(new T.Mesh(new T.TubeGeometry(ivc, 30, 1.0, 20, false), veinMat));
+    this.anat.add(tube(aoPts.slice(0, 7), 1.25, aoMat, 110));
+    this.anat.add(new T.Mesh(blob(AO0.clone().add(AO_AXIS.clone().multiplyScalar(0.55)), ROOT_R, ROOT_R, 1.05, new T.Matrix4().lookAt(V(0, 0, 0), AO_AXIS, AO_ANT)), aoMat));
+    // arch branches
+    const a3 = aoPts[3], a4 = aoPts[4], a34 = a3.clone().lerp(a4, 0.5).add(V(0, 0.5, 0));
+    this.anat.add(tube([a3.clone().add(V(0, 0.6, 0)), a3.clone().add(V(-0.9, 3.0, 0.3)), a3.clone().add(V(-2.0, 5.6, 0.2))], 0.6, aoMat));
+    this.anat.add(tube([a34, a34.clone().add(V(0.1, 2.8, 0.4)), a34.clone().add(V(0.3, 5.4, 0.5))], 0.4, aoMat));
+    this.anat.add(tube([a4.clone().add(V(0, 0.4, 0)), a4.clone().add(V(0.9, 2.6, -0.3)), a4.clone().add(V(2.4, 4.6, -0.5))], 0.46, aoMat));
+    // pulmonary trunk with both branches
+    this.anat.add(tube(paPts, 1.15, veinMat, 60));
+    this.anat.add(tube([paPts[4], paPts[4].clone().add(V(-1.8, 0.2, -0.9)), paPts[4].clone().add(V(-4.2, -0.2, -1.2))], 0.85, veinMat));
+    // venae cavae
+    this.anat.add(tube([RA_C.clone().add(V(0.1, 1.2, -0.4)), RA_C.clone().add(V(0.2, 4.0, -0.9)), RA_C.clone().add(V(0.2, 8.0, -1.2))], 0.85, cavaMat, 30));
+    this.anat.add(tube([RA_C.clone().add(V(0.0, -1.4, -0.8)), RA_C.clone().add(V(0.3, -4.5, -1.8)), RA_C.clone().add(V(0.6, -9, -2.2))], 1.0, cavaMat, 30));
+    // pulmonary veins
+    [[1, 0.9], [1, -0.7], [-1, 0.8], [-1, -0.6]].forEach(([sx, sy]) => {
+      this.anat.add(tube([LA_C.clone().add(V(sx * 1.3, sy, -0.9)), LA_C.clone().add(V(sx * 2.9, sy * 1.3, -1.3)), LA_C.clone().add(V(sx * 4.6, sy * 1.8, -1.2))], 0.45, pvMat, 20));
+    });
 
-    // fluoro: aorta faint, diaphragm/liver, spine
-    this.aoF = new T.Mesh(new T.TubeGeometry(aoCurve, 140, 1.25, 28, false), this._softMat(0.012, 2.5, false));
+    // fluoro: aorta faint, diaphragm/liver
+    this.aoF = new T.Mesh(new T.TubeGeometry(aoCurve, 140, 1.25, 28, false), this._softMat(0.012, 2.5, false, 1));
     this.fluoroOnly.add(this.aoF);
     const diaG = new T.SphereGeometry(1, 64, 40);
     diaG.scale(17, 12.5, 13);
     diaG.translate(-0.5, -18.4, -4.0);
-    this.dia = new T.Mesh(diaG, this._softMat(0.011, 26, false));
+    this.dia = new T.Mesh(diaG, this._softMat(0.011, 26, false, 1.25));
     this.fluoroOnly.add(this.dia);
+
+    // bones: vertebrae with pedicles and processes, ribs, sternum
     this.spine = new T.Group();
+    const vbMat = this._boneMat(0.03, 0.02, 3.3), smallMat = this._boneMat(0.022, 0.03, 1.0), ribMat = this._boneMat(0.017, 0.016, 0.9, 0.3);
+    const ribCurve = (side, y) => {
+      const pts = [];
+      for (let k = 0; k <= 14; k++) {
+        const a = 0.12 + (k / 14) * 2.0;                  // 0 = posterior midline, π/2 = lateral; bony rib ends anterolaterally
+        pts.push(V(side * 12.2 * Math.sin(a) * (0.86 + 0.14 * Math.sin(a)), y + 0.9 - 5.2 * Math.pow(a / Math.PI, 1.15), -0.8 - 9.6 * Math.cos(a)));
+      }
+      return new T.CatmullRomCurve3(pts);
+    };
     for (let i = -6; i <= 6; i++) {
       const y = i * 2.95;
-      const vg = new T.CylinderGeometry(1.75, 1.8, 2.25, 28, 1, false);
+      // vertebral body with a waist (lathe profile), flattened front to back
+      const prof = [[0.01, -1.12], [1.62, -1.12], [1.78, -0.98], [1.6, -0.55], [1.5, 0], [1.6, 0.55], [1.78, 0.98], [1.62, 1.12], [0.01, 1.12]].map((q) => new T.Vector2(q[0], q[1]));
+      const vg = new T.LatheGeometry(prof, 28);
       vg.scale(1, 1, 0.82);
       vg.translate(0, y, -8.3);
-      this.spine.add(new T.Mesh(vg, this._softMat(0.085, 3.3, false)));
-      const pg = new T.CylinderGeometry(0.55, 0.55, 1.6, 16);
-      pg.rotateX(Math.PI / 2);
-      [-1.25, 1.25].forEach((dx) => {
-        const g2 = pg.clone(); g2.translate(dx, y + 0.3, -10.2);
-        this.spine.add(new T.Mesh(g2, this._softMat(0.06, 1.1, false)));
+      this.spine.add(new T.Mesh(vg, vbMat));
+      const pg = new T.SphereGeometry(0.5, 14, 10);
+      pg.scale(0.85, 1.25, 1.4);
+      const tg = new T.CylinderGeometry(0.2, 0.26, 1.7, 10);
+      tg.rotateZ(Math.PI / 2);
+      [-1, 1].forEach((sd) => {
+        const g2 = pg.clone(); g2.translate(sd * 1.25, y + 0.3, -10.1);
+        this.spine.add(new T.Mesh(g2, smallMat));
+        const g3 = tg.clone(); g3.translate(sd * 2.6, y + 0.35, -10.4);
+        this.spine.add(new T.Mesh(g3, smallMat));
+        if (Math.abs(i) <= 5) this.spine.add(new T.Mesh(tubeGeometry(ribCurve(sd, y), { n: 46, ring: 10, radius: (t) => 0.2 + 0.26 * CL.smooth(0, 0.08, t) * (1 - 0.75 * CL.smooth(0.8, 1, t)) }), ribMat));
       });
+      const sp = new T.SphereGeometry(0.5, 12, 10);
+      sp.scale(0.55, 1.9, 1.7);
+      sp.translate(0, y - 0.6, -11.5);
+      this.spine.add(new T.Mesh(sp, smallMat));
     }
+    // ECG electrodes and lead wires on the chest wall: in nearly every real cine run
+    const wireMat = multiplyBlend(new T.ShaderMaterial({ uniforms: Object.assign({ uTime: this.U.uTime, uK: { value: 7.5 }, uAlways: { value: 1 }, uBase: { value: 0 } }, this._mv(0, 0.3)), vertexShader: fluoroVS, fragmentShader: fluoroFS }));
+    const padMat = this._softMat(1.5, 0.14, false, 0.3), snapMat = this._softMat(2.2, 0.4, false, 0.3);
+    [[V(-6.8, 7.6, 6.0), [V(-7.6, 10, 6.3), V(-10, 14, 5.8), V(-15, 19, 4.5)]],
+      [V(9.6, -4.6, 3.4), [V(11.4, -3.2, 2.8), V(14, -2.6, 1.4), V(19, -4.2, -0.5)]],
+      [V(-3.2, -6.8, 7.4), [V(-6, -8.2, 7.2), V(-11, -9.2, 5.8), V(-17, -12.5, 3.6)]]].forEach(([c, path]) => {
+      const tor = new T.TorusGeometry(0.42, 0.055, 8, 28); tor.translate(c.x, c.y, c.z);
+      this.spine.add(new T.Mesh(tor, padMat));
+      const sn = new T.SphereGeometry(0.19, 12, 10); sn.translate(c.x, c.y, c.z + 0.1);
+      this.spine.add(new T.Mesh(sn, snapMat));
+      this.spine.add(new T.Mesh(tubeGeometry(new T.CatmullRomCurve3([c.clone().add(V(0, 0, 0.15))].concat(path)), { radius: () => 0.04, ring: 6, n: 70 }), wireMat));
+    });
     this.fluoroOnly.add(this.spine);
     // contrast reflux cloud in the sinus during injection
-    this.reflux = new T.Mesh(blob(AO0.clone().add(AO_AXIS.clone().multiplyScalar(0.6)), 1.35, 1.35, 1.0, null), this._softMat(0.6, 2.0, false));
+    this.reflux = new T.Mesh(blob(AO0.clone().add(AO_AXIS.clone().multiplyScalar(0.6)), 1.35, 1.35, 1.0, null), this._softMat(0.6, 2.0, false, 1));
     this.reflux.material.uniforms.uIntensity.value = 0;
     this.fluoroOnly.add(this.reflux);
 
@@ -548,6 +795,46 @@
     sc.add(this.guides);
   };
 
+  /* paint the ventricles: myocardium with fat in the grooves and along the arteries */
+  Engine.prototype._colorHeart = function () {
+    const g = this.heart.geometry, pos = g.getAttribute('position'), col = g.getAttribute('color'), up = g.userData.up;
+    const pts = [];
+    this.tree.list.forEach((d) => {
+      if (/^(S\d|IS\d|LS\d)$/.test(d.id)) return;      // septal branches run inside the septum
+      const n = Math.max(2, Math.round(d.len / 0.3));
+      for (let i = 0; i <= n; i++) {
+        const t = i / n, r = d.r0 + (d.r1 - d.r0) * t;
+        if (r < 0.03) continue;
+        const p = d.curve.getPointAt(t);
+        pts.push(p.x, p.y, p.z, 0.34 + r * 3.0);
+      }
+    });
+    const lin = (hex) => new T.Color(hex).convertSRGBToLinear();
+    const mA = lin(0x74393a), mB = lin(0x925046), fA = lin(0xecdba8), fB = lin(0xd9bb80);
+    const c = new T.Color(), f = new T.Color();
+    const np = pts.length;
+    for (let i = 0; i < pos.count; i++) {
+      const x = pos.getX(i), y = pos.getY(i), z = pos.getZ(i), u = up[2 * i], psi = up[2 * i + 1];
+      let w = 0;
+      for (let k = 0; k < np; k += 4) {
+        const dx = x - pts[k], dy = y - pts[k + 1], dz = z - pts[k + 2], reach = pts[k + 3];
+        const d2 = dx * dx + dy * dy + dz * dz;
+        if (d2 < reach * reach) { const q = 1 - Math.sqrt(d2) / reach; if (q > w) w = q; }
+      }
+      const av = 1 - CL.smooth(0.015, 0.1, u);
+      const sn = Math.sin(psi);
+      const gv = Math.exp(-(sn / 0.15) * (sn / 0.15)) * (1 - 0.45 * Math.max(0, u));
+      const n1 = fbm(x * 1.6, y * 1.6, z * 1.6), n2 = fbm(x * 4.7, y * 4.7, z * 4.7);
+      let fat = Math.max(w * 1.25, av * 0.95, gv * 0.9) + (n1 - 0.5) * 0.4;
+      fat = CL.smooth(0.26, 0.6, fat);
+      c.copy(mA).lerp(mB, n2);
+      f.copy(fA).lerp(fB, n1);
+      c.lerp(f, fat * 0.92);
+      col.setXYZ(i, c.r, c.g, c.b);
+    }
+    col.needsUpdate = true;
+  };
+
   Engine.prototype._buildTree = function () {
     if (this.treeGroup) {
       this.scene.remove(this.treeGroup);
@@ -560,15 +847,15 @@
       if (!(id in this.segIndex)) { this.segIndex[id] = this.segList.length; this.segList.push(id); }
       return this.segIndex[id];
     };
-    this.anatVesselMat = new T.MeshStandardMaterial({ vertexColors: true, roughness: 0.42, metalness: 0.05 });
+    this.anatVesselMat = new T.MeshPhysicalMaterial({ vertexColors: true, roughness: 0.36, metalness: 0.0, clearcoat: 0.5, clearcoatRoughness: 0.25 });
     this.anatVesselMat.onBeforeCompile = (sh) => {
       sh.vertexShader = 'attribute float aRad;\n' + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\n transformed += normal * (aRad * 0.55 + 0.02);');
     };
     this.fluoroVesselMats = {
-      LCA: multiplyBlend(new T.ShaderMaterial({ uniforms: { uBeat: this.U.uBeat, uCenter: this.U.uCenter, uMove: this.U.uMove, uTime: this.U.uTime, uK: { value: 5.2 }, uAlways: { value: 1 }, uBase: { value: 0.0 } }, vertexShader: fluoroVS, fragmentShader: fluoroFS })),
-      RCA: multiplyBlend(new T.ShaderMaterial({ uniforms: { uBeat: this.U.uBeat, uCenter: this.U.uCenter, uMove: this.U.uMove, uTime: this.U.uTime, uK: { value: 5.2 }, uAlways: { value: 1 }, uBase: { value: 0.0 } }, vertexShader: fluoroVS, fragmentShader: fluoroFS })),
+      LCA: multiplyBlend(new T.ShaderMaterial({ uniforms: Object.assign({ uTime: this.U.uTime, uK: { value: 5.2 }, uAlways: { value: 1 }, uBase: { value: 0.0 } }, this._mv(1, 1)), vertexShader: fluoroVS, fragmentShader: fluoroFS })),
+      RCA: multiplyBlend(new T.ShaderMaterial({ uniforms: Object.assign({ uTime: this.U.uTime, uK: { value: 5.2 }, uAlways: { value: 1 }, uBase: { value: 0.0 } }, this._mv(1, 1)), vertexShader: fluoroVS, fragmentShader: fluoroFS })),
     };
-    this.hiMat = new T.ShaderMaterial({ uniforms: { uBeat: this.U.uBeat, uCenter: this.U.uCenter, uMove: this.U.uMove, uSel: { value: -10 }, uColor: { value: new T.Color(1.0, 0.62, 0.15) }, uPulse: { value: 1 } }, vertexShader: hiVS, fragmentShader: hiFS, blending: T.NormalBlending, depthTest: false, depthWrite: false, transparent: true });
+    this.hiMat = new T.ShaderMaterial({ uniforms: Object.assign({ uSel: { value: -10 }, uColor: { value: new T.Color(1.0, 0.62, 0.15) }, uPulse: { value: 1 } }, this._mv(1, 1)), vertexShader: hiVS, fragmentShader: hiFS, blending: T.NormalBlending, depthTest: false, depthWrite: false, transparent: true });
     this.vesselMeshes = [];
     this.tree.list.forEach((d) => {
       const segs = d.segs.map((s) => [segIdx(s[0]), s[1], s[2], s[0]]);
@@ -583,6 +870,8 @@
       } else d.lesionT = null;
       const geo = tubeGeometry(d.curve, {
         arcStart: d.arcStart,
+        n: d.twig ? Math.max(8, Math.round(d.len * 6)) : undefined,
+        ring: d.twig ? 6 : undefined,
         radius: (t) => {
           let r = d.r0 + (d.r1 - d.r0) * Math.pow(t, 0.9);
           if (lesT != null) {
@@ -610,6 +899,7 @@
     this.tree.list.forEach((d) => { for (let i = 0; i <= 20; i++) { cen[d.root].add(d.curve.getPointAt(i / 20)); cnt[d.root]++; } });
     this.treeCenter = { LCA: cen.LCA.multiplyScalar(1 / Math.max(1, cnt.LCA)), RCA: cen.RCA.multiplyScalar(1 / Math.max(1, cnt.RCA)) };
     this._recolor();
+    this._colorHeart();
     this._computeFlow();
     this._applyModeToTree();
     this._buildLabels();
@@ -651,7 +941,7 @@
     const curve = new T.CatmullRomCurve3(pts, false, 'centripetal');
     this.cathCurve = curve;
     const geo = tubeGeometry(curve, { radius: () => 0.1, ring: 8, n: 180 });
-    const mat = multiplyBlend(new T.ShaderMaterial({ uniforms: { uBeat: this.U.uBeat, uCenter: this.U.uCenter, uMove: { value: 0 }, uTime: this.U.uTime, uK: { value: 3.2 }, uAlways: { value: 1 }, uBase: { value: 0 } }, vertexShader: fluoroVS, fragmentShader: fluoroFS }));
+    const mat = multiplyBlend(new T.ShaderMaterial({ uniforms: Object.assign({ uTime: this.U.uTime, uK: { value: 3.2 }, uAlways: { value: 1 }, uBase: { value: 0 } }, this._mv(0, 1)), vertexShader: fluoroVS, fragmentShader: fluoroFS }));
     this.cathAnatMat = new T.MeshStandardMaterial({ color: 0xe8e8e8, roughness: 0.35, metalness: 0.1 });
     this.cathFluoroMat = mat;
     this.cath = new T.Mesh(geo, this.mode === 'fluoro' ? mat : this.cathAnatMat);
@@ -665,13 +955,13 @@
     const meta = CL.data.segments[segId];
     const v = meta ? meta.vessel : 'LAD';
     const key = CL.data.vesselColor[v] || 'lad';
-    const base = new T.Color(CL.color(key));
+    const base = new T.Color(CL.color(key)).convertSRGBToLinear();
     if (!this.opts.segColors) return base;
     // shade proximal / mid / distal so segment boundaries are visible
     const shade = { 'lad-p': 1.0, 'lad-m': 0.78, 'lad-d': 0.6, 'rca-p': 1.0, 'rca-m': 0.78, 'rca-d': 0.6, 'lcx-p': 1.0, 'lcx-d': 0.72 };
     const f = shade[segId] != null ? shade[segId] : 0.9;
     const hsl = {}; base.getHSL(hsl);
-    return new T.Color().setHSL(hsl.h, hsl.s, Math.min(0.85, hsl.l * (0.65 + 0.45 * f)));
+    return new T.Color().setHSL(hsl.h, hsl.s, Math.min(0.85, hsl.l * (0.6 + 0.6 * f)));
   };
   Engine.prototype._recolor = function () {
     const selIdx = this.sel != null && this.sel in this.segIndex ? this.segIndex[this.sel] : -10;
@@ -808,6 +1098,7 @@
     this.camera.up.set(0, 1, 0);
     this.camera.lookAt(look);
     this.key.position.copy(this.camera.position.clone().add(V(8, 14, 6)));
+    this.fill.position.copy(this.camera.position.clone().add(V(-16, -6, 4)));
   };
   Engine.prototype.setAngles = function (theta, phi, animate) {
     const lim = this.mode === 'fluoro' ? { t: 120, p: 50 } : { t: 180, p: 85 };
@@ -906,7 +1197,7 @@
     this.spine.visible = fl && this.opts.spine;
     this.bg.visible = fl;
     this.lights.visible = !fl;
-    this.grain.hidden = !fl;
+    this.scene.background = fl ? null : this.backdrop;
     this.wrap.classList.toggle('fluoro', fl);
     this.renderer.setClearColor(fl ? 0xd6d6d0 : 0x05080a, 1);
     this._applyModeToTree();
@@ -970,17 +1261,14 @@
   Engine.prototype._resize = function () {
     const w = this.wrap.clientWidth || 600, h = this.wrap.clientHeight || 400;
     this.renderer.setSize(w, h, false);
+    const pr = this.renderer.getPixelRatio();
+    this.rt.setSize(Math.max(2, Math.round(w * pr)), Math.max(2, Math.round(h * pr)));
+    this.post.material.uniforms.uRes.value.set(w * pr, h * pr);
+    this.post.material.uniforms.uPx.value = Math.max(1, pr) * (w < 520 ? 0.8 : 1.15);
     this.camera.aspect = w / h;
     // keep the heart framed on narrow screens
     this.camera.fov = w / h < 0.9 ? 30 : 22;
     this.camera.updateProjectionMatrix();
-  };
-  Engine.prototype._grain = function () {
-    const g = this.grain.getContext('2d');
-    const img = g.createImageData(160, 160);
-    const d = img.data;
-    for (let i = 0; i < d.length; i += 4) { const v = 110 + Math.random() * 40; d[i] = d[i + 1] = d[i + 2] = v; d[i + 3] = 255; }
-    g.putImageData(img, 0, 0);
   };
   Engine.prototype._loop = function () {
     requestAnimationFrame(this._loop);
@@ -998,9 +1286,10 @@
 
     const fl = this.mode === 'fluoro';
     // heartbeat: 70 bpm, systolic contraction
-    const hr = 70 / 60, ph = (this.time * hr) % 1;
-    const sys = ph < 0.38 ? Math.sin(ph / 0.38 * Math.PI) : 0;
-    this.U.uBeat.value = this.opts.beat && fl ? 0.045 * sys : 0;
+    const hr = 70 / 60, ph = (this.time * hr) % 1, sm = CL.smooth;
+    const sys = sm(0.02, 0.3, ph) * (1 - 0.85 * sm(0.36, 0.52, ph)) * (1 - sm(0.55, 0.95, ph));
+    this.U.uBeat.value = this.opts.beat && fl ? sys : 0;
+    this.U.uResp.value = this.opts.beat && fl ? 0.42 * Math.sin(this.time * 6.283 / 4.6) : 0;
     // injection timeline
     if (fl && this.inj) {
       const t = this.time - this.inj.t0;
@@ -1020,8 +1309,16 @@
       this.reflux.material.uniforms.uIntensity.value = 0;
     }
     this.hiMat.uniforms.uPulse.value = 0.75 + 0.25 * Math.sin(this.time * 4);
-    if (fl && Math.floor(this.time * 20) !== this._lastGrain) { this._lastGrain = Math.floor(this.time * 20); this._grain(); }
-    this.renderer.render(this.scene, this.camera);
+    if (fl) {
+      this.bg.material.uniforms.uShift.value.set(this.theta * 0.02, this.phi * 0.02);
+      this.post.material.uniforms.uTime.value = this.time;
+      this.renderer.setRenderTarget(this.rt);
+      this.renderer.render(this.scene, this.camera);
+      this.renderer.setRenderTarget(null);
+      this.renderer.render(this.postScene, this.postCam);
+    } else {
+      this.renderer.render(this.scene, this.camera);
+    }
     this._updateLabels();
     if (this.onFrame) this.onFrame();
   };

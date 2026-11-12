@@ -81,7 +81,7 @@
         CL.ui.check({ id: 'views-labels', label: 'Labels', checked: false, onChange: (v) => this.eng && this.eng.setOption('labels', v) }),
         CL.ui.check({ id: 'views-both', label: 'Show both arteries', checked: false, onChange: (v) => this.eng && this.eng.setOption('showBoth', v) }),
         CL.ui.check({ id: 'views-beat', label: 'Heart motion', checked: true, onChange: (v) => this.eng && this.eng.setOption('beat', v) }),
-        CL.ui.check({ id: 'views-spine', label: 'Spine', checked: true, onChange: (v) => this.eng && this.eng.setOption('spine', v) }),
+        CL.ui.check({ id: 'views-spine', label: 'Bones and ECG leads', checked: true, onChange: (v) => this.eng && this.eng.setOption('spine', v) }),
         CL.ui.check({ id: 'views-cl', label: 'Circle & loop', checked: false, onChange: (v) => this.eng && this.eng.setOption('circleLoop', v) }));
 
       // lesion builder

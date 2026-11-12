@@ -33,6 +33,16 @@ The content was checked against guidelines, consensus documents and trials. Each
 
 All images (angiograms, ECGs, echo, IVUS) are schematic simulations generated in code, not patient data. Doses and thresholds are typical values for study purposes. Always follow your lab's protocols and your attending's plan.
 
+## How the images are made
+
+Nothing here is a patient image. Every picture is computed in the browser from a model, built to behave like the real modality:
+
+- **Angiograms:** the coronary tree is rendered as X-ray attenuation (thicker contrast columns are darker, overlapping vessels add up). The frame then passes through a detector model: blur, edge enhancement, quantum noise and a tone curve. The chest has waisted vertebrae, ribs with dense cortical edges, a diaphragm, and ECG electrodes and lead wires. The heart moves the way it does on cine: the AV groove descends toward the apex, the walls move in, and the whole heart rides with breathing. Vessels are mildly tortuous and end in small unnamed branches.
+- **3D heart:** myocardium and epicardial fat are painted procedurally, with fat following the grooves and the arteries, on a slightly irregular surface.
+- **Echo:** each frame is drawn as a map of tissue echogenicity and then scan-converted like ultrasound. Speckle is generated along scan lines, so it coarsens with depth. Borders are bright where the beam hits them head-on and drop out where it runs parallel. Depth attenuation, near-field clutter and a noise floor are included.
+- **IVUS:** A-lines are marched outward from the catheter through a tissue model with echogenicity, attenuation and speckle, so calcium and stent struts cast real shadows.
+- **ECG:** waveforms are built per lead, with baseline wander, respiratory variation and fine recording noise.
+
 ## Code map
 
 ```

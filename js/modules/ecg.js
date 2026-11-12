@@ -29,7 +29,8 @@
       }
     } else {
       const rr = rhythm === 'brady' ? 60 / 48 : 60 / 76;
-      for (let q = 0.32; q < 10.5; q += rr) list.push({ p: q - 0.11, qrs: q });
+      // respiratory sinus arrhythmia: the R-R interval breathes by a few percent
+      for (let q = 0.32; q < 10.5; q += rr * (1 + 0.035 * Math.sin(6.283 * 0.21 * q))) list.push({ p: q - 0.11, qrs: q });
     }
     return list;
   }
@@ -142,16 +143,22 @@
       const stage = sc.special || sc.ischemia ? 'acute' : o.stage;
       const parsCache = {};
       const pars = (lead) => parsCache[lead] || (parsCache[lead] = leadParams(lead, sc, stage));
+      // recording artifact: slow baseline wander with breathing, amplitude change with breathing, fine muscle/electrical noise
+      const artifact = (lead, t) => {
+        const seed = lead.charCodeAt(0) * 7 + lead.charCodeAt(lead.length - 1) * 13;
+        const hz = Math.sin((Math.round(t * 250) + seed * 977) * 12.9898) * 43758.5453;
+        return 0.02 * Math.sin(6.283 * 0.21 * t + seed) + 0.009 * Math.sin(6.283 * 0.57 * t + seed * 1.7) + (hz - Math.floor(hz) - 0.5) * 0.017;
+      };
       const trace = (lead, x0, y0, t0, t1) => {
         const pp = pars(lead);
         let d = '';
         const step = 0.004;
         for (let t = t0; t <= t1 + 1e-9; t += step) {
           const x = x0 + (t - t0) * 25 * mm;
-          const y = y0 - sample(lead, t, sc, stage, bl, pp) * 10 * mm;
+          const y = y0 - (sample(lead, t, sc, stage, bl, pp) * (1 + 0.035 * Math.sin(6.283 * 0.21 * t + 1)) + artifact(lead, t)) * 10 * mm;
           d += (d ? 'L' : 'M') + x.toFixed(1) + ' ' + y.toFixed(1);
         }
-        return S('path', { d, fill: 'none', stroke: 'var(--ecg-trace)', 'stroke-width': 1.3, 'stroke-linejoin': 'round' });
+        return S('path', { d, fill: 'none', stroke: 'var(--ecg-trace)', 'stroke-width': 1.15, 'stroke-linejoin': 'round', 'stroke-linecap': 'round' });
       };
       const calib = (x, y) => S('path', { d: `M${x} ${y} l${1 * mm} 0 l0 ${-10 * mm} l${5 * mm} 0 l0 ${10 * mm} l${1 * mm} 0`, fill: 'none', stroke: 'var(--ecg-trace)', 'stroke-width': 1.2 });
       const label = (lead, x, y) => {
@@ -199,7 +206,7 @@
       svg.appendChild(calib(12, yR));
       svg.appendChild(label('II', 42, rowH * rIdx + 18));
       svg.appendChild(trace('II', 12 + 7 * mm, yR, 0.28, 10));
-      svg.appendChild(S('text', { x: W - 12, y: H - 6, 'text-anchor': 'end', 'font-size': 11, fill: '#555', 'font-family': 'var(--font-mono)', text: '25 mm/s · 10 mm/mV · simulated' }));
+      svg.appendChild(S('text', { x: W - 12, y: H - 6, 'text-anchor': 'end', 'font-size': 11, fill: '#555', 'font-family': 'var(--font-mono)', text: '25 mm/s · 10 mm/mV · 0.05–150 Hz · simulated' }));
       return svg;
     },
   };

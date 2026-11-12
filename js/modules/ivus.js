@@ -68,9 +68,9 @@
         if (angIn(phi, 17, 26) && rho > lr - 0.5 && rho < lr + 0.05) return { e: 1.0, a: 0.25 }; // torn free edge
         return null;
       }, ref: 6.6 },
-    hematoma: { fov: 4.0, cath: [-0.5, 0.2], lumen: offsetCircle(0.98, -0.5, 0.2), eem: (phi) => 2.1 + 0.3 * bumpAng(phi, -20, 160, 40),
+    hematoma: { fov: 4.0, veinAt: 250, cath: [-0.5, 0.2], lumen: offsetCircle(0.98, -0.5, 0.2), eem: (phi) => 2.1 + 0.3 * bumpAng(phi, -20, 160, 40),
       plaque: (phi, rho, lr, er) => (bumpAng(phi, -30, 170, 30) > 0.3 && rho > lr + 0.12 ? { e: 0.62, a: 0.12, homog: true } : { e: 0.5, a: 0.2 }), ref: 7.0, measLumenArea: true },
-    perforation: { fov: 4.2, cath: [0.0, -0.2], lumen: circle(1.6), eem: circle(1.92), plaque: () => ({ e: 0.5, a: 0.2 }),
+    perforation: { fov: 4.2, veinAt: false, cath: [0.0, -0.2], lumen: circle(1.6), eem: circle(1.92), plaque: () => ({ e: 0.5, a: 0.2 }),
       extra: (x, y, rho, phi, lr, er) => {
         if (angIn(phi, 70, 96) && rho >= lr && rho < er + 0.6) return { blood: true };
         const cx = 2.75 * Math.cos(84 * D), cy = 2.75 * Math.sin(84 * D);
@@ -79,7 +79,7 @@
         if (d < rag && rho > er) return { blood: true, smoke: true };
         return null;
       } },
-    aneurysm: { fov: 4.8, cath: [-1.6, 0.6], lumen: circle(2.95), eem: circle(3.2), plaque: () => ({ e: 0.45, a: 0.2 }), ref: 6.2 },
+    aneurysm: { fov: 4.8, veinAt: false, cath: [-1.6, 0.6], lumen: circle(2.95), eem: circle(3.2), plaque: () => ({ e: 0.45, a: 0.2 }), ref: 6.2 },
     thrombus: { fov: 3.8, cath: [0.35, -0.3], lumen: circle(1.62), eem: circle(1.95), plaque: () => FIB,
       extra: (x, y, rho, phi, lr) => {
         const cx = -0.85, cy = 0.62;
@@ -96,11 +96,21 @@
       }, ref: 7.0, measLumenFn: offsetCircle(0.93, 0.42, 0.18) },
   };
 
+  // ---------- tissue texture (deterministic value noise) ----------
+  function h2(x, y) { const s = Math.sin(x * 127.1 + y * 311.7) * 43758.5453; return s - Math.floor(s); }
+  function vn2(x, y) {
+    const xi = Math.floor(x), yi = Math.floor(y); let xf = x - xi, yf = y - yi;
+    xf = xf * xf * (3 - 2 * xf); yf = yf * yf * (3 - 2 * yf);
+    const a = h2(xi, yi), b = h2(xi + 1, yi), c = h2(xi, yi + 1), d = h2(xi + 1, yi + 1);
+    return a + (b - a) * xf + (c - a) * yf + (a - b - c + d) * xf * yf;
+  }
+  const fbm2 = (x, y) => 0.55 * vn2(x, y) + 0.3 * vn2(x * 2.2 + 5.1, y * 2.2) + 0.15 * vn2(x * 4.6, y * 4.6 + 2.3);
+
   // ---------- renderer ----------
   function Renderer(canvas) {
     this.canvas = canvas;
-    this.NT = 256; this.NR = 230;
-    this.px = 340;
+    this.NT = 360; this.NR = 260;
+    this.px = 420;
     canvas.width = this.px; canvas.height = this.px;
     this.ctx = canvas.getContext('2d');
     this.img = this.ctx.createImageData(this.px, this.px);
@@ -147,10 +157,22 @@
         if (t && t.add) { add = t.add; t = null; }
         if (!t) {
           if (rho < lr) t = { blood: true };
-          else if (rho < er - 0.17) t = C.plaque(phi, rho, lr, er) || FIB;
+          else if (rho < er - 0.17) {
+            // plaque is never perfectly uniform: modulate its echogenicity a little
+            const pq = C.plaque(phi, rho, lr, er) || FIB;
+            t = pq.e > 1.2 || pq.homog ? pq : { e: pq.e * (0.78 + 0.5 * fbm2(x * 2.6 + 9, y * 2.6)), a: pq.a, scint: pq.scint };
+          }
           else if (rho < er) t = { e: 0.07, a: 0.1 };
-          else if (rho < er + 0.42) t = { e: 0.9, a: 0.35 };
-          else { const n = 0.5 + 0.5 * Math.sin(x * 3.1 + Math.sin(y * 2.3) * 2) * Math.cos(y * 2.7 - x); t = { e: 0.22 + 0.3 * n, a: 0.25 }; }
+          else if (rho < er + 0.3 + 0.22 * fbm2(x * 1.5, y * 1.5 + 4)) t = { e: 0.78 + 0.3 * fbm2(x * 3.3, y * 3.3), a: 0.35 };   // adventitia: bright, irregular outer edge
+          else {
+            // perivascular tissue: fat and fibrous strands, plus an adjacent cardiac vein (echolucent, compressible)
+            const va = (C.veinAt != null ? C.veinAt : 208) * D, vr = er + 1.05;
+            const vx = x - vr * Math.cos(va), vy = y - vr * Math.sin(va);
+            const ct = Math.cos(va), st = Math.sin(va);
+            const vd = Math.hypot((vx * ct + vy * st) / 0.36, (-vx * st + vy * ct) / 0.62);
+            if (C.veinAt !== false && vd < 1) t = vd > 0.8 ? { e: 0.55, a: 0.2 } : { blood: true };
+            else { const n = fbm2(x * 1.25 + 3, y * 1.25); const strand = Math.pow(vn2(x * 0.9 + 7, y * 3.4), 3); t = { e: 0.13 + 0.42 * n + 0.35 * strand, a: 0.26 }; }
+          }
         }
         const k = i * NR + j;
         const tgc = 1 + 0.08 * r;
@@ -168,7 +190,7 @@
     }
     this.tissue = tissue; this.bloodT = bloodT; this.flags = flags; this.speck = sp2;
     // scan-conversion lookup
-    const P = this.px, fov = C.fov, lut = new Int32Array(P * P), w = new Float32Array(P * P);
+    const P = this.px, fov = C.fov, lut = new Int32Array(P * P), w = new Float32Array(P * P), lut2 = new Int32Array(P * P), wt = new Float32Array(P * P);
     for (let py = 0; py < P; py++) for (let px = 0; px < P; px++) {
       const X = (px / P * 2 - 1) * fov, Y = (py / P * 2 - 1) * fov;
       const dx = X - cx, dy = Y - cy;
@@ -182,8 +204,9 @@
       const j = Math.floor(fj);
       if (j >= NR - 1) { lut[k] = -2; continue; }
       lut[k] = i * NR + j; w[k] = fj - j;
+      lut2[k] = ((i + 1) % NT) * NR + j; wt[k] = fi - Math.floor(fi);
     }
-    this.lut = lut; this.w = w;
+    this.lut = lut; this.w = w; this.lut2 = lut2; this.wt = wt;
     this.strutPts = strutPts;
     this.measure();
   };
@@ -212,7 +235,7 @@
     this.m = { la, ea, pb: (ea - la) / ea, sa, minD, maxD, malap, ref: C.ref };
   };
   Renderer.prototype.frame = function (time) {
-    const P = this.px, img = this.img.data, lut = this.lut, w = this.w, NR = this.NR;
+    const P = this.px, img = this.img.data, lut = this.lut, w = this.w, lut2 = this.lut2, wt = this.wt, NR = this.NR;
     const tis = this.tissue, bT = this.bloodT, fl = this.flags;
     // blood speckle changes every frame; thrombus scintillates
     const tick = Math.floor(time * 24);
@@ -233,14 +256,15 @@
       if (idx === -1) v = 0;
       else if (idx === -2) v = 0;
       else {
-        const a = cur[idx], b = cur[idx + 1];
-        const I = a + (b - a) * w[k];
+        const i2 = lut2[k], wr = w[k];
+        const a = cur[idx] + (cur[idx + 1] - cur[idx]) * wr, b = cur[i2] + (cur[i2 + 1] - cur[i2]) * wr;
+        const I = a + (b - a) * wt[k];
         v = Math.log(1 + gain * I) / L;
         const j = idx % NR;
-        if (j < 14) v = Math.max(v, (1 - j / 14) * 0.85); // ring-down
+        if (j < 16) v = Math.max(v, (1 - j / 16) * 0.85); // ring-down
       }
       const g = Math.max(0, Math.min(255, v * 255));
-      img[q] = g; img[q + 1] = g; img[q + 2] = g * 0.98; img[q + 3] = 255;
+      img[q] = g; img[q + 1] = g * 0.985; img[q + 2] = g * 0.95; img[q + 3] = 255;
     }
     const ctx = this.ctx;
     ctx.putImageData(this.img, 0, 0);
