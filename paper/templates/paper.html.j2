@@ -1,0 +1,259 @@
+{%- macro wx_icon(name, size=28) -%}
+<svg class="wx" width="{{ size }}" height="{{ size }}" viewBox="0 0 32 32" aria-hidden="true">
+  {%- if name in ("sun", "partly") %}
+  <g class="{{ 'sun-small' if name == 'partly' else '' }}">
+    <circle cx="16" cy="16" r="6"/>
+    {%- for a in range(0, 360, 45) %}
+    <line x1="16" y1="5" x2="16" y2="2" transform="rotate({{ a }} 16 16)"/>
+    {%- endfor %}
+  </g>
+  {%- endif %}
+  {%- if name != "sun" %}
+  <path class="cloud" d="M9 25h15a5 5 0 0 0 0-10 7 7 0 0 0-13.4-1.6A5.5 5.5 0 0 0 9 25z"/>
+  {%- endif %}
+  {%- if name in ("rain", "drizzle") %}
+  <line x1="12" y1="27" x2="10.5" y2="30.5"/><line x1="17" y1="27" x2="15.5" y2="30.5"/>{% if name == "rain" %}<line x1="22" y1="27" x2="20.5" y2="30.5"/>{% endif %}
+  {%- elif name == "snow" %}
+  <circle class="dot" cx="11" cy="29" r="1.1"/><circle class="dot" cx="16" cy="29.5" r="1.1"/><circle class="dot" cx="21" cy="29" r="1.1"/>
+  {%- elif name == "storm" %}
+  <path class="bolt" d="M17 24l-3 4.5h3l-2 3.5 5-5.5h-3l2-2.5z"/>
+  {%- elif name == "fog" %}
+  <line x1="7" y1="28" x2="25" y2="28"/><line x1="9" y1="31" x2="23" y2="31"/>
+  {%- endif %}
+</svg>
+{%- endmacro -%}
+
+{%- macro event_row(e) -%}
+<li class="event{{ ' recurring' if e.recurring else '' }}">
+  <span class="when">{% if e.all_day %}All day{% else %}{{ e.start | ap_time }}{% endif %}</span>
+  <span class="what">{{ e.title }}{% if e.location %}<em class="where">{{ e.location }}</em>{% endif %}</span>
+</li>
+{%- endmacro -%}
+{%- macro local_box() -%}
+{%- if ed.local_news %}
+<section class="local">
+  <h3 class="kicker">{{ local_title }}</h3>
+  <ul class="local-list">
+    {%- for n in ed.local_news %}
+    <li>
+      <h4>{{ n.title }}</h4>
+      {%- if n.summary %}<p>{{ n.summary | clip(150) }}</p>{% endif %}
+      <div class="source">{{ n.source }}</div>
+    </li>
+    {%- endfor %}
+  </ul>
+</section>
+{%- endif %}
+{%- endmacro -%}
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>{{ ed.name }} — {{ ed.day | long_date }}</title>
+<style>
+{{ font_css | safe }}
+{{ css | safe }}
+@page { size: {{ page.width }} {{ page.height }}; margin: 0; }
+:root { --page-w: {{ page.width }}; --page-h: {{ page.height }}; --nameplate-size: {{ nameplate_size }}rem; }
+</style>
+</head>
+<body>
+<main class="sheet" id="sheet">
+
+  <header class="masthead">
+    <div class="ear ear-left">
+      {%- if ed.weather %}
+      <div class="ear-label">Today's Weather</div>
+      <div class="ear-body">{{ wx_icon(ed.weather.code | wx_icon_name, 22) }}<span><b>{{ ed.weather.high | deg }}</b> / {{ ed.weather.low | deg }}</span></div>
+      <div class="ear-small">{{ ed.weather.code | wx_describe }}</div>
+      {%- else %}
+      <div class="ear-label">Late City Edition</div>
+      <div class="ear-small">{{ ed.tagline }}</div>
+      {%- endif %}
+    </div>
+    <h1 class="nameplate">{{ ed.name }}</h1>
+    <div class="ear ear-right">
+      <div class="ear-label">Inside</div>
+      <div class="ear-small">
+        {{ ed.events | length }} event{{ '' if ed.events | length == 1 else 's' }}
+        {%- if ed.tasks %} · {{ ed.tasks | length }} task{{ '' if ed.tasks | length == 1 else 's' }}{% endif %}
+        {%- set stories = ed.news | length + ed.local_news | length %}
+        {%- if stories %} · {{ stories }} stor{{ 'y' if stories == 1 else 'ies' }}{% endif %}
+      </div>
+      <div class="ear-small">“{{ ed.tagline }}”</div>
+    </div>
+  </header>
+
+  <div class="dateline">
+    <span>Vol. {{ ed.volume | roman }} · No. {{ ed.number }}</span>
+    <span>{{ ed.day | long_date }}{% if ed.city %} · {{ ed.city }}{% endif %}</span>
+    <span>Price: {{ price }}</span>
+  </div>
+
+  <section class="front">
+    <h2 class="headline" id="headline">{{ ed.headline }}</h2>
+    {%- if ed.lede %}
+    <p class="lede">{{ ed.lede }}</p>
+    {%- endif %}
+  </section>
+
+  <div class="columns">
+
+    <!-- ===================== left: the day -->
+    <section class="col col-day">
+      <h3 class="kicker">The Day Ahead</h3>
+      {%- if ed.events %}
+      <ul class="agenda">
+        {%- for e in ed.events %}{{ event_row(e) }}{% endfor %}
+      </ul>
+      {%- else %}
+      <p class="empty">No appointments. Unscheduled time is a luxury — spend it well.</p>
+      {%- endif %}
+
+      {%- if ed.tasks %}
+      <h3 class="kicker">On the Docket</h3>
+      <ul class="tasks">
+        {%- for t in ed.tasks %}
+        <li class="{{ 'urgent' if t.priority >= 4 else '' }}"><span class="box"></span><span>{{ t.content }}{% if t.overdue %} <em class="overdue">overdue</em>{% elif t.due_time %} <em class="due">{{ t.due_time | ap_time }}</em>{% endif %}</span></li>
+        {%- endfor %}
+      </ul>
+      {%- endif %}
+
+      <h3 class="kicker">Notes</h3>
+      <div class="notes-lines fill">
+        {%- for _ in range(40) %}<div></div>{% endfor %}
+      </div>
+    </section>
+
+    <!-- ===================== center: the news -->
+    <section class="col col-news">
+      {%- if ed.news %}
+      {%- set lead = ed.news[0] %}
+      <article class="lead">
+        <div class="source">{{ lead.source }}</div>
+        <h3 class="lead-title">{{ lead.title }}</h3>
+        {%- if lead.image_url and show_images %}
+        <figure><img src="{{ lead.image_url }}" alt="" onerror="this.parentNode.remove()"></figure>
+        {%- endif %}
+        {%- if lead.summary %}<p class="dropcap">{{ lead.summary }}</p>{% endif %}
+      </article>
+      {{ local_box() }}
+      {%- if ed.news | length > 1 %}
+      <div class="briefs">
+        {%- for n in ed.news[1:] %}
+        <article class="brief">
+          <h4>{{ n.title }}</h4>
+          {%- if n.summary %}<p>{{ n.summary }}</p>{% endif %}
+          <div class="source">{{ n.source }}</div>
+        </article>
+        {%- endfor %}
+      </div>
+      {%- endif %}
+      {%- elif ed.local_news %}
+      {{ local_box() }}
+      {%- else %}
+      <article class="lead">
+        <h3 class="lead-title">Presses Quiet on the News Desk</h3>
+        <p>No headlines came over the wire this morning. Enjoy the silence — or add feeds under <code>[news]</code> in config.toml.</p>
+      </article>
+      {%- endif %}
+    </section>
+
+    <!-- ===================== right: weather & tomorrow -->
+    <section class="col col-side">
+      {%- if ed.weather %}
+      {%- set w = ed.weather %}
+      <h3 class="kicker">Weather</h3>
+      <div class="wx-box">
+        <div class="wx-main">
+          {{ wx_icon(w.code | wx_icon_name, 54) }}
+          <div>
+            <div class="wx-temps"><span class="hi">{{ w.high | deg }}</span><span class="lo">{{ w.low | deg }}</span></div>
+            <div class="wx-desc">{{ w.code | wx_describe }}</div>
+          </div>
+        </div>
+        {%- if w.hourly %}
+        <table class="hourly">
+          <tr>{% for h in w.hourly %}<th>{{ h.time | hour_label }}</th>{% endfor %}</tr>
+          <tr>{% for h in w.hourly %}<td>{{ wx_icon(h.code | wx_icon_name, 16) }}</td>{% endfor %}</tr>
+          <tr>{% for h in w.hourly %}<td class="t">{{ h.temp | deg }}</td>{% endfor %}</tr>
+          {%- if w.hourly[0].precip_chance is not none %}
+          <tr class="pop">{% for h in w.hourly %}<td>{{ h.precip_chance }}%</td>{% endfor %}</tr>
+          {%- endif %}
+        </table>
+        {%- endif %}
+        <dl class="wx-facts">
+          {%- if w.precip_chance is not none %}<dt>Precip.</dt><dd>{{ w.precip_chance }}%</dd>{% endif %}
+          {%- if w.wind_max is not none %}<dt>Wind</dt><dd>{{ w.wind_max | round | int }} {{ w.wind_unit }}</dd>{% endif %}
+          {%- if w.uv_max is not none %}<dt>UV index</dt><dd>{{ w.uv_max | round | int }}</dd>{% endif %}
+          {%- if w.sunrise %}<dt>Sunrise</dt><dd>{{ w.sunrise | clock }}</dd>{% endif %}
+          {%- if w.sunset %}<dt>Sunset</dt><dd>{{ w.sunset | clock }}</dd>{% endif %}
+        </dl>
+      </div>
+      {%- endif %}
+
+      <h3 class="kicker">Tomorrow</h3>
+      {%- if ed.weather and ed.weather.tomorrow_high is not none %}
+      <p class="tomorrow-wx">{{ wx_icon(ed.weather.tomorrow_code | wx_icon_name, 18) }} {{ ed.weather.tomorrow_code | wx_describe }}, {{ ed.weather.tomorrow_high | deg }} / {{ ed.weather.tomorrow_low | deg }}</p>
+      {%- endif %}
+      {%- if ed.tomorrow_events %}
+      <ul class="agenda compact">
+        {%- for e in ed.tomorrow_events[:4] %}{{ event_row(e) }}{% endfor %}
+      </ul>
+      {%- if ed.tomorrow_events | length > 4 %}<p class="more">…and {{ ed.tomorrow_events | length - 4 }} more.</p>{% endif %}
+      {%- else %}
+      <p class="empty">Nothing on the books yet.</p>
+      {%- endif %}
+
+      <h3 class="kicker">Today's Pledge</h3>
+      <p class="pledge">One thing I'll do before checking my phone:</p>
+      <div class="notes-lines fill short">
+        {%- for _ in range(40) %}<div></div>{% endfor %}
+      </div>
+    </section>
+  </div>
+
+  <footer class="colophon">
+    <span>{{ ed.name }} · printed {{ ed.printed_at | ap_time }}{% if ed.city %} in {{ ed.city }}{% endif %}</span>
+    {%- if ed.notes %}<span class="wire-notes">{{ ed.notes | join(' · ') }}</span>{% endif %}
+    <span>Read it, then recycle it.</span>
+  </footer>
+</main>
+<script>
+// Pick the largest type size at which everything still fits on one sheet
+// (runs in the PDF renderer and in any browser you open the HTML in).
+(function () {
+  var sheet = document.getElementById("sheet");
+  var root = document.documentElement;
+  var nameplate = document.querySelector(".nameplate");
+  var boxes = [].slice.call(document.querySelectorAll(".sheet, .columns, .col"));
+  function fitNameplate() {
+    // Blackletter is wide: scale the title down to the space between the ears.
+    nameplate.style.fontSize = "";
+    if (nameplate.scrollWidth > nameplate.clientWidth) {
+      var size = parseFloat(getComputedStyle(nameplate).fontSize);
+      nameplate.style.fontSize = (size * nameplate.clientWidth / nameplate.scrollWidth * 0.98) + "px";
+    }
+  }
+  function fitsAt(px) {
+    root.style.fontSize = px + "px";
+    fitNameplate();
+    return boxes.every(function (b) { return b.scrollHeight <= b.clientHeight + 1; });
+  }
+  function fit() {
+    var lo = 6, hi = 14;
+    if (!fitsAt(lo)) { root.setAttribute("data-fitted", lo); return; }
+    while (hi - lo > 0.1) {
+      var mid = (lo + hi) / 2;
+      if (fitsAt(mid)) { lo = mid; } else { hi = mid; }
+    }
+    fitsAt(lo);
+    root.setAttribute("data-fitted", lo.toFixed(2));
+  }
+  window.__fitSheet = fit;
+  if (document.fonts && document.fonts.ready) { document.fonts.ready.then(fit); } else { fit(); }
+  window.addEventListener("load", fit);
+})();
+</script>
+</body>
+</html>

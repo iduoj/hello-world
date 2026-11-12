@@ -1,0 +1,11 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+
+# Your personal config (contains secret calendar URLs / API tokens)
+config.toml
+
+# Generated editions
+out/
