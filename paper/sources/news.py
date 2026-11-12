@@ -5,6 +5,8 @@ from __future__ import annotations
 import html
 import re
 import xml.etree.ElementTree as ET
+from datetime import datetime, timedelta, timezone
+from email.utils import parsedate_to_datetime
 from html.parser import HTMLParser
 from itertools import zip_longest
 from typing import Iterable
@@ -16,9 +18,14 @@ NS = {
     "atom": "http://www.w3.org/2005/Atom",
     "media": "http://search.yahoo.com/mrss/",
     "content": "http://purl.org/rss/1.0/modules/content/",
+    "dc": "http://purl.org/dc/elements/1.1/",
 }
 
 SUMMARY_CHARS = 320
+
+# Sign-offs feeds append to every summary ("Read the story on VTDigger here: ...",
+# WordPress's "The post X appeared first on Y.").
+_BOILERPLATE = re.compile(r"\s*(Read the (full )?story on .+|The post .+ appeared first on .+|Continue reading.*)$", re.I)
 
 
 class _TextAndImages(HTMLParser):
@@ -45,7 +52,7 @@ def strip_html(fragment: str) -> tuple[str, list[str]]:
     parser.feed(fragment or "")
     parser.close()
     text = re.sub(r"\s+", " ", html.unescape("".join(parser.parts))).strip()
-    return text, parser.images
+    return _BOILERPLATE.sub("", text), parser.images
 
 
 def clean_title(text: str) -> str:
@@ -84,6 +91,20 @@ def _first_image(el: ET.Element, html_images: list[str]) -> str | None:
     return None
 
 
+def parse_date(text: str) -> datetime | None:
+    """RSS dates are RFC 822 ("Thu, 12 Nov 2026 13:21:00 +0000"); Atom's are ISO 8601."""
+    if not text:
+        return None
+    try:
+        dt = parsedate_to_datetime(text)
+    except (TypeError, ValueError):
+        try:
+            dt = datetime.fromisoformat(text.strip().replace("Z", "+00:00"))
+        except ValueError:
+            return None
+    return dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
+
+
 def _text(el: ET.Element, path: str) -> str:
     found = el.find(path, NS)
     return (found.text or "").strip() if found is not None and found.text else ""
@@ -109,6 +130,8 @@ def parse_feed(data: bytes, source: str = "") -> list[NewsItem]:
                     source=source,
                     link=link_el.get("href", "") if link_el is not None else "",
                     image_url=_first_image(entry, imgs),
+                    published=parse_date(_text(entry, "atom:published") or _text(entry, "atom:updated")),
+                    categories=[c.get("term", "") for c in entry.findall("atom:category", NS) if c.get("term")],
                 )
             )
         return [i for i in items if i.title]
@@ -127,9 +150,30 @@ def parse_feed(data: bytes, source: str = "") -> list[NewsItem]:
                 source=source,
                 link=_text(item, "link"),
                 image_url=_first_image(item, desc_imgs + content_imgs),
+                published=parse_date(_text(item, "pubDate") or _text(item, "dc:date")),
+                categories=[c.text.strip() for c in item.findall("category") if c.text and c.text.strip()],
             )
         )
     return [i for i in items if i.title]
+
+
+def keep_fresh(
+    items: Iterable[NewsItem],
+    now: datetime,
+    max_age_days: float | None = None,
+    skip_categories: Iterable[str] = (),
+) -> list[NewsItem]:
+    """Drop stories older than *max_age_days* (undated ones stay) and any in *skip_categories*."""
+    skip = {c.lower() for c in skip_categories}
+    cutoff = now - timedelta(days=max_age_days) if max_age_days is not None else None
+    kept = []
+    for item in items:
+        if skip and any(c.lower() in skip for c in item.categories):
+            continue
+        if cutoff is not None and item.published is not None and item.published < cutoff:
+            continue
+        kept.append(item)
+    return kept
 
 
 def merge_feeds(feeds: Iterable[list[NewsItem]], limit: int) -> list[NewsItem]:

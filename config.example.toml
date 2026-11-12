@@ -30,7 +30,7 @@ hide = ["Focus time", "Busy"]         # skip events whose titles contain any of 
 max_events = 9
 
 [todoist]
-enabled = false
+enabled = true
 token = ""                            # Todoist > Settings > Integrations > Developer > API token
                                       # (or set TODOIST_API_TOKEN in the environment)
 filter = "today | overdue"            # any Todoist filter query
@@ -38,13 +38,21 @@ max_tasks = 8
 
 [news]
 enabled = true
-max_stories = 6
+max_stories = 6                       # lead story + briefs
+max_age_days = 3                      # skip older stories; a feed can set its own max_age_days
 images = true                         # print the lead story's photo (in grayscale)
+local_title = "Around Thetford"       # heading for feeds marked local = true
+max_local = 4
 feeds = [
+  # Around Thetford
+  { name = "Sidenote", url = "https://www.sidenote.news/rss/", local = true, max_age_days = 14 },
+  { name = "Valley News", url = "https://vnews.com/tag/thetford-vt/feed/", local = true, max_age_days = 7 },
+  # Vermont, then the nation
+  { name = "VTDigger", url = "https://vtdigger.org/feed/", skip_categories = [
+      "Obituaries", "Opinion", "Commentaries", "Letters to the editor", "Partner stories" ] },
   { name = "NPR", url = "https://feeds.npr.org/1001/rss.xml" },
-  { name = "BBC News", url = "https://feeds.bbci.co.uk/news/world/rss.xml" },
-  # { name = "NYT", url = "https://rss.nytimes.com/services/xml/rss/nyt/HomePage.xml" },
-  # { name = "Hacker News", url = "https://hnrss.org/frontpage" },
+  # { name = "VTDigger: Upper Valley", url = "https://vtdigger.org/tag/upper-valley/feed/", local = true },
+  # { name = "BBC News", url = "https://feeds.bbci.co.uk/news/world/rss.xml" },
 ]
 
 [editor]

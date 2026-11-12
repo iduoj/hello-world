@@ -29,6 +29,22 @@
   <span class="what">{{ e.title }}{% if e.location %}<em class="where">{{ e.location }}</em>{% endif %}</span>
 </li>
 {%- endmacro -%}
+{%- macro local_box() -%}
+{%- if ed.local_news %}
+<section class="local">
+  <h3 class="kicker">{{ local_title }}</h3>
+  <ul class="local-list">
+    {%- for n in ed.local_news %}
+    <li>
+      <h4>{{ n.title }}</h4>
+      {%- if n.summary %}<p>{{ n.summary | clip(150) }}</p>{% endif %}
+      <div class="source">{{ n.source }}</div>
+    </li>
+    {%- endfor %}
+  </ul>
+</section>
+{%- endif %}
+{%- endmacro -%}
 <!doctype html>
 <html lang="en">
 <head>
@@ -61,7 +77,8 @@
       <div class="ear-small">
         {{ ed.events | length }} event{{ '' if ed.events | length == 1 else 's' }}
         {%- if ed.tasks %} · {{ ed.tasks | length }} task{{ '' if ed.tasks | length == 1 else 's' }}{% endif %}
-        {%- if ed.news %} · {{ ed.news | length }} stories{% endif %}
+        {%- set stories = ed.news | length + ed.local_news | length %}
+        {%- if stories %} · {{ stories }} stor{{ 'y' if stories == 1 else 'ies' }}{% endif %}
       </div>
       <div class="ear-small">“{{ ed.tagline }}”</div>
     </div>
@@ -120,6 +137,7 @@
         {%- endif %}
         {%- if lead.summary %}<p class="dropcap">{{ lead.summary }}</p>{% endif %}
       </article>
+      {{ local_box() }}
       {%- if ed.news | length > 1 %}
       <div class="briefs">
         {%- for n in ed.news[1:] %}
@@ -131,6 +149,8 @@
         {%- endfor %}
       </div>
       {%- endif %}
+      {%- elif ed.local_news %}
+      {{ local_box() }}
       {%- else %}
       <article class="lead">
         <h3 class="lead-title">Presses Quiet on the News Desk</h3>

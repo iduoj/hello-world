@@ -20,7 +20,8 @@ def fetch(url: str, *, params: dict[str, Any] | None = None, headers: dict[str, 
         raise ValueError(f"Only http(s) URLs are supported: {url!r}")
     if params:
         url += ("&" if "?" in url else "?") + urllib.parse.urlencode(params)
-    req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT, **(headers or {})})
+    # Some servers (NPR's feeds, for one) refuse requests with no Accept header, which urllib omits.
+    req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT, "Accept": "*/*", **(headers or {})})
     with urllib.request.urlopen(req, timeout=TIMEOUT) as resp:
         return resp.read()
 

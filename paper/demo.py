@@ -101,3 +101,16 @@ def news() -> list[NewsItem]:
             wire,
         ),
     ]
+
+
+def local_news() -> list[NewsItem]:
+    return [
+        NewsItem(
+            "Hometown Stories Get Their Own Corner",
+            "Feeds marked local = true in config.toml, such as Sidenote and the Valley News' "
+            "Thetford page, appear here.",
+            "Sample Wire",
+        ),
+        NewsItem("Old News Retires on Schedule", "Each feed sets how many days a story stays in the paper.", "Sample Wire"),
+        NewsItem("Obituaries and Op-Eds Can Be Skipped", "", "Sample Wire"),
+    ]

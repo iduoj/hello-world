@@ -16,6 +16,7 @@ from markupsafe import Markup
 
 from .editor import ap_time
 from .models import Edition
+from .sources.news import truncate
 from .sources.weather import describe, icon
 
 log = logging.getLogger(__name__)
@@ -121,6 +122,7 @@ def environment() -> Environment:
         long_date=_long_date,
         roman=_roman,
         deg=_deg,
+        clip=truncate,
         wx_describe=describe,
         wx_icon_name=icon,
     )
@@ -136,6 +138,7 @@ def render_html(ed: Edition, cfg: dict) -> str:
         page=PAGE_SIZES[cfg["paper"]["paper_size"]],
         price=cfg["paper"]["price"],
         show_images=cfg["news"]["images"],
+        local_title=cfg["news"]["local_title"],
         nameplate_size=nameplate_size(ed.name),
     )
 

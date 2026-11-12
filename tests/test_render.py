@@ -25,7 +25,7 @@ def test_demo_renders_masthead_and_sections():
     ed, html = demo_html()
     assert "Barker Road Times" in html
     assert ed.headline == "Dentist at 2:30. Dinner with Maya at 7."
-    for section in ("The Day Ahead", "On the Docket", "Weather", "Tomorrow"):
+    for section in ("The Day Ahead", "On the Docket", "Weather", "Tomorrow", "Around Town"):
         assert section in html
     # CSS must not be HTML-escaped, or the fonts silently fall back to Times
     assert 'font-family: "UnifrakturMaguntia"' in html
@@ -63,3 +63,34 @@ def test_cli_pdf_is_one_page(tmp_path):
     pdf = (tmp_path / "paper-2026-11-08.pdf").read_bytes()
     assert pdf.startswith(b"%PDF")
     assert len(re.findall(rb"/Type\s*/Page(?!s)", pdf)) == 1  # exactly one sheet of paper
+
+
+def test_local_feeds_fill_their_own_box(monkeypatch):
+    from datetime import datetime, timedelta, timezone
+
+    from paper import cli
+    from paper.models import NewsItem
+
+    now = datetime.now(timezone.utc)
+    stories = {
+        "https://town.example/rss": [NewsItem("Town story", published=now), NewsItem("Old town story", published=now - timedelta(days=30))],
+        "https://state.example/rss": [NewsItem("State story", published=now), NewsItem("An obit", published=now, categories=["Obituaries"])],
+    }
+
+    def fake_fetch(url, name=""):
+        if url == "https://down.example/rss":
+            raise OSError("offline")
+        return stories[url]
+
+    monkeypatch.setattr(cli.news, "fetch_feed", fake_fetch)
+    cfg = load_config(None)
+    cfg["weather"]["enabled"] = False
+    cfg["news"]["feeds"] = [
+        {"name": "Town", "url": "https://town.example/rss", "local": True, "max_age_days": 14},
+        {"name": "State", "url": "https://state.example/rss", "skip_categories": ["obituaries"]},
+        {"name": "Down", "url": "https://down.example/rss"},
+    ]
+    ed = build_edition(cfg, DAY, TZ)
+    assert [n.title for n in ed.local_news] == ["Town story"]
+    assert [n.title for n in ed.news] == ["State story"]
+    assert "Down unreachable" in ed.notes

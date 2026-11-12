@@ -12,7 +12,8 @@ and sent to your printer before you wake up.
 | The Day Ahead / Tomorrow | Any iCal feed: Google Calendar, iCloud, Outlook | No (uses your private .ics link) |
 | On the Docket | Todoist, `today \| overdue` | API token (optional) |
 | Weather | [Open-Meteo](https://open-meteo.com) | No |
-| News | Any RSS / Atom feeds (NPR and BBC by default) | No |
+| Around Thetford | [Sidenote](https://www.sidenote.news) and the Valley News' Thetford page | No |
+| News | VTDigger and NPR, or any RSS / Atom feeds | No |
 | Headline + lede | A built-in template, or Claude if you add an API key | Optional |
 
 If a source is down, the paper still prints and a small note in the footer says what was missing.
@@ -47,8 +48,12 @@ Then edit `config.toml` (it's git-ignored, so your private links stay local):
    - Google: Calendar settings → your calendar → *Integrate calendar* → **Secret address in iCal format**
    - iCloud: Calendar app → right-click the calendar → *Share Calendar* → *Public Calendar* → copy link
    - Outlook: Settings → Calendar → Shared calendars → *Publish a calendar* → ICS link
-4. **Todoist** (optional). Set `enabled = true` and paste your token from Settings → Integrations → Developer.
-5. **News.** Swap in any RSS feeds you like.
+4. **Todoist.** Paste your token from Settings → Integrations → Developer (or set `TODOIST_API_TOKEN`).
+   Tasks due today and overdue tasks print with a box to tick; change `filter` to any Todoist filter.
+5. **News.** Each feed in `[news] feeds` can set:
+   - `local = true`, to put its headlines in the "Around Thetford" box instead of the main news column
+   - `max_age_days`, how long a story stays in the paper (handy for sites that post weekly)
+   - `skip_categories`, to drop tagged stories such as `"Obituaries"` or `"Opinion"`
 6. **Claude as editor** (optional). Set `enabled = true` under `[editor]` and add an Anthropic API key.
    Claude then writes the headline and opening paragraph from your schedule and forecast, one small
    request per edition. If the key is missing or the call fails, the template writes them instead.

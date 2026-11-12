@@ -44,7 +44,10 @@ DEFAULTS: dict[str, Any] = {
     "news": {
         "enabled": True,
         "max_stories": 6,
+        "max_age_days": 3,  # per-feed max_age_days overrides this
         "images": True,
+        "local_title": "Around Town",
+        "max_local": 4,
         "feeds": [
             {"name": "NPR", "url": "https://feeds.npr.org/1001/rss.xml"},
             {"name": "BBC News", "url": "https://feeds.bbci.co.uk/news/world/rss.xml"},

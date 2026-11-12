@@ -5,6 +5,9 @@
     <item>
       <title>Bridge Reopens After &lt;Repairs&gt;</title>
       <link>https://example.com/bridge</link>
+      <pubDate>Thu, 12 Nov 2026 13:21:00 +0000</pubDate>
+      <category><![CDATA[News]]></category>
+      <category>Obituaries</category>
       <description><![CDATA[<p>The <b>bridge</b> reopened on Monday &amp; traffic resumed.</p><img src="https://example.com/inline.jpg">]]></description>
       <media:content url="https://example.com/bridge.jpg" medium="image" />
     </item>

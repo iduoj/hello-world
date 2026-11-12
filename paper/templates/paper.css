@@ -201,6 +201,19 @@ body {
   line-height: .82;
   padding: .06em .08em 0 0;
 }
+.local { margin-top: .8rem; }
+.local .kicker { margin-top: 0; }
+.local-list { list-style: none; column-count: 2; column-gap: 1.1rem; column-rule: .5px solid #999; }
+.local-list li { break-inside: avoid; margin-bottom: .55rem; }
+.local-list h4 {
+  font-family: "Playfair Display", serif;
+  font-weight: 700;
+  font-size: 1.15rem;
+  line-height: 1.12;
+  margin-bottom: .15rem;
+}
+.local-list p { font-size: .95rem; line-height: 1.35; margin-bottom: .1rem; }
+
 .briefs {
   margin-top: .8rem;
   padding-top: .55rem;

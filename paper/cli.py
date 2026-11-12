@@ -5,7 +5,7 @@ from __future__ import annotations
 import argparse
 import logging
 import sys
-from datetime import date, datetime, timedelta, tzinfo
+from datetime import date, datetime, timedelta, timezone, tzinfo
 from pathlib import Path
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
@@ -56,6 +56,7 @@ def build_edition(cfg: dict, day: date, tz: tzinfo, use_demo: bool = False) -> E
         ed.tasks = demo.tasks(day, tz)
         ed.weather = demo.weather(day)
         ed.news = demo.news()
+        ed.local_news = demo.local_news()
         write_front_page(ed, {"enabled": False})
         return ed
 
@@ -101,16 +102,23 @@ def build_edition(cfg: dict, day: date, tz: tzinfo, use_demo: bool = False) -> E
     # News ---------------------------------------------------------------
     n = cfg["news"]
     if n["enabled"] and n["feeds"]:
-        per_feed = []
+        general, local = [], []
+        now = datetime.now(timezone.utc)
         for feed in n["feeds"]:
-            name = feed.get("name", "") if isinstance(feed, dict) else ""
-            url = feed["url"] if isinstance(feed, dict) else str(feed)
+            feed = feed if isinstance(feed, dict) else {"url": str(feed)}
+            name = feed.get("name", "")
             try:
-                per_feed.append(news.fetch_feed(url, name))
+                items = news.fetch_feed(feed["url"], name)
             except Exception as exc:
-                log.warning("Feed %s failed: %s", name or url, exc)
+                log.warning("Feed %s failed: %s", name or feed["url"], exc)
                 ed.notes.append(f"{name or 'A news feed'} unreachable")
-        ed.news = news.merge_feeds(per_feed, n["max_stories"])
+                continue
+            items = news.keep_fresh(
+                items, now, feed.get("max_age_days", n["max_age_days"]), feed.get("skip_categories", ())
+            )
+            (local if feed.get("local") else general).append(items)
+        ed.news = news.merge_feeds(general, n["max_stories"])
+        ed.local_news = news.merge_feeds(local, n["max_local"])
 
     write_front_page(ed, cfg["editor"])
     return ed

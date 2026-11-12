@@ -58,6 +58,8 @@ class NewsItem:
     source: str = ""
     link: str = ""
     image_url: str | None = None
+    published: datetime | None = None
+    categories: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -73,6 +75,7 @@ class Edition:
     tasks: list[Task] = field(default_factory=list)
     weather: Weather | None = None
     news: list[NewsItem] = field(default_factory=list)
+    local_news: list[NewsItem] = field(default_factory=list)
     volume: int = 1
     number: int = 1
     printed_at: datetime | None = None
