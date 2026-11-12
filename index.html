@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Cath Lab Atlas</title>
+<meta name="description" content="Interactive study atlas for coronary anatomy, left heart catheterization, angiographic views, physiology, IVUS, stent sizing, bifurcation PCI, and ECG/echo territories.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&display=swap">
+<link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+<!-- APP:BEGIN -->
+<header class="topbar">
+  <div class="topbar-inner">
+    <a class="brand" href="#anatomy" aria-label="Cath Lab Atlas home">
+      <svg class="brand-mark" viewBox="0 0 40 40" aria-hidden="true">
+        <path d="M20 4 C 13 9, 11 16, 14 24 C 16 30, 20 34, 21 37" fill="none" stroke="var(--lad)" stroke-width="3" stroke-linecap="round"/>
+        <path d="M20 4 C 25 8, 30 12, 33 19" fill="none" stroke="var(--lcx)" stroke-width="3" stroke-linecap="round"/>
+        <path d="M14 24 L 7 27" fill="none" stroke="var(--lad)" stroke-width="2" stroke-linecap="round"/>
+        <path d="M27 11 L 30 26" fill="none" stroke="var(--lcx)" stroke-width="2" stroke-linecap="round"/>
+        <circle cx="20" cy="4" r="3" fill="var(--lm)"/>
+      </svg>
+      <span class="brand-text"><span class="brand-name">Cath Lab Atlas</span><span class="brand-sub">Coronary anatomy · LHC · PCI</span></span>
+    </a>
+    <nav class="tabs" aria-label="Sections">
+      <a href="#anatomy" data-tab="anatomy">3D Anatomy</a>
+      <a href="#views" data-tab="views">Angio Views</a>
+      <a href="#catheters" data-tab="catheters">Catheters</a>
+      <a href="#drugs" data-tab="drugs">Drugs</a>
+      <a href="#physiology" data-tab="physiology">FFR / iFR</a>
+      <a href="#territories" data-tab="territories">ECG + Echo</a>
+      <a href="#ivus" data-tab="ivus">IVUS</a>
+      <a href="#stents" data-tab="stents">Stent Sizing</a>
+      <a href="#bifurcation" data-tab="bifurcation">Bifurcation</a>
+      <a href="#cicu" data-tab="cicu">CICU Cases</a>
+      <a href="#quiz" data-tab="quiz">Quiz</a>
+    </nav>
+  </div>
+</header>
+
+<main id="app">
+  <section class="view" id="view-anatomy" data-view="anatomy" hidden></section>
+  <section class="view" id="view-views" data-view="views" hidden></section>
+  <section class="view" id="view-catheters" data-view="catheters" hidden></section>
+  <section class="view" id="view-drugs" data-view="drugs" hidden></section>
+  <section class="view" id="view-physiology" data-view="physiology" hidden></section>
+  <section class="view" id="view-territories" data-view="territories" hidden></section>
+  <section class="view" id="view-ivus" data-view="ivus" hidden></section>
+  <section class="view" id="view-stents" data-view="stents" hidden></section>
+  <section class="view" id="view-bifurcation" data-view="bifurcation" hidden></section>
+  <section class="view" id="view-cicu" data-view="cicu" hidden></section>
+  <section class="view" id="view-quiz" data-view="quiz" hidden></section>
+</main>
+
+<footer class="footer">
+  <p>Educational study aid for trainees. Doses and criteria are summarized from guidelines and consensus documents (see each section's references) and vary by institution. Always follow your lab's protocols and attending guidance. Images are schematic simulations, not patient data.</p>
+</footer>
+<!-- APP:END -->
+
+<script src="vendor/three.min.js" data-cdn="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="js/core.js"></script>
+<script src="js/data/anatomy.js"></script>
+<script src="js/data/views.js"></script>
+<script src="js/data/catheters.js"></script>
+<script src="js/data/drugs.js"></script>
+<script src="js/data/territories.js"></script>
+<script src="js/data/ivus.js"></script>
+<script src="js/data/bifurcation.js"></script>
+<script src="js/data/quiz.js"></script>
+<script src="js/data/cicu.js"></script>
+<script src="js/data/cicu-cases.js"></script>
+<script src="js/modules/heart3d.js"></script>
+<script src="js/modules/anatomy.js"></script>
+<script src="js/modules/views.js"></script>
+<script src="js/modules/catheters.js"></script>
+<script src="js/modules/drugs.js"></script>
+<script src="js/modules/physiology.js"></script>
+<script src="js/modules/ecg.js"></script>
+<script src="js/modules/echo.js"></script>
+<script src="js/modules/territories.js"></script>
+<script src="js/modules/ivus.js"></script>
+<script src="js/modules/stents.js"></script>
+<script src="js/modules/bifurcation.js"></script>
+<script src="js/modules/monitor.js"></script>
+<script src="js/modules/cicu.js"></script>
+<script src="js/modules/quiz.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>
