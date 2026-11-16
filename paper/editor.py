@@ -162,7 +162,9 @@ def briefing(ed: Edition) -> dict:
             "chance_of_precipitation_pct": w.precip_chance,
         },
         "events_today": [ev(e) for e in ed.events],
-        "tasks": [{"task": t.content, "overdue": t.overdue, "urgent": t.priority >= 4} for t in ed.tasks],
+        "tasks_total": len(ed.tasks),
+        "tasks_overdue": sum(t.overdue for t in ed.tasks),
+        "top_tasks": [{"task": t.content, "overdue": t.overdue, "urgent": t.priority >= 4} for t in ed.tasks[:10]],
         "tomorrow": [ev(e) for e in ed.tomorrow_events[:3]],
     }
 

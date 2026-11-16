@@ -113,10 +113,11 @@
       {%- if ed.tasks %}
       <h3 class="kicker">On the Docket</h3>
       <ul class="tasks">
-        {%- for t in ed.tasks %}
-        <li class="{{ 'urgent' if t.priority >= 4 else '' }}"><span class="box"></span><span>{{ t.content }}{% if t.overdue %} <em class="overdue">overdue</em>{% elif t.due_time %} <em class="due">{{ t.due_time | ap_time }}</em>{% endif %}</span></li>
+        {%- for t in ed.tasks[:max_tasks] %}
+        <li class="{{ 'urgent' if t.priority >= 4 else '' }}"><span class="box"></span><span>{{ t.content | clip(90) }}{% if t.overdue %} <em class="overdue">overdue</em>{% elif t.due_time %} <em class="due">{{ t.due_time | ap_time }}</em>{% endif %}</span></li>
         {%- endfor %}
       </ul>
+      {%- if ed.tasks | length > max_tasks %}<p class="more">…and {{ ed.tasks | length - max_tasks }} more in Todoist.</p>{% endif %}
       {%- endif %}
 
       <h3 class="kicker">Notes</h3>

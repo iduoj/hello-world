@@ -139,6 +139,7 @@ def render_html(ed: Edition, cfg: dict) -> str:
         price=cfg["paper"]["price"],
         show_images=cfg["news"]["images"],
         local_title=cfg["news"]["local_title"],
+        max_tasks=int(cfg["todoist"]["max_tasks"]),
         nameplate_size=nameplate_size(ed.name),
     )
 

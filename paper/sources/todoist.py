@@ -28,7 +28,8 @@ def _parse_due(due: dict[str, Any] | None, tz: tzinfo) -> tuple[date | None, dat
     return stamp.date(), stamp
 
 
-def parse_tasks(payload: Any, today: date, tz: tzinfo, limit: int) -> list[Task]:
+def parse_tasks(payload: Any, today: date, tz: tzinfo, limit: int | None = None) -> list[Task]:
+    """Most important first: priority, then overdue before today, then due time."""
     rows = payload.get("results", []) if isinstance(payload, dict) else payload
     tasks: list[Task] = []
     for row in rows:
@@ -42,14 +43,14 @@ def parse_tasks(payload: Any, today: date, tz: tzinfo, limit: int) -> list[Task]
             )
         )
     far = datetime.max.replace(tzinfo=timezone.utc)
-    tasks.sort(key=lambda t: (not t.overdue, -t.priority, t.due_time or far))
-    return tasks[:limit]
+    tasks.sort(key=lambda t: (-t.priority, not t.overdue, t.due_time or far))
+    return tasks if limit is None else tasks[:limit]
 
 
-def fetch_tasks(token: str, query: str, today: date, tz: tzinfo, limit: int = 8) -> list[Task]:
+def fetch_tasks(token: str, query: str, today: date, tz: tzinfo, limit: int | None = None) -> list[Task]:
     payload = fetch_json(
         FILTER_URL,
-        params={"query": query, "limit": 50},
+        params={"query": query, "limit": 200},
         headers={"Authorization": f"Bearer {token}"},
     )
     return parse_tasks(payload, today, tz, limit)

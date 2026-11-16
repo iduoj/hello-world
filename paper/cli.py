@@ -80,7 +80,7 @@ def build_edition(cfg: dict, day: date, tz: tzinfo, use_demo: bool = False) -> E
             ed.notes.append("Todoist token missing")
         else:
             try:
-                ed.tasks = todoist.fetch_tasks(t["token"], t["filter"], day, tz, t["max_tasks"])
+                ed.tasks = todoist.fetch_tasks(t["token"], t["filter"], day, tz)
             except Exception as exc:
                 log.warning("Todoist failed: %s", exc)
                 ed.notes.append("Todoist unreachable")

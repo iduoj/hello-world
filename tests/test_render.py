@@ -94,3 +94,14 @@ def test_local_feeds_fill_their_own_box(monkeypatch):
     assert [n.title for n in ed.local_news] == ["Town story"]
     assert [n.title for n in ed.news] == ["State story"]
     assert "Down unreachable" in ed.notes
+
+
+def test_task_overflow_is_counted():
+    from paper.models import Task
+
+    cfg = load_config(None)
+    ed = build_edition(cfg, DAY, TZ, use_demo=True)
+    ed.tasks = [Task(f"task {i}", overdue=i < 3) for i in range(11)]
+    html = render_html(ed, cfg)
+    assert "task 7" in html and "task 8" not in html  # max_tasks = 8
+    assert "and 3 more in Todoist" in html
