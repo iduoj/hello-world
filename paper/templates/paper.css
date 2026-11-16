@@ -1,0 +1,287 @@
+/* One-page broadsheet, tuned for black-and-white laser printers.
+   Everything is sized in rem so the fit-to-page script can scale the whole sheet. */
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html {
+  font-size: 10.5px;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+body {
+  background: #fff;
+  color: #111;
+  font-family: "Old Standard TT", Georgia, "Times New Roman", serif;
+  font-kerning: normal;
+  text-rendering: optimizeLegibility;
+}
+@media screen {
+  body { background: #d9d6cf; }
+  .sheet { margin: 24px auto; box-shadow: 0 2px 18px rgba(0, 0, 0, .25); }
+}
+
+.sheet {
+  width: var(--page-w);
+  height: var(--page-h);
+  padding: 0.42in 0.5in 0.34in;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: #fff;
+}
+
+/* ------------------------------------------------------------ masthead */
+.masthead {
+  display: grid;
+  grid-template-columns: 11.5rem minmax(0, 1fr) 11.5rem;
+  align-items: center;
+  gap: 1rem;
+  padding-bottom: .5rem;
+  border-bottom: 3px solid #111;
+}
+.nameplate {
+  font-family: "UnifrakturMaguntia", "Old English Text MT", serif;
+  font-weight: 400;
+  font-size: var(--nameplate-size, 6rem);
+  line-height: 1;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  letter-spacing: .01em;
+}
+.ear {
+  border: 1px solid #111;
+  padding: .35rem .5rem;
+  font-size: .85rem;
+  line-height: 1.3;
+  text-align: center;
+}
+.ear-label {
+  font-family: "Playfair Display", serif;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .12em;
+  font-size: .72rem;
+  border-bottom: .5px solid #111;
+  margin-bottom: .2rem;
+  padding-bottom: .1rem;
+}
+.ear-body { font-size: 1.3rem; display: flex; align-items: center; justify-content: center; gap: .3rem; white-space: nowrap; }
+.ear-small { font-style: italic; }
+
+.dateline {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-top: 2px;
+  padding: .3rem 0;
+  border-top: .5px solid #111;
+  border-bottom: .5px solid #111;
+  text-transform: uppercase;
+  letter-spacing: .1em;
+  font-size: .8rem;
+}
+
+/* ------------------------------------------------------------ front page */
+.front {
+  text-align: center;
+  padding: .7rem 0 .75rem;
+  border-bottom: 2px solid #111;
+}
+.headline {
+  font-family: "Playfair Display", serif;
+  font-weight: 900;
+  font-size: 3.7rem;
+  line-height: 1.04;
+  letter-spacing: -.01em;
+  text-wrap: balance;
+}
+.lede {
+  font-style: italic;
+  font-size: 1.32rem;
+  line-height: 1.4;
+  max-width: 80%;
+  margin: .5rem auto 0;
+  text-wrap: pretty;
+}
+
+/* ------------------------------------------------------------ columns */
+.columns {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 1.08fr 2fr 1.08fr;
+  grid-template-rows: minmax(0, 1fr); /* columns get exactly the space left, so overflow is measurable */
+  padding-top: .7rem;
+}
+.col { min-width: 0; display: flex; flex-direction: column; }
+.col + .col { border-left: .5px solid #111; padding-left: 1.1rem; }
+.col:not(:last-child) { padding-right: 1.1rem; }
+
+.kicker {
+  font-family: "Playfair Display", serif;
+  font-weight: 700;
+  font-size: .9rem;
+  text-transform: uppercase;
+  letter-spacing: .16em;
+  text-align: center;
+  border-top: 2px solid #111;
+  border-bottom: .5px solid #111;
+  padding: .22rem 0 .18rem;
+  margin: 1.1rem 0 .45rem;
+}
+.col > .kicker:first-child { margin-top: 0; }
+
+.empty, .more, .pledge { font-style: italic; font-size: 1.05rem; line-height: 1.4; }
+.more { font-size: .95rem; margin-top: .2rem; }
+
+/* agenda */
+.agenda { list-style: none; }
+.event {
+  display: grid;
+  grid-template-columns: 4.7rem 1fr;
+  gap: .45rem;
+  padding: .32rem 0;
+  border-bottom: .5px dotted #555;
+  line-height: 1.25;
+}
+.event:last-child { border-bottom: 0; }
+.when { font-weight: 700; font-size: .95rem; padding-top: .08rem; white-space: nowrap; }
+.what { font-size: 1.12rem; }
+.where { display: block; font-size: .9rem; color: #333; }
+.agenda.compact .event { grid-template-columns: 4.3rem 1fr; padding: .22rem 0; }
+.agenda.compact .what { font-size: 1rem; }
+
+/* tasks: real boxes you can tick with a pen */
+.tasks { list-style: none; }
+.tasks li { display: flex; gap: .5rem; align-items: flex-start; padding: .22rem 0; font-size: 1.08rem; line-height: 1.3; }
+.tasks .box { flex: 0 0 auto; width: .95rem; height: .95rem; border: 1.2px solid #111; margin-top: .18rem; }
+.tasks li.urgent { font-weight: 700; }
+.overdue, .due { font-size: .85rem; font-variant: small-caps; letter-spacing: .04em; font-weight: 400; white-space: nowrap; }
+
+/* ruled lines that soak up whatever space is left at the bottom of a column */
+.notes-lines { flex: 1 1 0; min-height: 5.7rem; overflow: hidden; }
+.notes-lines div { height: 1.9rem; border-bottom: .5px solid #888; }
+.notes-lines.short { min-height: 3.4rem; }
+
+/* ------------------------------------------------------------ news */
+.source {
+  font-size: .72rem;
+  text-transform: uppercase;
+  letter-spacing: .14em;
+  color: #333;
+}
+.lead .source { margin-bottom: .15rem; }
+.lead-title {
+  font-family: "Playfair Display", serif;
+  font-weight: 700;
+  font-size: 2.15rem;
+  line-height: 1.08;
+  margin-bottom: .5rem;
+  text-wrap: balance;
+}
+.lead figure { margin: 0 0 .55rem; border-bottom: .5px solid #111; padding-bottom: .3rem; }
+.lead img {
+  display: block;
+  width: 100%;
+  max-height: 2.5in;
+  object-fit: cover;
+  filter: grayscale(1) contrast(1.08);
+}
+.lead p, .brief p {
+  text-align: justify;
+  hyphens: auto;
+  line-height: 1.42;
+}
+.lead p { font-size: 1.15rem; }
+.dropcap::first-letter {
+  float: left;
+  font-family: "Playfair Display", serif;
+  font-weight: 900;
+  font-size: 3.5em;
+  line-height: .82;
+  padding: .06em .08em 0 0;
+}
+.local { margin-top: .8rem; }
+.local .kicker { margin-top: 0; }
+.local-list { list-style: none; column-count: 2; column-gap: 1.1rem; column-rule: .5px solid #999; }
+.local-list li { break-inside: avoid; margin-bottom: .55rem; }
+.local-list h4 {
+  font-family: "Playfair Display", serif;
+  font-weight: 700;
+  font-size: 1.15rem;
+  line-height: 1.12;
+  margin-bottom: .15rem;
+}
+.local-list p { font-size: .95rem; line-height: 1.35; margin-bottom: .1rem; }
+
+.briefs {
+  margin-top: .8rem;
+  padding-top: .55rem;
+  border-top: 2px solid #111;
+  column-count: 2;
+  column-gap: 1.1rem;
+  column-rule: .5px solid #999;
+}
+.brief { break-inside: avoid; margin-bottom: .75rem; }
+.brief h4 {
+  font-family: "Playfair Display", serif;
+  font-weight: 700;
+  font-size: 1.3rem;
+  line-height: 1.12;
+  margin-bottom: .25rem;
+}
+.brief p { font-size: 1rem; margin-bottom: .15rem; }
+
+/* ------------------------------------------------------------ weather */
+.wx {
+  stroke: #111;
+  stroke-width: 1.7;
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vertical-align: middle;
+  overflow: visible;
+}
+.wx circle { fill: #fff; }
+.wx .cloud { fill: #fff; }
+.wx .dot, .wx .bolt { fill: #111; stroke: none; }
+.wx .sun-small { transform: translate(5px, -6px) scale(.72); transform-origin: 16px 16px; }
+
+.wx-main { display: flex; align-items: center; gap: .7rem; }
+.wx-temps .hi { font-family: "Playfair Display", serif; font-weight: 900; font-size: 2.8rem; line-height: 1; }
+.wx-temps .lo { font-size: 1.6rem; color: #444; margin-left: .35rem; }
+.wx-temps .hi .deg { font-family: "Old Standard TT", serif; font-weight: 400; }
+.wx-desc { font-style: italic; font-size: 1.1rem; }
+
+.hourly {
+  width: 100%;
+  margin: .6rem 0 .45rem;
+  border-collapse: collapse;
+  border-top: .5px solid #111;
+  border-bottom: .5px solid #111;
+  text-align: center;
+  font-size: .85rem;
+}
+.hourly th { font-weight: 400; text-transform: uppercase; font-size: .72rem; letter-spacing: .06em; padding-top: .25rem; }
+.hourly td.t { font-weight: 700; font-size: .95rem; }
+.hourly tr.pop td { font-size: .72rem; color: #444; padding-bottom: .2rem; }
+
+.wx-facts { display: grid; grid-template-columns: auto 1fr; column-gap: .6rem; row-gap: .08rem; font-size: .95rem; }
+.wx-facts dt { font-variant: small-caps; letter-spacing: .04em; color: #333; }
+.wx-facts dd { text-align: right; }
+
+.tomorrow-wx { font-size: 1.02rem; margin-bottom: .3rem; font-style: italic; }
+
+/* ------------------------------------------------------------ footer */
+.colophon {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-top: .5rem;
+  padding-top: .3rem;
+  border-top: 3px double #111;
+  font-size: .75rem;
+  letter-spacing: .04em;
+}
+.wire-notes { font-style: italic; text-align: center; flex: 1; }
+code { font-family: ui-monospace, Menlo, monospace; font-size: .9em; }

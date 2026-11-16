@@ -1,0 +1,11 @@
+jinja2>=3.1
+icalendar>=6.0
+recurring-ical-events>=3.3
+tomli>=2.0; python_version < "3.11"
+
+# PDF rendering. Optional if Google Chrome / Chromium is already installed:
+# the renderer falls back to headless Chrome when Playwright is missing.
+playwright>=1.45
+
+# Optional: lets Claude write the front-page headline and lede.
+anthropic>=0.70

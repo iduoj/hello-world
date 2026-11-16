@@ -1,0 +1,72 @@
+# Copy this file to config.toml and edit it. config.toml is git-ignored,
+# so your private calendar links and tokens stay on your machine.
+
+[paper]
+name = "Barker Road Times"
+tagline = "All the News That's Fit to Wake Up To"
+city = "Post Mills, VT"               # shown in the dateline; also used to look up weather if no lat/lon
+timezone = "America/New_York"         # IANA name; leave blank to use this computer's time zone
+paper_size = "Letter"                 # "Letter" or "A4"
+founded = 2026-01-01                  # first issue; drives "Vol. I · No. 312"
+price = "One Cup of Coffee"
+
+[weather]                             # Open-Meteo: free, no account needed
+enabled = true
+latitude = 43.8856                    # Post Mills, VT (right-click in Google Maps for another spot)
+longitude = -72.2606
+units = "imperial"                    # or "metric"
+
+[calendar]
+enabled = true
+# Private iCal links, one per calendar:
+#   Google:  calendar.google.com > Settings > [your calendar] > Integrate calendar
+#            > "Secret address in iCal format"
+#   iCloud:  Calendar app > right-click calendar > Share > Public Calendar > copy link
+#   Outlook: Settings > Calendar > Shared calendars > Publish a calendar > ICS link
+ics_urls = [
+  # "https://calendar.google.com/calendar/ical/you%40gmail.com/private-abc123/basic.ics",
+]
+hide = ["Focus time", "Busy"]         # skip events whose titles contain any of these
+max_events = 9
+
+[todoist]
+enabled = true
+token = ""                            # Todoist > Settings > Integrations > Developer > API token
+                                      # (or set TODOIST_API_TOKEN in the environment)
+filter = "today | overdue"            # any Todoist filter query
+max_tasks = 8
+
+[news]
+enabled = true
+max_stories = 6                       # lead story + briefs
+max_age_days = 3                      # skip older stories; a feed can set its own max_age_days
+images = true                         # print the lead story's photo (in grayscale)
+local_title = "Around Thetford"       # heading for feeds marked local = true
+max_local = 4
+feeds = [
+  # Around Thetford
+  { name = "Sidenote", url = "https://www.sidenote.news/rss/", local = true, max_age_days = 14 },
+  { name = "Valley News", url = "https://vnews.com/tag/thetford-vt/feed/", local = true, max_age_days = 7 },
+  # Vermont, then the nation
+  { name = "VTDigger", url = "https://vtdigger.org/feed/", skip_categories = [
+      "Obituaries", "Opinion", "Commentaries", "Letters to the editor", "Partner stories" ] },
+  { name = "NPR", url = "https://feeds.npr.org/1001/rss.xml" },
+  # { name = "VTDigger: Upper Valley", url = "https://vtdigger.org/tag/upper-valley/feed/", local = true },
+  # { name = "BBC News", url = "https://feeds.bbci.co.uk/news/world/rss.xml" },
+]
+
+[editor]
+# Let Claude write the front-page headline and lede from your day.
+# Needs an Anthropic API key (console.anthropic.com). Each edition is one small request.
+# Without a key, or if the call fails, a built-in template writes the front page.
+enabled = false
+model = "claude-opus-5-5"
+api_key = ""                          # or set ANTHROPIC_API_KEY in the environment
+
+[printer]
+name = ""                             # from `python -m paper --list-printers`; blank = system default
+copies = 1
+options = []                          # extra `lp -o` options, e.g. ["sides=one-sided", "media=Letter"]
+
+[render]
+chromium_path = ""                    # only if Chrome/Chromium lives somewhere unusual
