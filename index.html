@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ValvEcho</title>
+  <meta name="description" content="Echocardiographic grading of native valvular heart disease using an integrated, guideline-based approach.">
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <svg class="logo" viewBox="0 0 32 32" aria-hidden="true">
+        <path d="M16 4c5 4 10 6 12 12-2 6-7 8-12 12C11 24 6 22 4 16 6 10 11 8 16 4z" fill="none" stroke="currentColor" stroke-width="2"/>
+        <path d="M16 4v24M4 16h24" stroke="currentColor" stroke-width="1.4" opacity=".55"/>
+      </svg>
+      <div>
+        <h1>ValvEcho</h1>
+        <p class="tagline">Integrated echo grading of native valvular disease</p>
+      </div>
+    </div>
+    <button id="reset" class="ghost" type="button">Clear all</button>
+  </header>
+
+  <section class="patient card" aria-label="Patient and LV data">
+    <h2>Patient</h2>
+    <div class="grid" id="patient-fields"></div>
+    <p class="derived" id="patient-derived"></p>
+  </section>
+
+  <nav class="tabs" role="tablist" id="tabs"></nav>
+
+  <main id="panels"></main>
+
+  <footer class="foot">
+    <p>Thresholds: ASE 2017 native regurgitation, ASE/EACVI 2017 aortic stenosis, EAE/ASE 2009 valve stenosis,
+      2020 ACC/AHA valvular heart disease guideline; TR massive/torrential grades per Hahn &amp; Zamorano 2017.</p>
+    <p><strong>Decision support only.</strong> Always integrate with image quality, clinical context and multimodality imaging.
+      Not a medical device.</p>
+  </footer>
+
+  <script src="js/valve-logic.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
