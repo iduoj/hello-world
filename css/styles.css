@@ -51,7 +51,9 @@ html { -webkit-text-size-adjust: 100%; }
 body {
   margin: 0 auto;
   max-width: 1180px;
-  padding: 0 16px 40px;
+  padding-block: 0 40px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
   background: var(--bg);
   color: var(--text);
   font: 15px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
@@ -77,7 +79,9 @@ button.primary { background: var(--accent); border-color: var(--accent); color: 
 
 .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); padding: 16px; }
 .patient { margin-bottom: 14px; }
-.patient h2 { margin-bottom: 10px; }
+.patient-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin-bottom: 10px; }
+.actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+button.armed { border-color: var(--g3); color: var(--g3); }
 .derived { margin: 10px 0 0; color: var(--muted); font-size: 13px; min-height: 1em; }
 
 .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 10px 14px; }
@@ -115,7 +119,7 @@ input[type="number"] { -moz-appearance: textfield; }
 .sub .row { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
 .sub .calcout { font-size: 13px; color: var(--muted); }
 
-.result { position: sticky; top: 12px; }
+.result { position: sticky; top: calc(12px + env(safe-area-inset-top, 0px)); }
 .verdict { display: flex; align-items: center; gap: 12px; margin: 6px 0 12px; }
 .badge {
   font-weight: 700; font-size: 18px; padding: 8px 14px; border-radius: 8px; color: var(--chip-text); background: var(--g0);

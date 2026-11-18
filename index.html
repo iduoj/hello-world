@@ -19,11 +19,14 @@
         <p class="tagline">Integrated echo grading of native valvular disease</p>
       </div>
     </div>
-    <button id="reset" class="ghost" type="button">Clear all</button>
+    <div class="actions">
+      <button id="load-example" class="ghost" type="button">Load example</button>
+      <button id="reset" class="ghost" type="button">Clear all</button>
+    </div>
   </header>
 
   <section class="patient card" aria-label="Patient and LV data">
-    <h2>Patient</h2>
+    <div class="patient-head"><h2>Patient</h2><span class="pill warn" id="example-flag" hidden>Example case. Not patient data. Edit any field or Clear all to start.</span></div>
     <div class="grid" id="patient-fields"></div>
     <p class="derived" id="patient-derived"></p>
   </section>

@@ -102,9 +102,10 @@
   // State
   // ---------------------------------------------------------------------------
   let state = { tab: 'AS', patient: {}, AS: {}, MS: {}, AR: {}, MR: {}, TR: {}, calc: {} };
+  let hadSaved = false;
   try {
     const saved = JSON.parse(localStorage.getItem(STORE_KEY) || 'null');
-    if (saved && typeof saved === 'object') state = Object.assign(state, saved);
+    if (saved && typeof saved === 'object') { state = Object.assign(state, saved); hadSaved = true; }
   } catch (e) { /* storage unavailable */ }
   const save = () => { try { localStorage.setItem(STORE_KEY, JSON.stringify(state)); } catch (e) { /* ignore */ } };
 
@@ -386,6 +387,7 @@
     if (t.type === 'checkbox') state[scope][key] = t.checked;
     else if (t.value === '') delete state[scope][key];
     else state[scope][key] = t.type === 'number' ? parseFloat(t.value) : t.value;
+    if (state.example) { state.example = false; renderExampleFlag(); }
     renderScope(scope);
     save();
   }
@@ -420,16 +422,51 @@
     document.getElementById('tab-' + next).focus();
   });
 
-  document.getElementById('reset').addEventListener('click', () => {
-    if (!confirm('Clear all entered measurements?')) return;
-    const tab = state.tab;
-    state = { tab, patient: {}, AS: {}, MS: {}, AR: {}, MR: {}, TR: {}, calc: {} };
+  const resetBtn = document.getElementById('reset');
+  let resetArmed = null;
+  resetBtn.addEventListener('click', () => {
+    if (!resetArmed) {
+      resetBtn.textContent = 'Click again to clear';
+      resetBtn.classList.add('armed');
+      resetArmed = setTimeout(() => { resetArmed = null; resetBtn.textContent = 'Clear all'; resetBtn.classList.remove('armed'); }, 3000);
+      return;
+    }
+    clearTimeout(resetArmed); resetArmed = null;
+    resetBtn.textContent = 'Clear all'; resetBtn.classList.remove('armed');
+    loadState({ tab: state.tab, patient: {}, AS: {}, MS: {}, AR: {}, MR: {}, TR: {}, calc: {} }, false);
+  });
+  document.getElementById('load-example').addEventListener('click', () => loadState(exampleState(), true));
+
+  function loadState(next, isExample) {
+    state = next;
+    state.example = !!isExample;
     save();
     document.getElementById('patient-fields').innerHTML = PATIENT.map((f) => fieldHTML('patient', f)).join('');
-    buildPanels(); selectTab(tab); renderAll();
-  });
+    buildPanels(); selectTab(state.tab); renderAll(); renderExampleFlag();
+  }
+  function renderExampleFlag() { document.getElementById('example-flag').hidden = !state.example; }
 
+  function exampleState() {
+    return {
+      tab: 'AS', example: true,
+      patient: { height: 165, weight: 68, sex: 'F', lvef: 62, symptomatic: true },
+      AS: { vmax: 3.6, mg: 32, lvotD: 1.9, lvotVti: 16, avVti: 64, calcium: 1750 },
+      MS: { planimetry: 1.2, pht: 190, mg: 8, hr: 72, pasp: 48, mr: 'mild', w_mobility: '2', w_thickening: '2', w_calcification: '2', w_subvalvular: '1' },
+      AR: { vc: 0.4, pht: 380, jetRatio: 35, desc: 'intermediate', lvesd: 38 },
+      MR: { vc: 0.75, eroa: 0.48, rvol: 72, rf: 54, morph: 'flail', pv: 'reversal', cw: 'triangular', etiology: 'primary', lvesd: 42, pasp: 45 },
+      TR: { vc: 1.5, eroa: 0.65, rvol: 62, hv: 'reversal', chambers: 'dilated', annulus: 44 },
+      pisaMR: { r: 1.0, alias: 40, vmax: 500, vti: 150, fsv: 60 },
+      calc: {},
+    };
+  }
+
+  if (!hadSaved) {
+    const ex = exampleState();
+    Object.keys(ex).forEach((k) => { state[k] = ex[k]; });
+    document.getElementById('patient-fields').innerHTML = PATIENT.map((f) => fieldHTML('patient', f)).join('');
+  }
   buildPanels();
   selectTab(TABS.some((t) => t.id === state.tab) ? state.tab : 'AS');
   renderAll();
+  renderExampleFlag();
 })();
