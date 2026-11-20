@@ -158,6 +158,18 @@
   tabsEl.innerHTML = TABS.map((t) => '<button role="tab" type="button" id="tab-' + t.id + '" aria-controls="panel-' + t.id +
     '" data-tab="' + t.id + '"><span class="dot" id="dot-' + t.id + '"></span>' + esc(t.label) + '</button>').join('');
 
+  function echoShell(id) {
+    return '<section class="echo" aria-label="Schematic echo screen"><div class="echoscreen">' +
+      '<canvas id="echo2d-' + id + '" role="img" aria-label="Schematic 2D and colour Doppler image"></canvas>' +
+      '<canvas id="echodop-' + id + '" role="img" aria-label="Schematic spectral Doppler trace"></canvas></div>' +
+      '<p class="echonote" id="echonote-' + id + '"></p></section>';
+  }
+  function drawEcho(id, inputs, res, extra) {
+    if (!window.EchoScreen) return;
+    const assumed = window.EchoScreen.draw(id, document.getElementById('echo2d-' + id), document.getElementById('echodop-' + id), inputs, res, extra);
+    document.getElementById('echonote-' + id).textContent = 'Schematic drawn from your entries, not a real image.' +
+      (assumed ? ' Values marked * were not entered and use typical figures.' : '');
+  }
   function resultShell(id) {
     return '<section class="card result" id="result-' + id + '" aria-live="polite"></section>';
   }
@@ -165,13 +177,13 @@
   function buildPanels() {
     let html = '';
     // AS
-    html += '<div class="panel" role="tabpanel" id="panel-AS"><section class="card inputs"><h2>Aortic stenosis</h2>' +
+    html += '<div class="panel" role="tabpanel" id="panel-AS">' + echoShell('AS') + '<section class="card inputs"><h2>Aortic stenosis</h2>' +
       '<h3>Doppler</h3>' + grid('AS', AS_FIELDS.main) +
       '<h3>Continuity equation / DVI</h3>' + grid('AS', AS_FIELDS.continuity) +
       '<h3>Low-gradient work-up</h3>' + grid('AS', AS_FIELDS.lowflow, true) +
       '</section>' + resultShell('AS') + '</div>';
     // MS
-    html += '<div class="panel" role="tabpanel" id="panel-MS"><section class="card inputs"><h2>Mitral stenosis</h2>' +
+    html += '<div class="panel" role="tabpanel" id="panel-MS">' + echoShell('MS') + '<section class="card inputs"><h2>Mitral stenosis</h2>' +
       '<h3>Haemodynamics</h3>' + grid('MS', MS_FIELDS.main) +
       '<h3>Wilkins score (PMBC suitability)</h3>' + grid('MS', MS_FIELDS.wilkins, true) +
       '</section>' + resultShell('MS') + '</div>';
@@ -180,7 +192,7 @@
       const fields = regurgFields(L);
       const numeric = fields.filter((f) => f.type === 'number');
       const qual = fields.filter((f) => f.type === 'select');
-      html += '<div class="panel" role="tabpanel" id="panel-' + L + '"><section class="card inputs"><h2>' + esc(V.REGURG_DEFS[L].name) + '</h2>' +
+      html += '<div class="panel" role="tabpanel" id="panel-' + L + '">' + echoShell(L) + '<section class="card inputs"><h2>' + esc(V.REGURG_DEFS[L].name) + '</h2>' +
         '<h3>Quantitative &amp; semi-quantitative</h3>' + grid(L, numeric) +
         pisaHelperHTML(L) +
         '<h3>Qualitative &amp; supportive signs</h3>' + grid(L, qual, true) +
@@ -302,14 +314,17 @@
   }
 
   function renderAS() {
-    const r = V.assessAS(Object.assign({}, state.AS, patientInputs()));
+    const inp = Object.assign({}, state.AS, patientInputs());
+    const r = V.assessAS(inp);
     renderResult('AS', r, (g) => AS_CHIP[g]);
+    drawEcho('AS', inp, r);
   }
   function renderMS() {
     const s = state.MS;
     const w = { mobility: s.w_mobility, thickening: s.w_thickening, calcification: s.w_calcification, subvalvular: s.w_subvalvular };
     const r = V.assessMS(Object.assign({}, s, { wilkins: w, symptomatic: !!state.patient.symptomatic, laThrombus: !!s.laThrombus }));
     renderResult('MS', r, (g) => MS_CHIP[g]);
+    drawEcho('MS', s, r);
   }
   function renderRegurg(L) {
     const inp = Object.assign({}, state[L], patientInputs());
@@ -317,6 +332,7 @@
     const r = V.assessRegurg(L, inp);
     renderResult(L, r, regurgChipLabel);
     renderPisa(L);
+    drawEcho(L, inp, r, { pisa: state['pisa' + L] || {} });
   }
 
   function pisaCalc(L) {
@@ -364,7 +380,7 @@
     if (scope === 'AS') return renderAS();
     if (scope === 'MS') return renderMS();
     if (scope === 'calc') return renderCalc();
-    if (/^pisa/.test(scope)) return renderPisa(scope.slice(4));
+    if (/^pisa/.test(scope)) return renderRegurg(scope.slice(4));
     renderRegurg(scope);
   }
 

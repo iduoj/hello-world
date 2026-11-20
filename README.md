@@ -18,6 +18,8 @@ Open `index.html` in a browser (or run `npm start` and visit http://localhost:80
 | **Calculators** | Continuity equation, Bernoulli/PASP, PISA, volumetric RF, PHT→MVA. |
 | **Reference** | Threshold tables. |
 
+Each lesion tab opens with a schematic **echo screen**: a 2D sector with colour Doppler and a spectral Doppler strip, drawn from the entered values (valve opening, jet size, PISA, envelope shape, pressure half-time slope, venous flow patterns). It is an illustration, not a real image; values not entered use typical figures and are marked `*`.
+
 Each regurgitation tab includes a PISA helper that computes EROA, RVol and RF and fills them in for you.
 
 ## Integration logic (regurgitation)
