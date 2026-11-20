@@ -18,7 +18,7 @@ Open `index.html` in a browser (or run `npm start` and visit http://localhost:80
 | **Calculators** | Continuity equation, Bernoulli/PASP, PISA, volumetric RF, PHT→MVA. |
 | **Reference** | Threshold tables. |
 
-Each lesion tab opens with a schematic **echo screen**: a 2D sector with colour Doppler and a spectral Doppler strip, drawn from the entered values (valve opening, jet size, PISA, envelope shape, pressure half-time slope, venous flow patterns). It is an illustration, not a real image; values not entered use typical figures and are marked `*`.
+Each lesion tab opens with a schematic **echo screen**: a 2D sector with colour Doppler and a spectral Doppler strip, drawn from the entered values (valve opening, jet size, PISA, envelope shape, pressure half-time slope, venous flow patterns). The screen beats through the cardiac cycle (Freeze/Play) with a sweep cursor on the Doppler strip. Measuring tools work on the screen like a machine's calc package: calipers on the 2D image (LVOT diameter, vena contracta, PISA radius) and velocity points, pressure half-time slopes and envelope traces on the spectral strip. Each measurement is graded against the severity thresholds, compared with the entered value, and can be written into the form with **Use this value**. It is an illustration, not a real image; values not entered use typical figures and are marked `*`.
 
 Each regurgitation tab includes a PISA helper that computes EROA, RVol and RF and fills them in for you.
 

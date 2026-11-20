@@ -162,14 +162,95 @@
     return '<section class="echo" aria-label="Schematic echo screen"><div class="echoscreen">' +
       '<canvas id="echo2d-' + id + '" role="img" aria-label="Schematic 2D and colour Doppler image"></canvas>' +
       '<canvas id="echodop-' + id + '" role="img" aria-label="Schematic spectral Doppler trace"></canvas></div>' +
-      '<p class="echonote" id="echonote-' + id + '"></p></section>';
+      '<div class="measure" id="measure-' + id + '"></div></section>';
+  }
+
+  // --- Echo screen controllers and on-screen measurements --------------------
+  const echo = {};
+  let echoAssumed = {};
+  function mountEcho() {
+    Object.keys(echo).forEach((k) => { echo[k].destroy(); delete echo[k]; });
+    if (!window.EchoScreen) return;
+    ['AS', 'MS', 'AR', 'MR', 'TR'].forEach((L) => {
+      echo[L] = window.EchoScreen.create(L, document.getElementById('echo2d-' + L), document.getElementById('echodop-' + L),
+        { onMeasure: () => renderMeasure(L) });
+    });
   }
   function drawEcho(id, inputs, res, extra) {
-    if (!window.EchoScreen) return;
-    const assumed = window.EchoScreen.draw(id, document.getElementById('echo2d-' + id), document.getElementById('echodop-' + id), inputs, res, extra);
-    document.getElementById('echonote-' + id).textContent = 'Schematic drawn from your entries, not a real image.' +
-      (assumed ? ' Values marked * were not entered and use typical figures.' : '');
+    if (!echo[id]) return;
+    echoAssumed[id] = echo[id].update(inputs, res, extra);
+    renderMeasure(id);
   }
+
+  const r1 = (v) => V.round(v, 1), r2 = (v) => V.round(v, 2);
+  const stepGrade = (v, cuts) => cuts.reduce((g, c) => (v >= c ? g + 1 : g), 0);
+  const regParam = (L, key) => V.REGURG_DEFS[L].params.find((q) => q.key === key);
+  const row = (label, value, unit, scope, key, grade, names) => ({ label, value, unit, scope, key, grade, names });
+  const regRow = (L, key, label, value, unit) => row(label, value, unit, L, key, V.gradeNumeric(regParam(L, key), value), V.GRADE_NAMES);
+  // What each on-screen measurement means: the rows it yields, the field it fills and its severity class.
+  const MEASURE = {
+    AS: {
+      lvotD: (m) => [row('LVOT diameter', r2(m.value), 'cm', 'AS', 'lvotD')],
+      vmax: (m) => [row('AV Vmax', r1(m.value), 'm/s', 'AS', 'vmax', m.value < 2.6 ? 0 : 1 + stepGrade(m.value, [3, 4, 5]), AS_CHIP),
+        row('Peak gradient (4v²)', Math.round(4 * m.value * m.value), 'mmHg')],
+      avTrace: (m) => [row('AV VTI', r1(m.vti), 'cm', 'AS', 'avVti'),
+        row('Mean gradient', Math.round(m.meanPG), 'mmHg', 'AS', 'mg', 1 + stepGrade(m.meanPG, [20, 40, 60]), AS_CHIP)],
+      lvotTrace: (m) => [row('LVOT VTI', r1(m.vti), 'cm', 'AS', 'lvotVti')],
+    },
+    MS: {
+      pht: (m) => [row('Pressure half-time', Math.round(m.value), 'ms', 'MS', 'pht', m.value >= 220 ? 4 : m.value >= 150 ? 3 : m.value >= 110 ? 2 : 1, MS_CHIP),
+        row('MVA (220 / PHT)', r2(220 / m.value), 'cm²')],
+      mvTrace: (m) => [row('Mean gradient', r1(m.meanPG), 'mmHg', 'MS', 'mg', m.meanPG > 10 ? 3 : m.meanPG >= 5 ? 2 : 1, MS_CHIP)],
+    },
+    AR: {
+      vc: (m) => [regRow('AR', 'vc', 'Vena contracta', r2(m.value), 'cm')],
+      pht: (m) => [regRow('AR', 'pht', 'Pressure half-time', Math.round(m.value), 'ms')],
+    },
+    MR: {
+      vc: (m) => [regRow('MR', 'vc', 'Vena contracta', r2(m.value), 'cm')],
+      pisaR: (m) => [row('PISA radius', r2(m.value), 'cm', 'pisaMR', 'r')],
+      vmax: (m) => [row('MR Vmax', Math.round(m.value * 100), 'cm/s', 'pisaMR', 'vmax')],
+      trace: (m) => [row('MR VTI', Math.round(m.vti), 'cm', 'pisaMR', 'vti')],
+    },
+    TR: {
+      vc: (m) => [regRow('TR', 'vc', 'Vena contracta', r2(m.value), 'cm')],
+      pisaR: (m) => [regRow('TR', 'pisaR', 'PISA radius', r2(m.value), 'cm')],
+      vmax: (m) => [row('TR Vmax', Math.round(m.value * 100), 'cm/s', 'pisaTR', 'vmax'),
+        row('RV–RA gradient (4v²)', Math.round(4 * m.value * m.value), 'mmHg')],
+    },
+  };
+  function verdict(r) {
+    if (!r.key) return '';
+    const cur = V.num(state[r.scope] ? state[r.scope][r.key] : null);
+    if (cur === null) return '<span class="mnote">not entered yet</span>';
+    const diff = (r.value - cur) / cur, tol = Math.max(r.tol || 0.1, r.unit === 'cm' && cur < 5 ? 0.08 / cur : 0);
+    if (Math.abs(diff) <= tol) return '<span class="mnote ok">matches entered ' + esc(cur) + ' ' + esc(r.unit) + '</span>';
+    return '<span class="mnote off">' + Math.round(Math.abs(diff) * 100) + '% ' + (diff > 0 ? 'above' : 'below') + ' entered ' + esc(cur) + ' ' + esc(r.unit) + '</span>';
+  }
+  function renderMeasure(L) {
+    const ct = echo[L], el = document.getElementById('measure-' + L);
+    if (!ct || !el) return;
+    const tool = ct.tool(), meas = ct.measurements();
+    let html = '<div class="measurebar"><button type="button" data-echo-play="' + L + '">' + (ct.playing() ? 'Freeze' : 'Play') + '</button>' +
+      '<span class="mlabel">Measure</span>' +
+      ct.tools.map((t) => '<button type="button" data-tool="' + L + ':' + t.id + '" aria-pressed="' + (tool && tool.id === t.id) + '">' + esc(t.label) + '</button>').join('') +
+      (Object.keys(meas).length ? '<button type="button" class="ghost" data-echo-clear="' + L + '">Clear measurements</button>' : '') + '</div>';
+    html += '<p class="echonote">' + esc(tool ? tool.hint
+      : 'Schematic drawn from your entries, not a real image.' + (echoAssumed[L] ? ' Values marked * were not entered and use typical figures.' : '')) + '</p>';
+    const rows = [];
+    ct.tools.forEach((t) => { if (meas[t.id] && MEASURE[L][t.id]) MEASURE[L][t.id](meas[t.id].result).forEach((r) => { r.tol = t.type === 'trace' ? 0.15 : 0.1; rows.push(r); }); });
+    if (rows.length) {
+      html += '<table class="params measured"><tbody>' + rows.map((r) => {
+        const cur = r.key ? V.num(state[r.scope] ? state[r.scope][r.key] : null) : null;
+        return '<tr><td>' + esc(r.label) + '</td><td class="mval">' + esc(r.value) + ' ' + esc(r.unit) +
+          (r.grade !== undefined && r.grade !== null ? ' <span class="chip ' + gradeClass(r.grade) + '">' + esc(r.names[r.grade]) + '</span>' : '') + '</td>' +
+          '<td>' + verdict(r) + '</td><td>' +
+          (r.key && cur !== r.value ? '<button type="button" data-use="' + L + ':' + r.scope + ':' + r.key + ':' + r.value + '">Use this value</button>' : '') + '</td></tr>';
+      }).join('') + '</tbody></table>';
+    }
+    el.innerHTML = html;
+  }
+
   function resultShell(id) {
     return '<section class="card result" id="result-' + id + '" aria-live="polite"></section>';
   }
@@ -202,6 +283,7 @@
     html += '<div class="panel" role="tabpanel" id="panel-calc" style="grid-template-columns:1fr">' + calculatorsHTML() + '</div>';
     html += '<div class="panel" role="tabpanel" id="panel-ref" style="grid-template-columns:1fr">' + referenceHTML() + '</div>';
     panelsEl.innerHTML = html;
+    mountEcho();
   }
 
   function pisaHelperHTML(L) {
@@ -419,6 +501,23 @@
       const put = (k, v, dp) => { if (v === null) return; state[L][k] = V.round(v, dp); const el = document.getElementById(fid(L, k)); if (el) el.value = state[L][k]; };
       put('eroa', c.eroa, 2); put('rvol', c.rvol, 0); if (L !== 'TR') put('rf', c.rf, 0);
       renderRegurg(L); save();
+      return;
+    }
+    const toolBtn = e.target.closest('[data-tool]');
+    if (toolBtn) { const [L, id] = toolBtn.dataset.tool.split(':'); echo[L].setTool(id); return renderMeasure(L); }
+    const playBtn = e.target.closest('[data-echo-play]');
+    if (playBtn) { const L = playBtn.dataset.echoPlay; echo[L].setPlaying(!echo[L].playing()); return renderMeasure(L); }
+    const clearBtn = e.target.closest('[data-echo-clear]');
+    if (clearBtn) { const L = clearBtn.dataset.echoClear; echo[L].clear(); return renderMeasure(L); }
+    const useBtn = e.target.closest('[data-use]');
+    if (useBtn) {
+      const [L, scope, key, raw] = useBtn.dataset.use.split(':'), value = parseFloat(raw);
+      if (!state[scope]) state[scope] = {};
+      state[scope][key] = value;
+      const input = document.getElementById(fid(scope, key));
+      if (input) input.value = value;
+      if (state.example) { state.example = false; renderExampleFlag(); }
+      renderScope(scope); renderMeasure(L); save();
       return;
     }
     const copy = e.target.closest('[data-copy]');

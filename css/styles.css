@@ -126,6 +126,21 @@ input[type="number"] { -moz-appearance: textfield; }
 }
 .echoscreen canvas { display: block; width: 100%; height: auto; background: #000; }
 .echonote { margin: 6px 2px 0; font-size: 12px; color: var(--muted); }
+.measure { overflow-x: auto; }
+.measurebar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 8px; }
+.measurebar button { padding: 4px 10px; font-size: 13px; }
+.measurebar button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--chip-text); }
+.measurebar .mlabel { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; margin: 0 2px 0 8px; }
+table.measured { margin-top: 8px; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; border-collapse: separate; border-spacing: 0; }
+table.measured td { padding: 6px 10px; vertical-align: middle; }
+table.measured tr:first-child td { border-top: 0; }
+table.measured td:last-child { text-align: right; }
+table.measured button { padding: 3px 9px; font-size: 12px; }
+.mval { font-variant-numeric: tabular-nums; font-weight: 600; white-space: nowrap; }
+.mnote { font-size: 12px; color: var(--muted); }
+.mnote.ok { color: var(--g1); }
+.mnote.off { color: var(--g2); }
+.echoscreen canvas { user-select: none; -webkit-user-select: none; }
 @media (max-width: 640px) { .echoscreen { grid-template-columns: 1fr; } }
 .result { position: sticky; top: calc(12px + env(safe-area-inset-top, 0px)); }
 .verdict { display: flex; align-items: center; gap: 12px; margin: 6px 0 12px; }
