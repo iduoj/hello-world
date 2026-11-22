@@ -389,7 +389,7 @@
       const site = this.sites ? this.sites[Math.floor(s.rng() * this.sites.length)] : this.site;
       if (this.node === 'A') ok = s.activateA(t, { site: site || 'sinus', kind: this.label === 'sinus' ? 'sinus' : (this.label || 'ectopic'), focus: this });
       else if (this.node === 'H') ok = s.activateH(t, null, { focus: this, label: this.label || 'junctional', junctional: true });
-      else ok = s.contribV(t, { type: 'focus', spec: this.spec || Mo.spec(this.site || 'rvApex'), label: this.label || 'PVC', focus: this });
+      else ok = s.contribV(t, { type: 'focus', spec: this.specs ? this.specs[this.fired % this.specs.length] : (this.spec || Mo.spec(this.site || 'rvApex')), label: this.label || 'PVC', focus: this });
       if (ok) this.fired++;
       if (this.kind === 'auto') this.arm(t + this.interval());
       else if (this.repeatLeft > 0) { this.repeatLeft--; this.arm(t + (this.cl || 400)); }

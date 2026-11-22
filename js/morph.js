@@ -162,7 +162,7 @@
     if (r) { vcache.delete(key); vcache.set(key, r); return r; }
     const seeds = sp.seeds.map((s) => ({ v: s.v != null ? s.v : M.nearest(s.p, s.kind || 'any'), t: s.t || 0 }));
     const T = M.activate(seeds, sp);
-    const d = M.dipole(T);
+    const d = M.dipole(T, sp.vm ? 3.2 * Math.min(3.2, M.VM / sp.vm) : 3.2);   // slowed conduction: smooth proportionally
     if (sp.lobes) {
       const sc = sp.vm ? M.VM / sp.vm : 1;
       for (const lb of sp.lobes.list) {

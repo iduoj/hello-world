@@ -20,7 +20,9 @@
     leftAnterolateral: { name: 'Left anterolateral', ring: 'mitral', deg: 235 },
   };
   for (const k in R.AP) { const a = R.AP[k]; a.id = k; a.vSite = ring(a.ring, a.deg, 0.75); a.aSite = ring(a.ring, a.deg, -0.9); }
-  R.apCfg = (loc, o) => Object.assign({ aSite: R.AP[loc].aSite, vSite: R.AP[loc].vSite, delay: 28, erp: 290, retro: { delay: 28, erp: 240 } }, o || {});
+  /* Pathway at an arbitrary angle on a ring ('mitral' | 'tricuspid'). */
+  R.apAt = (which, deg) => ({ ring: which, deg, vSite: ring(which, deg, 0.75), aSite: ring(which, deg, -0.9) });
+  R.apCfg = (loc, o) => { const a = typeof loc === 'string' ? R.AP[loc] : loc; return Object.assign({ aSite: a.aSite, vSite: a.vSite, delay: 28, erp: 290, retro: { delay: 28, erp: 240 } }, o || {}); };
 
   const PAC = (o) => Object.assign({ id: 'pac', node: 'A', kind: 'coupled', after: 'sinus', coupling: 420, every: 3, site: 'lspv', label: 'PAC' }, o);
   const PVC = (o) => Object.assign({ id: 'pvc', node: 'V', kind: 'coupled', after: 'hps', coupling: 430, every: 3, site: 'rvotSeptal', label: 'PVC' }, o);

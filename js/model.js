@@ -192,7 +192,7 @@
 
   /* Heart dipole time series from a LAT field. Returns { vcg: Float32Array(3n) in mV, n (ms samples),
    * t0 (ms of first sample relative to LAT zero), dur, area:[x,y,z] (mV·ms) }. */
-  M.dipole = function (T) {
+  M.dipole = function (T, sigma) {
     let tmax = 0, tmin = Infinity;
     for (let i = 0; i < nv; i++) { const t = T[i]; if (t < Infinity) { if (t > tmax) tmax = t; if (t < tmin) tmin = t; } }
     const pad = 12;
@@ -225,7 +225,7 @@
       D[b * 3] += gx * k0; D[b * 3 + 1] += gy * k0; D[b * 3 + 2] += gz * k0;
       if (b + 1 < n) { D[b * 3 + 3] += gx * k1; D[b * 3 + 4] += gy * k1; D[b * 3 + 5] += gz * k1; }
     }
-    EP.smooth(D, n, 3, 3.2);
+    EP.smooth(D, n, 3, sigma || 3.2);
     const area = [0, 0, 0];
     for (let i = 0; i < n; i++) { area[0] += D[i * 3]; area[1] += D[i * 3 + 1]; area[2] += D[i * 3 + 2]; }
     return { vcg: D, n, t0, dur: tmax - tmin, tmin, tmax, area };
