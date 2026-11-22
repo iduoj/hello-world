@@ -96,14 +96,25 @@ See docs/ARCHITECTURE.md for module APIs.
 - [x] Block 1: geometry + activation model + ECG synthesis (model-derived QRS validated visually)
 - [x] Block 2: ECG renderer + rhythm engine + library (40 rhythms)
 - [x] Block 3: 3D heart + sync
-- [x] Block 4: app shell + Rhythm Lab; first artifact published
-- [ ] Block 5: devices (3D leads, CXR), pacemaker sim, temp pacing, ICD
-- [ ] Block 6: localisation lab
-- [ ] Block 7: tox, scenarios, quiz
-- [ ] Block 8: final polish, PR
+- [x] Block 4: app shell + Rhythm Lab
+- [x] Block 5: devices (3D hardware, simulated CXR, catalogue + malpositions), pacemaker simulator,
+      temporary pacing, ICD
+- [x] Block 6: localisation lab (PVC/VT origin, accessory pathway, pacing site)
+- [x] Block 7: tox & electrolytes, cases, quiz
+- [x] Block 8: bundle, artifact published, draft PR #4
+
+### Ideas not done yet (candidates for the next round)
+- Rate response (R) and AV-search / minimised-ventricular-pacing algorithms in the pacemaker sim
+- Intracardiac electrogram channels (A/V EGM) beside the marker channel
+- Scar-based VT circuit drawn on the 3D map (isthmus, exit) and entrainment concepts
+- STEMI / pericarditis / LVH morphologies (outside pure EP but useful for the quiz)
+- Epicardial post-surgical wires; S-ICD sensing-vector screening tool
+- Spaced-repetition scheduling for the quiz; per-topic progress
 
 ### Notes for whoever resumes
 - Hemiblock axis shift is boosted by small additive lobes (`LOBES` in morph.js) — the uniform
   Purkinje sheet alone under-shifts the axis. Everything else is pure model output.
 - Normal frontal axis ≈ +30°; normal QRS 78 ms (visible), PR ≈ 160 ms.
 - Sandbox blocks cdnjs: tests map the three.js URL to the npm copy (tools/shot.mjs).
+- X-ray hardware materials must be `transparent: true` or the subtractive lung pass darkens them.
+- Canvas views (ECGView/LiveStrip) must be created after their canvas has a parent element.

@@ -64,6 +64,11 @@ QRS events are emitted `FW` (100 ms) after onset so late contributors can fuse.
 ### heart3d.js — `new EP.Heart3D(el)`, `.setRecording`, `.setTime`, `.setMode('prop'|'iso'|'anat')`,
 `.setOpts({opacity,vessels,conduction,labels})`, `.setView(name)`, `.onPick`, `.group(name)`, `.addLabel`.
 ### ui.js — `EP.h`, `EP.UI.{seg,check,range,select,kv,teach,store}`, `EP.Player` (ECG card + heart card).
+### device.js — `new EP.Pacemaker(sim, cfg)` (modes AOO/AAI/VOO/VVI/VDD/DOO/DDI/DDD/OFF; emits `mark` and
+`timer` events; `.set(cfg)` live), `new EP.ICD(sim, cfg)` (`.log`), `new EP.Live({sim, strips, pulse, onTick})`.
+### devices3d.js — `EP.Hardware.build(parts)`, `EP.Hardware.add3D(heart, hw)`, `new EP.XRay(el)`.
+### ui-*.js — one module per tab: rhythms, localise, devices (`EP.Devices` catalogue), pacer, temp, icd,
+tox (`EP.Tox`), cases (+ quiz).
 ### app.js — modules register in `EP.Modules = [{id,title,mount(root)→{unmount}}]`; tabs + hash routing.
 
 ## Dev tools

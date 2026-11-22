@@ -820,7 +820,7 @@ table.tbl td { padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-
 
   /* Heart dipole time series from a LAT field. Returns { vcg: Float32Array(3n) in mV, n (ms samples),
    * t0 (ms of first sample relative to LAT zero), dur, area:[x,y,z] (mV·ms) }. */
-  M.dipole = function (T) {
+  M.dipole = function (T, sigma) {
     let tmax = 0, tmin = Infinity;
     for (let i = 0; i < nv; i++) { const t = T[i]; if (t < Infinity) { if (t > tmax) tmax = t; if (t < tmin) tmin = t; } }
     const pad = 12;
@@ -853,7 +853,7 @@ table.tbl td { padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-
       D[b * 3] += gx * k0; D[b * 3 + 1] += gy * k0; D[b * 3 + 2] += gz * k0;
       if (b + 1 < n) { D[b * 3 + 3] += gx * k1; D[b * 3 + 4] += gy * k1; D[b * 3 + 5] += gz * k1; }
     }
-    EP.smooth(D, n, 3, 3.2);
+    EP.smooth(D, n, 3, sigma || 3.2);
     const area = [0, 0, 0];
     for (let i = 0; i < n; i++) { area[0] += D[i * 3]; area[1] += D[i * 3 + 1]; area[2] += D[i * 3 + 2]; }
     return { vcg: D, n, t0, dur: tmax - tmin, tmin, tmax, area };
@@ -1144,7 +1144,7 @@ table.tbl td { padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-
     if (r) { vcache.delete(key); vcache.set(key, r); return r; }
     const seeds = sp.seeds.map((s) => ({ v: s.v != null ? s.v : M.nearest(s.p, s.kind || 'any'), t: s.t || 0 }));
     const T = M.activate(seeds, sp);
-    const d = M.dipole(T);
+    const d = M.dipole(T, sp.vm ? 3.2 * Math.min(3.2, M.VM / sp.vm) : 3.2);   // slowed conduction: smooth proportionally
     if (sp.lobes) {
       const sc = sp.vm ? M.VM / sp.vm : 1;
       for (const lb of sp.lobes.list) {
@@ -1684,7 +1684,7 @@ table.tbl td { padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-
       const site = this.sites ? this.sites[Math.floor(s.rng() * this.sites.length)] : this.site;
       if (this.node === 'A') ok = s.activateA(t, { site: site || 'sinus', kind: this.label === 'sinus' ? 'sinus' : (this.label || 'ectopic'), focus: this });
       else if (this.node === 'H') ok = s.activateH(t, null, { focus: this, label: this.label || 'junctional', junctional: true });
-      else ok = s.contribV(t, { type: 'focus', spec: this.spec || Mo.spec(this.site || 'rvApex'), label: this.label || 'PVC', focus: this });
+      else ok = s.contribV(t, { type: 'focus', spec: this.specs ? this.specs[this.fired % this.specs.length] : (this.spec || Mo.spec(this.site || 'rvApex')), label: this.label || 'PVC', focus: this });
       if (ok) this.fired++;
       if (this.kind === 'auto') this.arm(t + this.interval());
       else if (this.repeatLeft > 0) { this.repeatLeft--; this.arm(t + (this.cl || 400)); }
@@ -1913,7 +1913,9 @@ table.tbl td { padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-
     leftAnterolateral: { name: 'Left anterolateral', ring: 'mitral', deg: 235 },
   };
   for (const k in R.AP) { const a = R.AP[k]; a.id = k; a.vSite = ring(a.ring, a.deg, 0.75); a.aSite = ring(a.ring, a.deg, -0.9); }
-  R.apCfg = (loc, o) => Object.assign({ aSite: R.AP[loc].aSite, vSite: R.AP[loc].vSite, delay: 28, erp: 290, retro: { delay: 28, erp: 240 } }, o || {});
+  /* Pathway at an arbitrary angle on a ring ('mitral' | 'tricuspid'). */
+  R.apAt = (which, deg) => ({ ring: which, deg, vSite: ring(which, deg, 0.75), aSite: ring(which, deg, -0.9) });
+  R.apCfg = (loc, o) => { const a = typeof loc === 'string' ? R.AP[loc] : loc; return Object.assign({ aSite: a.aSite, vSite: a.vSite, delay: 28, erp: 290, retro: { delay: 28, erp: 240 } }, o || {}); };
 
   const PAC = (o) => Object.assign({ id: 'pac', node: 'A', kind: 'coupled', after: 'sinus', coupling: 420, every: 3, site: 'lspv', label: 'PAC' }, o);
   const PVC = (o) => Object.assign({ id: 'pvc', node: 'V', kind: 'coupled', after: 'hps', coupling: 430, every: 3, site: 'rvotSeptal', label: 'PVC' }, o);
@@ -3900,6 +3902,247 @@ table.tbl td { padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-
 })(globalThis.EP = globalThis.EP || {});
 
 
+/* ---- js/ui-localise.js ---- */
+/* EP Simulator — Localisation lab: where does this QRS come from?
+ * PVC / VT exit site (click the heart), accessory pathway (delta-wave polarity), pacing site. */
+(function (EP) {
+  'use strict';
+  const h = EP.h, UI = EP.UI, Mo = EP.Morph, G = EP.G, M = EP.Model, R = EP.Rhythms, Lds = EP.Leads;
+
+  /* Measurements a clinician reads off a single QRS. */
+  function features(act) {
+    const n0 = Math.max(0, Math.round(act.on - act.t0)), n1 = Math.min(act.n - 1, Math.round(act.off - act.t0));
+    const f = { qrs: Math.round(act.off - act.on), lead: [] };
+    for (let l = 0; l < 12; l++) {
+      let mx = 0, mn = 0, area = 0, init = 0;
+      for (let i = n0; i <= n1; i++) { const v = Lds.project(act.vcg[i * 3], act.vcg[i * 3 + 1], act.vcg[i * 3 + 2], l); if (v > mx) mx = v; if (v < mn) mn = v; area += v; if (i - n0 < 40) init += v; }
+      f.lead.push({ r: mx, s: -mn, area, init: init / 40, pos: mx >= -mn });
+    }
+    f.v1 = f.lead[6].area >= 0 ? 'R' : 'L';
+    f.axis = Math.round(Mo.axis(act));
+    f.inferior = f.lead[1].area > 0 && f.lead[5].area > 0; f.superior = f.lead[1].area < 0 && f.lead[5].area < 0;
+    f.trans = 7; for (let k = 6; k < 12; k++) if (f.lead[k].pos) { f.trans = k - 5; break; }
+    f.negConc = f.trans === 7; f.posConc = f.lead.slice(6).every((x) => x.pos);
+    f.leadI = f.lead[0].area;
+    return f;
+  }
+  EP.qrsFeatures = features;
+  function readPVC(f) {
+    const out = [];
+    out.push(f.v1 === 'L' ? ['V1 is negative (LBBB pattern)', 'the wave moves away from V1 → it starts in the right ventricle or the septum'] : ['V1 is positive (RBBB pattern)', 'the wave moves toward V1 → it starts in the left ventricle']);
+    out.push(f.inferior ? ['Tall R waves in II, III, aVF (inferior axis)', 'activation travels downward → origin high: outflow tracts, summit, anterior base'] : f.superior ? ['QS in II, III, aVF (superior axis)', 'activation travels upward → origin low: inferior wall, apex, posterior papillary muscle or fascicle'] : ['Intermediate axis (' + f.axis + '°)', 'origin is mid-level: septum or lateral free wall']);
+    out.push(f.negConc ? ['No precordial transition (negative concordance)', 'everything moves away from the chest leads → apical origin'] : f.posConc ? ['Positive concordance V1–V6', 'everything moves toward the chest → basal left ventricle / mitral annulus'] : ['Precordial transition at V' + f.trans, f.v1 === 'L' ? (f.trans <= 2 ? 'early transition → think LVOT / aortic cusps rather than RVOT' : f.trans === 3 ? 'V3 is the grey zone: compare with the sinus beat — a PVC that transitions earlier than sinus rhythm points to the LVOT, later to the RVOT' : 'transition V4 or later → right ventricular origin') : 'R dominant from V1 with later loss of R → lateral or apical LV']);
+    out.push(f.leadI > 0.15 * Math.abs(f.lead[1].area) || f.leadI > 4 ? ['Lead I positive', 'wave travels right-to-left → origin on the rightward / septal side'] : f.leadI < -4 ? ['Lead I negative', 'wave travels left-to-right → origin on the far left: LV free wall, summit, anterior RVOT'] : ['Lead I small or isoelectric', 'origin near the midline (septum, outflow tracts)']);
+    out.push(f.qrs < 130 ? ['QRS only ' + f.qrs + ' ms', 'relatively narrow → close to the conduction system or septum (both ventricles reached quickly)'] : f.qrs > 165 ? ['QRS ' + f.qrs + ' ms', 'very wide → free wall or epicardial origin, far from the Purkinje network'] : ['QRS ' + f.qrs + ' ms', 'typical width for a myocardial origin']);
+    return out;
+  }
+  function regionName(p) {
+    const l = G.toLocal(p), info = {};
+    const inV = G.ventInfo(p[0], p[1], p[2], info);
+    const lv = !inV || info.inLV;
+    const level = l[2] < 2.2 ? 'basal' : l[2] < 5.2 ? 'mid' : 'apical';
+    if (!lv) { if (l[1] < -2.0 && l[2] < 2.4) return 'RV outflow tract'; return 'right ventricle, ' + level + (l[0] > 5 ? ' free wall' : l[1] > 1.5 ? ' inferior wall' : ' anterior wall'); }
+    const ang = Math.atan2(l[1], l[0]) * 180 / Math.PI;      // 0 = septal (+S), 90 = inferior (+N), ±180 lateral, −90 anterior
+    const wall = Math.abs(ang) < 45 ? 'septum' : ang >= 45 && ang < 135 ? 'inferior wall' : ang <= -45 && ang > -135 ? 'anterior wall' : 'lateral wall';
+    if (l[2] > 7.4) return 'left ventricular apex';
+    return 'left ventricle, ' + level + ' ' + wall;
+  }
+
+  const PRESETS = [['rvotSeptal', 'RVOT, septal'], ['rvotFree', 'RVOT, free wall'], ['lvotSeptal', 'LVOT / aortic cusps'], ['lvSummit', 'LV summit (epicardial)'], ['mitralAnt', 'Mitral annulus, anterior'], ['mitralLat', 'Mitral annulus, lateral'], ['mitralPost', 'Mitral annulus, posterior'],
+    ['papAL', 'Anterolateral papillary muscle'], ['papPM', 'Posteromedial papillary muscle'], ['fascPost', 'Left posterior fascicle'], ['fascAnt', 'Left anterior fascicle'], ['moderator', 'Moderator band'], ['rvInflow', 'Tricuspid annulus'], ['rvApex', 'RV apex'], ['rvFreeWall', 'RV free wall'], ['lvApex', 'LV apex'], ['lvInfBase', 'LV inferobasal (inferior MI scar)'], ['lvAntWall', 'LV anterior wall'], ['lvLatEpi', 'LV lateral wall (epicardial)']];
+  const PACE = [['rvApex', 'RV apex', () => Mo.spec('rvApex')], ['rvMidSeptum', 'RV mid-septum', () => Mo.spec('rvMidSeptum')], ['rvotSeptal', 'RV outflow tract', () => Mo.spec('rvotSeptal')],
+    ['his', 'His bundle (selective)', () => ({ seeds: Mo.hps({ t: 42 }), purkLV: 1, purkRV: 1 })], ['lbbArea', 'Left bundle branch area', () => Mo.spec('lbbArea')],
+    ['lvLatEpi', 'LV lateral vein (LV only)', () => Mo.spec('lvLatEpi')], ['biv', 'Biventricular', () => Mo.fuse([{ spec: Mo.spec('rvApex'), t: 0 }, { spec: Mo.spec('lvLatEpi'), t: 0 }])], ['lvInfApical', 'LV endocardium (lead across a PFO)', () => Mo.spec('lvInfApical')], ['midCardiacVein', 'Middle cardiac vein', () => Mo.spec('midCardiacVein')]];
+  const PACE_NOTE = {
+    rvApex: 'LBBB pattern, superior axis (negative II/III/aVF), positive I and aVL. The widest of the right-sided sites.',
+    rvMidSeptum: 'LBBB pattern but narrower; axis normal to leftward. Lead I positive.',
+    rvotSeptal: 'LBBB pattern with an inferior axis (tall R in II/III/aVF) — looks like an RVOT PVC.',
+    his: 'An isoelectric gap after the spike (the HV interval), then the patient\'s own narrow QRS.',
+    lbbArea: 'Narrow QRS with a terminal R in V1 (Qr / rSR′): the left ventricle leads, the right ventricle is late. Short stimulus-to-peak in V5–V6.',
+    lvLatEpi: 'RBBB pattern (dominant R in V1), negative in I and aVL, right axis: activation runs from the left lateral wall toward the right.',
+    biv: 'Fusion of RV apical and LV lateral wavefronts: narrower than either alone, Q/QS in lead I, superior or right-superior axis, usually an R in V1.',
+    lvInfApical: 'RBBB pattern with a superior axis. If you expected an RV lead, this lead is in the left ventricle.',
+    midCardiacVein: 'RBBB-type pattern with a superior axis — an "RV" lead that has entered the coronary sinus and a posterior vein.',
+  };
+
+  /* Small multi-lead thumbnail of one QRS-T. */
+  function mini(beat, leads, w, hgt) {
+    const c = h('canvas', { width: w * 2, height: hgt * 2, style: { width: w + 'px', height: hgt + 'px', display: 'block' } });
+    const ctx = c.getContext('2d'), col = EP.cssColors(document.body);
+    ctx.scale(2, 2); ctx.lineJoin = 'round';
+    const cw = w / leads.length, n = Math.min(beat.n, 520), sx = (cw - 8) / n, sy = hgt * 0.17;
+    leads.forEach((l, k) => {
+      ctx.strokeStyle = col.major; ctx.lineWidth = 0.5; ctx.beginPath(); ctx.moveTo(k * cw + 2, hgt / 2); ctx.lineTo((k + 1) * cw - 2, hgt / 2); ctx.stroke();
+      ctx.strokeStyle = col.trace; ctx.lineWidth = 1.1; ctx.beginPath();
+      for (let i = 0; i < n; i += 2) { const v = Lds.project(beat.vcg[i * 3], beat.vcg[i * 3 + 1], beat.vcg[i * 3 + 2], l); const x = k * cw + 4 + i * sx, y = hgt / 2 - EP.clamp(v, -2.6, 2.6) * sy; if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y); }
+      ctx.stroke();
+      ctx.fillStyle = col.label; ctx.font = '600 9px ' + col.font; ctx.fillText(Lds.names[l], k * cw + 3, 10);
+    });
+    return c;
+  }
+
+  EP.Modules = EP.Modules || [];
+  EP.Modules.push({
+    id: 'localise', title: 'Localise',
+    mount(root) {
+      const player = new EP.Player({ layout: '12', ladder: false });
+      const st = { tool: 'pvc', depth: 'epi', quiz: null, point: null, apRing: 'tricuspid', apDeg: 0, apMax: true, pace: 'rvApex' };
+      let marker = null, mlabel = null;
+      const panel = h('div.card-b'), sideEl = h('div.stack');
+      function setMarker(p, text) {
+        const hd = player.heart; if (!hd) return;
+        const g = hd.group('marker'); while (g.children.length) g.remove(g.children[0]);
+        if (mlabel) { mlabel.remove(); mlabel = null; }
+        if (!p) { hd.invalidate(); return; }
+        marker = new THREE.Mesh(new THREE.SphereGeometry(0.34, 16, 12), new THREE.MeshBasicMaterial({ color: 0x18e0ff }));
+        marker.position.set(p[0], p[1], p[2]); marker.renderOrder = 20; marker.material.depthTest = false; g.add(marker);
+        mlabel = hd.addLabel(text || 'Origin', [p[0], p[1] + 0.9, p[2]], 'note');
+        hd.invalidate();
+      }
+      function recFor(spec, label) {
+        const sim = EP.simulate({ sinus: { cl: 900, resp: 0 }, avn: { fast: { retro: { block: true } } }, foci: [{ id: 'x', node: 'V', kind: 'coupled', after: 'hps', coupling: 470, every: 1, spec, label: label || 'PVC' }] }, 10000);
+        const rec = EP.Synth.build(sim, 0, 10000); rec.sim = sim; return rec;
+      }
+      // ---------------- PVC tool ----------------
+      function pvcAt(p, kind, name, quiet) {
+        const v = M.nearest(p, kind || 'any'), pos = M.pos(v);
+        const st0 = typeof name === 'string' && Mo.SITES[name] ? Mo.SITES[name] : null;
+        const spec = st0 ? Mo.spec(name) : Mo.siteSpec({ p: pos, kind: 'any' });
+        const act = Mo.vent(spec), f = features(act);
+        st.point = pos; st.feat = f;
+        const rec = recFor(spec);
+        const q = rec.events.find((e) => e.type === 'QRS' && e.label === 'PVC');
+        player.load(rec, { title: 'Sinus beats alternating with the ectopic beat', t: q ? q.t + act.tmax * 0.6 : null });
+        if (!quiet) { setMarker(pos, st0 ? st0.name : 'Origin'); if (player.heart) { player.heart.setMode('iso'); player.modeSeg.set('iso'); player._legend('iso'); } drawPvc(st0 ? st0.name : regionName(pos), f); }
+        return { f, pos, spec };
+      }
+      function drawPvc(name, f) {
+        panel.innerHTML = '';
+        panel.append(h('div.eyebrow', 'Origin'), h('h3', { style: { fontSize: '16px', marginBottom: '8px' } }, name),
+          UI.kv([['V1', f.v1 === 'L' ? 'LBBB type' : 'RBBB type'], ['Axis', f.axis + '°'], ['Transition', f.negConc ? 'none' : 'V' + f.trans], ['QRS', f.qrs, 'ms'], ['Lead I', f.leadI > 4 ? 'positive' : f.leadI < -4 ? 'negative' : 'flat']]),
+          h('div.prose', { style: { marginTop: '10px', fontSize: '13px' } }, h('h4', 'Reading it step by step'), h('ol', { style: { margin: 0, paddingLeft: '1.2em' } }, readPVC(f).map(([a, b]) => h('li', h('b', a), ' — ' + b)))));
+      }
+      function pvcControls() {
+        const selEl = UI.select('Jump to', [['', '— named sites —']].concat(PRESETS), '', (v) => { if (!v) return; st.quiz = null; const s0 = Mo.SITES[v]; pvcAt(s0.p, s0.kind, v); });
+        const depth = UI.seg([['epi', 'Epicardial'], ['endo', 'Endocardial']], st.depth, (v) => { st.depth = v; }, 'Depth of clicked site');
+        const quizBtn = h('button.btn', { type: 'button', onclick: startPvcQuiz }, 'Quiz me');
+        return h('div.row', selEl, depth, quizBtn);
+      }
+      function startPvcQuiz() {
+        const pick = PRESETS[Math.floor(Math.random() * PRESETS.length)], s0 = Mo.SITES[pick[0]];
+        const others = PRESETS.filter((x) => x[0] !== pick[0]).sort(() => Math.random() - 0.5).slice(0, 4);
+        const opts = others.concat([pick]).sort(() => Math.random() - 0.5);
+        st.quiz = pick[0];
+        pvcAt(s0.p, s0.kind, pick[0], true); setMarker(null);
+        if (player.heart) { player.heart.setMode('anat'); player.modeSeg.set('anat'); player._legend('anat'); }
+        panel.innerHTML = '';
+        const box = h('div.opts');
+        panel.append(h('div.eyebrow', 'Quiz'), h('h3', { style: { fontSize: '16px', margin: '0 0 8px' } }, 'Where does the wide beat come from?'), box);
+        for (const o of opts) box.append(h('button.opt', { type: 'button', onclick: (ev) => {
+          for (const b of box.children) { b.disabled = true; if (b.textContent === pick[1]) b.classList.add('right'); }
+          if (o[0] !== pick[0]) ev.currentTarget.classList.add('wrong');
+          const r = pvcAt(s0.p, s0.kind, pick[0]);
+          panel.prepend(h('div.note' + (o[0] === pick[0] ? '.good' : '.bad'), { style: { marginBottom: '10px' } }, (o[0] === pick[0] ? 'Correct. ' : 'It was: ' + pick[1] + '. ') + 'The map now shows the activation sequence from that site.'), h('div', { style: { marginBottom: '10px' } }, h('button.btn.sm', { type: 'button', onclick: startPvcQuiz }, 'Another')));
+          void r;
+        } }, o[1]));
+      }
+      // ---------------- accessory pathway tool ----------------
+      function apShow() {
+        const ap = R.apAt(st.apRing, st.apDeg);
+        const sim = EP.simulate({ sinus: { cl: 880, resp: 0 }, avn: { fast: { min: st.apMax ? 150 : 66 } }, ap: R.apCfg(ap) }, 10000);
+        const rec = EP.Synth.build(sim, 0, 10000); rec.sim = sim;
+        const q = rec.events.find((e) => e.type === 'QRS' && e.t > 1500);
+        player.load(rec, { title: 'Sinus rhythm with pre-excitation', t: q ? q.t + 30 : null });
+        if (player.heart) { player.heart.setMode('prop'); player.modeSeg.set('prop'); player._legend('prop'); }
+        setMarker(null);
+        const f = q ? features(q.act) : null;
+        panel.innerHTML = '';
+        if (!f) return;
+        const pol = (x) => (x > 0.035 ? '+' : x < -0.035 ? '−' : '±');
+        const name = Object.values(R.AP).find((a) => a.ring === st.apRing && Math.abs(((a.deg - st.apDeg + 540) % 360) - 180) < 22);
+        const steps = [];
+        const dI = f.lead[0].init, dV1 = f.lead[6].init, dII = f.lead[1].init, dF = f.lead[5].init, dIII = f.lead[2].init;
+        steps.push(dI < -0.035 || f.lead[6].r > f.lead[6].s ? ['Delta negative in I (or R > S in V1)', 'the pathway is on the LEFT free wall — the early vector points away from the left lateral leads.'] : ['Delta positive in I and V1 not dominant', 'not a left free-wall pathway → septal or right-sided.']);
+        steps.push(dV1 < -0.035 ? ['Delta negative / isoelectric in V1', 'septal or right-sided insertion: the early vector points away from V1.'] : ['Delta positive in V1', 'the early vector points anteriorly/rightward → posterior or left-sided insertion.']);
+        steps.push(dF < -0.035 || dIII < -0.035 ? ['Delta negative in III / aVF', 'the pathway is INFERIOR (posterior ring, posteroseptal): pre-excitation spreads upward. This is the pattern that mimics an inferior MI.'] : ['Delta positive in the inferior leads', 'the pathway is on the ANTERIOR/SUPERIOR part of the ring (anteroseptal, anterolateral).']);
+        if (dII < -0.035) steps.push(['Delta negative in lead II as well', 'suggests a posteroseptal pathway near the coronary sinus / middle cardiac vein (sometimes epicardial).']);
+        panel.append(h('div.eyebrow', st.apRing === 'mitral' ? 'Mitral ring' : 'Tricuspid ring'), h('h3', { style: { fontSize: '16px', marginBottom: '8px' } }, (name ? name.name : 'Pathway') + ' pathway'),
+          h('div.scroll-x', h('table.tbl', h('thead', h('tr', h('th', 'Delta'), Lds.names.map((n) => h('th', n)))), h('tbody', h('tr', h('td', 'first 40 ms'), f.lead.map((x) => h('td.mono', pol(x.init))))))),
+          UI.kv([['PR', q ? Math.round(q.t - rec.events.filter((e) => e.type === 'P' && e.t < q.t).pop().t) : null, 'ms'], ['QRS', f.qrs, 'ms'], ['V1', f.v1 === 'L' ? 'negative' : 'positive'], ['Axis', f.axis + '°']]),
+          h('div.prose', { style: { marginTop: '10px', fontSize: '13px' } }, h('h4', 'Reading the delta wave'), h('ol', { style: { margin: 0, paddingLeft: '1.2em' } }, steps.map(([a, b]) => h('li', h('b', a), ' — ' + b))),
+            h('p', { style: { marginTop: '8px' } }, 'The rule behind every algorithm: the delta wave is the first 40 ms of ventricular activation spreading from the pathway insertion, so it is negative in leads that look at the insertion site and positive in leads on the opposite side.')));
+      }
+      function apControls() {
+        const ringSeg = UI.seg([['tricuspid', 'Tricuspid ring (right)'], ['mitral', 'Mitral ring (left)']], st.apRing, (v) => { st.apRing = v; apShow(); }, 'Ring');
+        const deg = UI.range('Position', { min: 0, max: 345, step: 15, value: st.apDeg, fmt: (v) => v + '°', grow: true }, (v) => { st.apDeg = v; clearTimeout(deg._t); deg._t = setTimeout(apShow, 120); });
+        const mx = UI.check('Maximise pre-excitation (slow AV node)', st.apMax, (v) => { st.apMax = v; apShow(); });
+        const named = UI.select('Named', [['', '— common locations —']].concat(Object.keys(R.AP).map((k) => [k, R.AP[k].name])), '', (k) => { if (!k) return; st.apRing = R.AP[k].ring; st.apDeg = R.AP[k].deg; ringSeg.set(st.apRing); deg.set(st.apDeg); apShow(); });
+        return h('div', h('div.row', ringSeg, named, mx), h('div.row', { style: { marginTop: '8px' } }, deg), h('p.muted', { style: { fontSize: '12px', marginTop: '4px' } }, 'Tricuspid ring: 0° lateral free wall, 90° inferior/posterior, 180° septal, 270° anterior. Mitral ring: 0° septal, 90° posterior, 180° lateral, 270° anterior.'));
+      }
+      // ---------------- pacing site tool ----------------
+      function paceShow() {
+        const item = PACE.find((x) => x[0] === st.pace), spec = item[2]();
+        const sim = new EP.HeartSim({ sinus: { cl: 820, resp: 0 }, avn: { fast: { block: true, retro: { block: true } } } });
+        new EP.Pacemaker(sim, { mode: 'DDD', lrl: 60, vSpec: spec, vSite: st.pace === 'his' || st.pace === 'biv' ? 'rvApex' : st.pace });
+        sim.runUntil(12500);
+        const rec = EP.Synth.build(sim, 2000, 12000); rec.sim = sim;
+        const q = rec.events.find((e) => e.type === 'QRS' && e.t > 3000);
+        player.load(rec, { title: 'Paced 12-lead — ' + item[1], t: q ? q.t + 40 : null });
+        if (player.heart) { player.heart.setMode('iso'); player.modeSeg.set('iso'); player._legend('iso'); }
+        const s0 = Mo.SITES[st.pace]; setMarker(s0 ? s0.p : st.pace === 'his' ? G.LM.his : null, 'Pacing site');
+        const f = features(Mo.vent(spec));
+        panel.innerHTML = '';
+        panel.append(h('div.eyebrow', 'Pacing site'), h('h3', { style: { fontSize: '16px', marginBottom: '8px' } }, item[1]),
+          UI.kv([['V1', f.v1 === 'L' ? 'LBBB type' : 'RBBB type'], ['Axis', f.axis + '°'], ['QRS', f.qrs, 'ms'], ['Lead I', f.leadI > 4 ? 'positive' : f.leadI < -4 ? 'negative' : 'flat'], ['Transition', f.negConc ? 'none' : 'V' + f.trans]]),
+          h('p', { style: { marginTop: '10px', fontSize: '13px' } }, PACE_NOTE[st.pace]));
+      }
+      function paceControls() {
+        const row = h('div.variants');
+        for (const it of PACE) { const b = h('button.btn.sm', { type: 'button', 'aria-pressed': String(it[0] === st.pace), onclick: () => { st.pace = it[0]; for (const x of row.children) x.setAttribute('aria-pressed', String(x === b)); paceShow(); } }, it[1]); row.append(b); }
+        return row;
+      }
+      function chart(title, items, getSpec) {
+        const grid = h('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: '10px' } });
+        for (const it of items) { const b = Mo.vbeat(getSpec(it), { rr: 900 }); grid.append(h('div', h('div', { style: { fontSize: '12px', fontWeight: '600', marginBottom: '2px' } }, it[1]), mini(b, [0, 1, 2, 6, 11], 250, 62))); }
+        return h('section.card', h('div.card-h', h('h3', title), h('span.grow'), h('span.muted', { style: { fontSize: '12px' } }, 'leads I · II · III · V1 · V6')), h('div.card-b', grid));
+      }
+
+      const ctl = h('div.card-b');
+      const toolSeg = UI.seg([['pvc', 'PVC / VT origin'], ['ap', 'Accessory pathway'], ['pace', 'Pacing site']], st.tool, (v) => { st.tool = v; setTool(); }, 'Tool');
+      const intro = h('p.muted', { style: { fontSize: '13px' } });
+      const charts = h('div.stack');
+      function setTool() {
+        ctl.innerHTML = ''; charts.innerHTML = ''; st.quiz = null;
+        if (player.heart) player.heart.onPick = null;
+        if (st.tool === 'pvc') {
+          intro.textContent = 'Click anywhere on the ventricles. The model starts a beat there, spreads it cell-to-cell, and derives the 12-lead from the result — the QRS vector always points away from the origin.';
+          ctl.append(pvcControls());
+          if (player.heart) { player.setOpacity(1); player.heart.setView('front'); player.heart.onPick = (pk) => { if (pk.atrial) return; st.quiz = null; let p = pk.point; if (st.depth === 'endo') { const kind = G.toLocal(p)[0] > 3.3 || pk.region === G.REG.RV || pk.region === G.REG.RVOT ? 'endoRV' : 'endoLV'; p = M.pos(M.nearest(p, kind)); } pvcAt(p, 'any'); }; }
+          const s0 = Mo.SITES.rvotSeptal; pvcAt(s0.p, s0.kind, 'rvotSeptal');
+          charts.append(chart('Signature chart — ectopic origins', PRESETS, (it) => Mo.spec(it[0])));
+        } else if (st.tool === 'ap') {
+          intro.textContent = 'Slide the pathway around either AV ring. With pre-excitation maximised the QRS is almost entirely the wave spreading from the pathway insertion, which is what delta-wave algorithms assume.';
+          ctl.append(apControls());
+          if (player.heart) { player.setOpacity(0.32); player.heart.setView('base'); }
+          apShow();
+        } else {
+          intro.textContent = 'The paced QRS tells you where the lead tip is. Compare each site with the apex, and note which leads change.';
+          ctl.append(paceControls());
+          if (player.heart) { player.setOpacity(0.4); player.heart.setView('lao'); }
+          paceShow();
+          charts.append(chart('Signature chart — pacing sites', PACE, (it) => it[2]()));
+        }
+      }
+      root.append(h('div.sim', { style: { gridTemplateColumns: '' } },
+        h('div.sim-main', h('section.card', h('div.card-h', h('h2', 'Localisation lab'), h('span.grow'), toolSeg), h('div.card-b', intro), ctl), player.ecgCard, charts),
+        h('div.sim-main', player.heartCard || h('div'), h('section.card', panel))));
+      setTool();
+      return { unmount() { player.destroy(); } };
+    },
+  });
+})(globalThis.EP = globalThis.EP || {});
+
+
 /* ---- js/ui-devices.js ---- */
 /* EP Simulator — Devices: hardware in 3D, simulated chest radiograph, paced 12-lead, correct vs
  * malpositioned variants and what gives each away. */
@@ -4512,6 +4755,466 @@ table.tbl td { padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-
           h('section.card', h('div.card-h', h('h3', 'Pacing box')), h('div.card-b', h('div.box', lcd, boxCtl, asyncChk, onBtn))))));
       newPatient(); teach(); rebuild();
       return { unmount() { live.destroy(); if (strip.ro) strip.ro.disconnect(); } };
+    },
+  });
+})(globalThis.EP = globalThis.EP || {});
+
+
+/* ---- js/ui-icd.js ---- */
+/* EP Simulator — ICD: detection zones, discriminators, anti-tachycardia pacing, shocks,
+ * and the common ways therapy goes wrong. */
+(function (EP) {
+  'use strict';
+  const h = EP.h, UI = EP.UI;
+  const NOVA = { fast: { retro: { block: true } } };
+  const VT = (cl, o) => Object.assign({ id: 'vt', node: 'V', cl, site: 'lvInfBase', label: 'VT', reentrant: true, startAt: 3200 }, o || {});
+  const CASES = {
+    vt: { name: 'Monomorphic VT 185/min', cfg: () => ({ sinus: { cl: 820 }, avn: NOVA, hps: { retro: { delay: 60, erp: 200 } }, foci: [VT(325, { atpSuccess: 0.9 })] }),
+      note: 'A stable re-entrant circuit. A burst of pacing slightly faster than the tachycardia enters the circuit\'s excitable gap, collides with the returning wave and stops it — painlessly. ATP terminates about 70–90% of monomorphic VT below 200/min.' },
+    fvt: { name: 'Fast VT 235/min', cfg: () => ({ sinus: { cl: 820 }, avn: NOVA, hps: { retro: { delay: 60, erp: 180 } }, foci: [VT(255, { atpSuccess: 0.35, accelerate: 0.3 })] }),
+      note: 'Falls in the VF zone by rate. Modern devices deliver one ATP attempt while charging; if it fails, the shock follows. Fast VT is less often pace-terminated and can accelerate.' },
+    vf: { name: 'Ventricular fibrillation', cfg: () => ({ sinus: { cl: 780 }, avn: NOVA, script: [{ t: 3200, do: (s, t) => s.setVentMode('vf', t) }] }),
+      note: 'No organised circuit to pace into. The device counts short, irregular intervals, charges its capacitor (a few seconds), reconfirms, and shocks. Note the under-sensing risk: fine VF electrograms are small.' },
+    af: { name: 'Atrial fibrillation with rapid conduction 190/min', cfg: () => ({ sinus: { on: false }, atria: { mode: 'fib', fibMean: 110 }, avn: { fast: { erp: 205, conceal: 0.2, min: 55 } } }),
+      note: 'The ventricular rate is in the VT zone but the rhythm is supraventricular. Discriminators — irregular intervals (stability), electrogram morphology matching the sinus template, and in dual-chamber devices more atrial than ventricular events — should withhold therapy. Turn them off to see an inappropriate shock.' },
+    st: { name: 'Sinus tachycardia 178/min (exercise)', cfg: () => ({ sinus: { cl: 337, resp: 0, sd: 0.004 }, avn: { fast: { erp: 200, min: 50, alpha: 60 } } }),
+      note: 'Gradual onset, 1:1 AV relationship, unchanged electrogram morphology. Inappropriate therapy is avoided by discriminators and, more reliably, by programming the detection rate above the patient\'s achievable sinus rate.' },
+    slow: { name: 'Slow VT 150/min (on amiodarone)', cfg: () => ({ sinus: { cl: 900 }, avn: NOVA, hps: { retro: { delay: 60, erp: 200 } }, foci: [VT(400)] }),
+      note: 'Antiarrhythmic drugs slow VT. If the tachycardia is below the lowest programmed detection rate the device watches it and does nothing: the patient has VT "under the radar". Lower the VT zone (or add a monitor zone) to see the difference.' },
+    tover: { name: 'T-wave over-sensing in sinus rhythm', cfg: () => ({ sinus: { cl: 600, resp: 0 } }), icd: { tOver: true },
+      note: 'Every beat is counted twice (R and T), so the device calculates double the true rate. Classic in hyperkalaemia, long QT, low R-wave amplitude, and the S-ICD. The surface ECG shows sinus rhythm while the marker channel shows alternating short intervals.' },
+    noise: { name: 'Lead fracture noise', cfg: () => ({ sinus: { cl: 850 } }), icd: { noise: 0.9 },
+      note: 'Make-and-break contact in a fractured conductor produces very short, non-physiological intervals that satisfy VF detection. The patient is awake, in sinus rhythm, and shocked repeatedly. First aid: a magnet over the generator suspends detection.' },
+    storm: { name: 'Electrical storm (recurrent VT)', storm: true, cfg: () => ({ sinus: { cl: 760 }, avn: NOVA, hps: { retro: { delay: 60, erp: 200 } }, foci: [VT(300, { atpSuccess: 0.5 })] }),
+      note: 'Three or more separate VT/VF episodes in 24 hours. Each shock raises sympathetic tone, which begets more VT. The device is doing its job; the treatment is of the patient: sedation, beta-blockade (propranolol or esmolol), amiodarone, correction of potassium and magnesium, treating ischaemia, reprogramming to favour ATP, and urgent ablation or sympathetic blockade if it continues.' },
+  };
+
+  EP.Modules = EP.Modules || [];
+  EP.Modules.push({
+    id: 'icd', title: 'ICD',
+    mount(root) {
+      const st = { cs: 'vt', vtRate: 170, vfRate: 220, atp: 2, svtDisc: true, shock: true, magnet: false };
+      let sim, icd, live, lastLog = 0;
+      const canvas = h('canvas', { 'aria-label': 'Live rhythm with ICD marker channel' }), liveBox = h('div.live', canvas);
+      const strip = new EP.LiveStrip(canvas, { channels: [{ lead: 1 }, { key: 'pulse', label: 'Arterial pressure' }], windowMs: 10000, markers: true, rowMm: 22 });
+      const logEl = h('div.findings'), noteEl = h('p.muted', { style: { fontSize: '13px' } }), stateEl = h('span.pill', 'monitoring');
+      function icdCfg() { return Object.assign({ vtRate: st.vtRate, vfRate: st.vfRate, atp: st.atp, svtDisc: st.svtDisc, shock: st.shock, on: !st.magnet, nidVT: 12, nidVF: 9 }, CASES[st.cs].icd || {}); }
+      function rebuild() {
+        const c = CASES[st.cs];
+        sim = new EP.HeartSim(c.cfg());
+        icd = new EP.ICD(sim, icdCfg());
+        if (c.storm) { let n = 0; sim.on('shock', (e) => { if (n++ < 3) sim.schedule(e.t + 5200, (t) => sim.addFocus(VT(300, { startAt: t, atpSuccess: 0.4, id: 'vt' + n }))); }); const chk = (t) => { const f = sim.foci.filter((x) => x.reentrant); if (f.length && f.every((x) => !x.enabled) && n < 3 && !chk.wait) { chk.wait = true; n++; sim.schedule(t + 5200, (tt) => { chk.wait = false; sim.addFocus(VT(300, { startAt: tt, atpSuccess: 0.4, id: 'vt' + n })); }); } sim.schedule(t + 500, chk); }; sim.schedule(1000, chk); }
+        if (live) live.setSim(sim); else live = new EP.Live({ sim, strips: [strip], pulse: true, noPulse: (b) => b.rr < 290, onTick: tick }).start();
+        logEl.innerHTML = ''; lastLog = 0; noteEl.textContent = c.note;
+        logEl.append(h('div.muted', 'Therapy log is empty.'));
+      }
+      function tick(t) {
+        if (icd.log.length !== lastLog) {
+          lastLog = icd.log.length; logEl.innerHTML = '';
+          for (const e of icd.log.slice(-9)) logEl.append(h('div.finding', h('span.pill.mono', (e.t / 1000).toFixed(1) + ' s'), h('div', e.what)));
+        }
+        const s = !icd.c.on ? 'therapy suspended (magnet)' : icd.state === 'charging' ? 'charging' : icd.state === 'atp' ? 'ATP' : 'monitoring';
+        if (stateEl.textContent !== s) { stateEl.textContent = s; stateEl.className = 'pill' + (s === 'monitoring' ? '' : s.startsWith('therapy') ? ' warn' : ' bad'); }
+      }
+      const apply = () => { Object.assign(icd.c, icdCfg()); };
+      const ctl = h('div.ctl');
+      function num(label, key, min, max, step, unit) {
+        const val = h('span.val', st[key] + ' ' + unit);
+        const inp = h('input', { type: 'range', min, max, step, value: st[key], 'aria-label': label, oninput: () => { st[key] = +inp.value; val.textContent = st[key] + ' ' + unit; apply(); } });
+        ctl.append(h('label', label), val, inp);
+      }
+      num('VT zone starts at', 'vtRate', 130, 210, 5, '/min'); num('VF zone starts at', 'vfRate', 190, 260, 5, '/min'); num('ATP bursts before shock', 'atp', 0, 3, 1, '');
+      const csSel = UI.select(null, Object.keys(CASES).map((k) => [k, CASES[k].name]), st.cs, (v) => { st.cs = v; rebuild(); });
+      csSel.setAttribute('aria-label', 'Rhythm scenario'); csSel.style.width = '100%';
+      root.append(h('div.sim',
+        h('div.sim-main',
+          h('section.card', h('div.card-h', h('h2', 'Live strip with marker channel'), h('span.grow'), stateEl, h('button.btn.sm', { type: 'button', onclick: rebuild }, 'Restart')), liveBox,
+            h('div.card-b', h('p.muted', { style: { fontSize: '12px' } }, 'VS sensed (below any zone) · TS in the VT zone · FS in the VF zone · TD/FD detection met · TP anti-tachycardia pace · CHG charging · CD charge delivered · ABT aborted · SVT therapy withheld.'))),
+          h('section.card', h('div.card-h', h('h3', 'What is happening')), h('div.card-b', noteEl, h('div', { style: { marginTop: '10px' } }, logEl))),
+          h('div.two',
+            h('section.card', h('div.card-h', h('h3', 'How an ICD decides')), h('div.card-b.prose',
+              h('p', h('b', 'Rate zones. '), 'Every sensed ventricular interval is binned: slower than the VT zone (ignore), VT zone, or VF zone. Detection is met when enough consecutive or recent intervals fall in a zone — e.g. 30 of 40 for VF in modern "long-detection" programming.'),
+              h('p', h('b', 'Discriminators (VT zone only). '), 'Onset — sudden (VT) vs gradual (sinus tachycardia). Stability — regular (VT) vs irregular (AF). Morphology — does the electrogram match the stored sinus template? Dual-chamber: more V than A events = VT.'),
+              h('p', h('b', 'Therapy. '), 'ATP: 8 pulses at about 85–88% of the tachycardia cycle length, as a burst (fixed) or ramp (shortening). Shock: 30–40 J biphasic, RV coil to can. In the VF zone, shocks, usually with one ATP attempt during charging.'),
+              h('p', h('b', 'Programming that saves lives. '), 'High detection rates (≥ 185–200/min for primary prevention) and long detection times reduce inappropriate and unnecessary shocks and reduce mortality (MADIT-RIT, ADVANCE III).'))),
+            h('section.card', h('div.card-h', h('h3', 'At the bedside')), h('div.card-b.prose', UI.list([
+              'A single shock, patient well: device check within 24–48 h. Multiple shocks, or shock with syncope/chest pain/dyspnoea: emergency assessment.',
+              'Magnet over an ICD: suspends tachycardia detection and therapy while it is in place. It does not change pacing. Remove it and therapy resumes. (A pacemaker does the opposite: it paces asynchronously.)',
+              'Shocks in sinus rhythm = inappropriate therapy: lead fracture, T-wave over-sensing, EMI, or SVT. Apply a magnet, attach external pads, interrogate.',
+              'In VF the external defibrillator still comes first if the ICD has not terminated it: place pads at least 8 cm from the generator, anteroposterior if possible.',
+              'Touching a patient during an internal shock is safe.',
+              'End of life: discuss and deactivate tachycardia therapies so the patient is not shocked while dying.']))))),
+        h('div.sim-main',
+          h('section.card', h('div.card-h', h('h3', 'Scenario')), h('div.card-b', csSel)),
+          h('section.card', h('div.card-h', h('h3', 'Programming')), h('div.card-b', ctl,
+            UI.check('SVT discriminators on', true, (v) => { st.svtDisc = v; apply(); }), h('div'),
+            UI.check('Shock therapy on', true, (v) => { st.shock = v; apply(); }), h('div'),
+            UI.check('Magnet over the generator', false, (v) => { st.magnet = v; apply(); }))))));
+      rebuild();
+      return { unmount() { live.destroy(); if (strip.ro) strip.ro.disconnect(); } };
+    },
+  });
+})(globalThis.EP = globalThis.EP || {});
+
+
+/* ---- js/ui-tox.js ---- */
+/* EP Simulator — Toxicology & electrolytes: ECG patterns of overdose and metabolic disturbance,
+ * each with a severity control, the mechanism, and the antidote. */
+(function (EP) {
+  'use strict';
+  const h = EP.h, UI = EP.UI, Mo = EP.Morph, R = EP.Rhythms;
+  const lerp = (a, b, t) => a + (b - a) * EP.clamp(t, 0, 1);
+  const TN = [48.6, -33.9, 23.6];
+  const brugada = (amp) => [{ lead: 6, fn: (ms, jt) => cove(ms, jt, 0.34 * amp) }, { lead: 7, fn: (ms, jt) => cove(ms, jt, 0.46 * amp) }, { lead: 8, fn: (ms, jt) => cove(ms, jt, 0.14 * amp) }];
+  function cove(ms, jt, a) { if (ms < -12) return 0; if (ms < 0) return a * (1 + ms / 12); const x = ms / jt; if (x < 0.5) return a * (1 - x / 0.5) - 0.3 * a * EP.smoothstep(0.25, 0.5, x); if (x < 1) return -0.3 * a * (1 - EP.smoothstep(0.5, 0.95, x)); return 0; }
+
+  const T = (EP.Tox = {});
+  T.list = [
+    { id: 'hyperk', group: 'Electrolytes', name: 'Hyperkalaemia', unit: (s) => 'K⁺ ' + (5.2 + 4.3 * s).toFixed(1) + ' mmol/L', def: 0.45,
+      cfg: (s) => ({ sinus: { cl: lerp(850, 1350, (s - 0.3) / 0.7) }, atria: { pAmp: 1 - EP.smoothstep(0.3, 0.68, s) }, avn: { fast: { min: lerp(66, 190, (s - 0.2) / 0.6) } },
+        vent: { slow: lerp(1, 3.0, Math.pow(Math.max(0, s - 0.35) / 0.65, 1.3)), mods: { tAmp: lerp(1, 1.2, s / 0.4), tAdd: TN.map((x) => x * (lerp(0, 0.85, s / 0.45) - lerp(0, 0.35, (s - 0.6) / 0.4))), kappa: lerp(0.62, 0.25, s),
+          tShape: { p: lerp(0.72, 0.6, s / 0.5), sl: s < 0.6 ? lerp(0.2, 0.085, s / 0.45) : lerp(0.085, 0.24, (s - 0.6) / 0.35), sr: s < 0.6 ? lerp(0.105, 0.075, s / 0.45) : lerp(0.075, 0.16, (s - 0.6) / 0.35) },
+          qtc: lerp(412, 390, s), jtScale: lerp(1, 0.4, (s - 0.55) / 0.45), stFrac: lerp(0.03, 0.5, (s - 0.6) / 0.4) } } }),
+      teach: { mech: 'Raising extracellular potassium depolarises the resting membrane. At first repolarisation speeds up (tall, narrow T waves). Then sodium channels inactivate: conduction slows everywhere — atria (P waves flatten and vanish, although the sinus node may still drive the ventricles), AV node (long PR) and ventricles (wide QRS) — until QRS and T merge into a sine wave that degenerates to VF or asystole.',
+        ecg: ['≈ 5.5–6.5: tall, narrow-based, symmetrical ("tented") T waves, best in V2–V4; short QT.', '≈ 6.5–7.5: PR lengthens, P waves flatten and disappear.', '≈ 7.5–8.5: QRS widens with a bizarre intraventricular conduction delay; bradycardia, junctional or "slow wide" rhythms; pseudo-STEMI and Brugada-like patterns.', '> 8.5: sine wave → VF / asystole. The ECG correlates loosely with the level: some patients arrest with minimal changes.'],
+        pearls: ['Any QRS widening or bradycardia: IV calcium NOW — calcium gluconate 30 mL of 10% (or calcium chloride 10 mL of 10% centrally) over 5–10 min; repeat if the ECG has not improved. It stabilises the membrane within minutes and lasts 30–60 min; it does not lower potassium.', 'Shift potassium into cells: insulin 10 units with 25 g dextrose, nebulised salbutamol 10–20 mg; sodium bicarbonate only if acidotic.', 'Remove it: dialysis; loop diuretics if making urine; potassium binders for the slower phase.', 'A wide-complex bradycardia in a dialysis patient is hyperkalaemia until proven otherwise. It also raises pacing thresholds — pacemakers fail to capture.'] } },
+    { id: 'hypok', group: 'Electrolytes', name: 'Hypokalaemia', unit: (s) => 'K⁺ ' + (3.6 - 1.7 * s).toFixed(1) + ' mmol/L', def: 0.6,
+      cfg: (s) => ({ sinus: { cl: 880 }, vent: { mods: { tAmp: lerp(1, 0.22, s), u: lerp(0, 2.6, s), st: [-0.06 * s, 0.04 * s, -0.03 * s], qtc: lerp(412, 450, s) } },
+        foci: s > 0.6 ? [{ id: 'pvc', node: 'V', kind: 'coupled', after: 'hps', coupling: 520, every: 4, site: 'lvInfApical', label: 'PVC' }] : [] }),
+      teach: { mech: 'Low extracellular potassium reduces the repolarising potassium currents (IKr falls with low K⁺), prolonging the action potential — especially its tail — and promoting early and delayed after-depolarisations.',
+        ecg: ['T waves flatten, then invert; ST segments sag.', 'Prominent U waves (after the T, largest in V2–V3), eventually taller than the T: the "QT" you measure is really a QU interval.', 'Ectopy: PACs, PVCs, then torsades de pointes, especially with digoxin or QT-prolonging drugs.'],
+        pearls: ['Replace potassium AND magnesium — hypomagnesaemia makes hypokalaemia refractory (renal potassium wasting).', 'Target K⁺ ≥ 4.0 (4.5–5.0 after torsades or in acute MI), Mg²⁺ ≥ 2.0 mg/dL.', 'Hypokalaemia potentiates digoxin toxicity and every QT-prolonging drug.'] } },
+    { id: 'ca', group: 'Electrolytes', name: 'Calcium', unit: (s) => (s < 0.5 ? 'Hypocalcaemia' : 'Hypercalcaemia') + ' · ionised Ca²⁺ ' + (0.7 + 1.3 * s).toFixed(2) + ' mmol/L', def: 0.1,
+      cfg: (s) => ({ sinus: { cl: 870 }, vent: { mods: s < 0.5 ? { qtc: lerp(540, 412, s / 0.5), tShape: { p: lerp(0.83, 0.72, s / 0.5), sl: lerp(0.09, 0.2, s / 0.5), sr: lerp(0.07, 0.105, s / 0.5) } } : { qtc: lerp(412, 325, (s - 0.5) / 0.5), tShape: { p: lerp(0.72, 0.5, (s - 0.5) / 0.5), sl: 0.2, sr: 0.13 }, jWave: 0.08 * (s - 0.5) * 2 } } }),
+      teach: { mech: 'Calcium sets the length of the action-potential plateau (phase 2), which is the ST segment. Low calcium prolongs the plateau; high calcium shortens it. The T wave itself is little changed.',
+        ecg: ['Hypocalcaemia: long QT made of a long, flat ST segment with a normal-width T wave at the end.', 'Hypercalcaemia: short QT — the T wave starts almost at the end of the QRS, with virtually no ST segment; Osborn-like J waves when severe.', 'Compare with hypokalaemia (long QU with flat T) and drug-induced long QT (broad, notched T).'],
+        pearls: ['Hypocalcaemia: after thyroid/parathyroid surgery, massive transfusion (citrate), pancreatitis, renal failure. Torsades is uncommon. IV calcium gluconate if symptomatic; correct magnesium.', 'Hypercalcaemia: malignancy, hyperparathyroidism. Fluids, calcitonin, bisphosphonate. Potentiates digoxin.'] } },
+    { id: 'cold', group: 'Electrolytes', name: 'Hypothermia', unit: (s) => 'Core ' + (36 - 9 * s).toFixed(0) + ' °C', def: 0.6,
+      cfg: (s) => ({ sinus: { cl: lerp(850, 1750, s) }, avn: { fast: { min: lerp(66, 150, s) } }, vent: { slow: lerp(1, 1.45, s), mods: { jWave: lerp(0, 0.62, s), qtc: lerp(412, 540, s) } } }),
+      teach: { mech: 'Cold slows every ion channel: pacemaker firing, conduction and repolarisation. A transmural difference in the early repolarisation current (Ito) produces the J (Osborn) wave.',
+        ecg: ['Sinus bradycardia, then slow AF.', 'Osborn wave: a positive hump at the J point, largest in the inferior and lateral precordial leads; its size tracks the temperature.', 'Long PR, QRS and QT; shivering artefact on the baseline.', 'Below ≈ 28 °C: VF, which is resistant to defibrillation until rewarmed.'],
+        pearls: ['Handle gently — the cold ventricle fibrillates with movement or central lines.', 'Bradycardia and AF usually resolve with rewarming; do not pace or cardiovert them.', 'In arrest < 30 °C: defibrillate up to three times, withhold drugs until > 30 °C, and continue CPR while rewarming (ECMO if available). Not dead until warm and dead.'] } },
+    { id: 'tca', group: 'Sodium-channel blockers', name: 'Tricyclic antidepressant overdose', unit: (s) => 'QRS ≈ ' + Math.round(lerp(92, 190, s)) + ' ms', def: 0.6,
+      cfg: (s) => ({ sinus: { cl: lerp(640, 480, s), resp: 0 }, avn: { fast: { min: lerp(60, 90, s), erp: 240 } }, hps: { pattern: s < 0.3 ? 'normal' : s < 0.62 ? 'irbbb' : 'rbbb', erp: 250 }, vent: { slow: lerp(1.05, 1.75, s), mods: { qtc: lerp(420, 470, s) } } }),
+      teach: { mech: 'Tricyclics block the fast sodium channel (slowing phase 0, so conduction slows — more at faster rates), block muscarinic receptors (tachycardia), alpha-1 receptors (hypotension) and potassium channels (QT). The right bundle is the most sensitive part of the conduction system, so the last part of the QRS points to the right.',
+        ecg: ['Sinus tachycardia.', 'QRS > 100 ms predicts seizures; > 160 ms predicts ventricular arrhythmias.', 'Terminal R wave in aVR ≥ 3 mm and R/S in aVR > 0.7; deep slurred S in I and aVL — a rightward terminal 40 ms axis.', 'Progression to a wide-complex tachycardia that may be sinus with aberrancy or VT.'],
+        pearls: ['Sodium bicarbonate 1–2 mmol/kg IV boluses, repeated until the QRS narrows; aim for pH 7.50–7.55. Both the sodium load and the alkalinisation help.', 'Hyperventilate if intubated; hypertonic saline if bicarbonate is limited by alkalaemia.', 'Avoid class Ia, Ic and III antiarrhythmics, beta-blockers, phenytoin and physostigmine. Lidocaine for refractory VT; lipid emulsion and ECMO as rescue.', 'The same pattern and the same treatment apply to other sodium-channel blockers: flecainide, cocaine, diphenhydramine, carbamazepine, lamotrigine, quinine/chloroquine, propranolol, bupivacaine.'] } },
+    { id: 'flec', group: 'Sodium-channel blockers', name: 'Flecainide: 1:1 atrial flutter', unit: () => 'flutter slowed to 200/min', def: 1, fixed: true,
+      cfg: () => ({ sinus: { on: false }, atria: { mode: 'flutter', flutterCL: 300 }, avn: { fast: { erp: 215, conceal: 0.1, min: 70 } }, hps: { pattern: 'rbbb', erp: 220 }, vent: { slow: 1.5 } }),
+      teach: { mech: 'Class Ic drugs slow conduction in the flutter circuit from ≈ 300/min to ≈ 200/min. At that slower atrial rate the AV node can conduct every impulse. The same use-dependent sodium-channel block widens the QRS at fast rates — producing a regular wide-complex tachycardia at 200/min that looks like VT.',
+        ecg: ['Regular wide-complex tachycardia ≈ 180–220/min in a patient taking flecainide or propafenone for AF.', 'Flutter waves at the same rate as the QRS (1:1) — hard to see.', 'QRS narrows and the rate halves if the AV node is slowed.'],
+        pearls: ['Prevention: always co-prescribe a beta-blocker or rate-limiting calcium-channel blocker with a class Ic drug.', 'Unstable → synchronised cardioversion. Stable → AV-nodal blockade; sodium bicarbonate for the QRS widening in overdose.', 'Class Ic drugs are contraindicated in structural or ischaemic heart disease (CAST).'] } },
+    { id: 'brugada', group: 'Sodium-channel blockers', name: 'Brugada pattern unmasked', unit: () => 'type 1 (coved) pattern', def: 1, fixed: true,
+      cfg: () => ({ sinus: { cl: 900 }, hps: { pattern: 'irbbb' }, vent: { mods: { leadAdd: brugada(1), qtc: 410 } } }),
+      teach: { mech: 'A reduced sodium current (SCN5A variants, or drugs) leaves the transient outward current unopposed in the right ventricular outflow tract epicardium. The resulting transmural voltage gradient produces ST elevation in V1–V2 and can trigger phase-2 re-entry → polymorphic VT / VF.',
+        ecg: ['Type 1: coved ST elevation ≥ 2 mm in V1 and/or V2 descending into an inverted T wave. This is the only diagnostic pattern.', 'Type 2: "saddle-back" ST elevation — suggestive only.', 'Moving V1–V2 up to the 2nd or 3rd intercostal space increases sensitivity.', 'Unmasked by fever, sodium-channel blockers (flecainide, ajmaline, TCAs, cocaine, lithium), alcohol, large meals, vagal tone.'],
+        pearls: ['Treat fever aggressively; avoid the drugs listed at brugadadrugs.org.', 'Electrical storm: isoprenaline infusion and quinidine. Amiodarone and sodium-channel blockers make it worse.', 'ICD for survivors of arrest or arrhythmic syncope with a spontaneous type 1 pattern.'] } },
+    { id: 'dig', group: 'Digoxin', name: 'Digoxin effect and toxicity', unit: () => '', def: 0, variants: [['effect', 'Therapeutic effect'], ['big', 'Ventricular bigeminy'], ['atb', 'Atrial tachycardia with block'], ['regaf', 'Regularised AF'], ['bidir', 'Bidirectional VT']],
+      cfg: (s, v) => {
+        const scoop = { st: [-0.17, 0.125, 0.03], stShape: 'scoop', tAmp: 0.35, qtc: 365 };
+        if (v === 'big') return { sinus: { cl: 950, resp: 0 }, avn: { fast: { min: 120, retro: { block: true } } }, vent: { mods: scoop }, foci: [{ id: 'p', node: 'V', kind: 'coupled', after: 'hps', coupling: 480, every: 1, site: 'fascPost', label: 'PVC' }] };
+        if (v === 'atb') return { sinus: { on: false }, avn: { fast: { erp: 560, conceal: 0.2, min: 150 } }, vent: { mods: scoop }, foci: [{ id: 'at', node: 'A', cl: 345, site: 'crista', label: 'AT', startAt: 100 }] };
+        if (v === 'regaf') return { sinus: { on: false }, atria: { mode: 'fib', fibAmp: 0.8 }, avn: { fast: { block: true, retro: { block: true } } }, vent: { mods: scoop }, foci: [{ id: 'j', node: 'H', cl: 1040, label: 'junctional', startAt: 300 }] };
+        if (v === 'bidir') return { sinus: { cl: 900 }, avn: { fast: { retro: { block: true } } }, hps: { retro: { delay: 30, erp: 200 } }, foci: [{ id: 'vt', node: 'V', cl: 400, specs: [Mo.spec('fascPost'), Mo.spec('fascAnt')], label: 'VT', startAt: 60 }] };
+        return { sinus: { cl: 980 }, avn: { fast: { min: 118 } }, vent: { mods: scoop } };
+      },
+      teach: { mech: 'Digoxin inhibits the Na⁺/K⁺-ATPase: intracellular calcium rises (inotropy — and delayed after-depolarisations, hence triggered automaticity) and vagal tone increases (slower sinus rate and AV conduction). Toxicity is therefore the combination of INCREASED automaticity with DEPRESSED conduction.',
+        ecg: ['Effect (not toxicity): down-sloping "scooped" ST depression with a short QT and flattened T — the reverse-tick or Salvador Dalí moustache — and a longish PR.', 'Toxicity — excitation: frequent PVCs and bigeminy (commonest), atrial tachycardia, accelerated junctional rhythm, fascicular VT, bidirectional VT (the QRS axis alternates beat to beat).', 'Toxicity — depression: sinus bradycardia, AV block of any degree.', 'The combinations are nearly pathognomonic: atrial tachycardia WITH block; AF that has become slow and perfectly regular (complete AV block with a junctional escape).'],
+        pearls: ['Digoxin-specific antibody fragments for life-threatening arrhythmia, K⁺ > 5.0–5.5 in acute overdose, or end-organ dysfunction.', 'In acute overdose hyperkalaemia marks severity (the pump is poisoned); in chronic toxicity hypokalaemia and hypomagnesaemia are usually the precipitants — correct them.', 'Atropine for bradycardia. Lidocaine (or phenytoin) for ventricular arrhythmias. Avoid cardioversion if possible — it can precipitate refractory VF; if unavoidable use the lowest energy.', 'Precipitants: renal impairment, dehydration, amiodarone, verapamil, macrolides, hypokalaemia.'] } },
+    { id: 'bbccb', group: 'Rate-slowing drugs', name: 'Beta-blocker / calcium-channel blocker overdose', unit: (s) => (s < 0.75 ? 'sinus ' + Math.round(60000 / lerp(900, 1750, s / 0.75)) + '/min' : 'junctional escape'), def: 0.5,
+      cfg: (s) => (s < 0.75 ? { sinus: { cl: lerp(900, 1750, s / 0.75), resp: 0.01 }, avn: { fast: { min: lerp(70, 260, s / 0.75) } } } : { sinus: { cl: 2600, startAt: 20000 }, avn: { fast: { min: 300, retro: { delay: 150, erp: 300 } } }, foci: [{ id: 'j', node: 'H', cl: lerp(1500, 1900, (s - 0.75) / 0.25), label: 'junctional', startAt: 400 }] }),
+      teach: { mech: 'Both classes depress the L-type calcium current that drives the sinus and AV nodes (beta-blockers by removing cAMP, verapamil and diltiazem directly), and reduce contractility. Dihydropyridines mainly vasodilate. In large overdose all selectivity is lost.',
+        ecg: ['Sinus bradycardia → PR prolongation → higher-grade AV block → junctional or ventricular escape → asystole.', 'Verapamil / diltiazem: bradycardia with AV block and profound hypotension; hyperglycaemia (insulin release is calcium-dependent) helps tell it from beta-blocker poisoning (hypoglycaemia, bronchospasm).', 'Propranolol adds sodium-channel block (wide QRS, seizures); sotalol adds a long QT and torsades.'],
+        pearls: ['Atropine is worth a try but usually fails.', 'IV calcium (10–20 mL of 10% calcium chloride, or 30–60 mL gluconate; repeat/infuse).', 'High-dose insulin euglycaemia therapy is the main treatment for shock: 1 unit/kg bolus then 1–10 units/kg/h with dextrose and potassium monitoring. Onset 15–40 min.', 'Glucagon 5–10 mg IV for beta-blockers (bypasses the receptor; expect vomiting). Vasopressors: norepinephrine ± epinephrine.', 'Pacing often captures electrically without improving pressure — the problem is contractility and vasodilation. Lipid emulsion for lipophilic agents; VA-ECMO for refractory shock.'] } },
+    { id: 'qt', group: 'QT-prolonging drugs', name: 'Acquired long QT', unit: (s) => 'QTc ≈ ' + Math.round(lerp(440, 640, s)) + ' ms' + (s > 0.8 ? ' → torsades' : ''), def: 0.6,
+      cfg: (s) => {
+        const mods = { qtc: lerp(440, 640, s), tShape: { p: lerp(0.72, 0.76, s), sl: lerp(0.2, 0.27, s), sr: 0.12 }, u: lerp(0, 1.1, s), tAmp: lerp(1, 0.85, s) };
+        const c = { sinus: { cl: lerp(900, 1180, s), resp: 0, sd: 0 }, vent: { mods } };
+        if (s > 0.8) c.script = R.onBeats([{ beat: 2, coupling: 560, site: 'lvInfApical' }, { beat: 'next', coupling: 610, site: 'lvAntWall', then: (sm, t) => { sm.schedule(t + 150, (tt) => sm.setVentMode('tdp', tt)); sm.schedule(t + 4200, (tt) => sm.setVentMode('normal', tt)); } }]);
+        return c;
+      },
+      teach: { mech: 'Almost every culprit blocks the hERG potassium channel (IKr), delaying repolarisation. The longer and more uneven the repolarisation, the more likely an early after-depolarisation is to reach threshold and trigger torsades de pointes.',
+        ecg: ['QTc > 500 ms, or an increase > 60 ms from baseline, is the action threshold.', 'Broad, notched or bifid T waves, prominent U waves, T-U alternans; the QT lengthens further after a pause.', 'Measure in II or V5–V6, use the longest, and correct with Fridericia at fast or slow rates.', 'Slide to the right to see the short-long-short sequence start torsades.'],
+        pearls: ['Common drugs: sotalol, dofetilide, ibutilide, quinidine, procainamide; haloperidol, droperidol, ziprasidone; methadone; macrolides and fluoroquinolones; azoles; ondansetron; citalopram/escitalopram; chloroquine. See crediblemeds.org.', 'Risk multiplies with female sex, bradycardia, hypokalaemia, hypomagnesaemia, renal or hepatic impairment, heart failure, and drug combinations.', 'Stop the drug. Magnesium 2 g IV (even with a normal level), potassium to 4.5–5.0, and raise the heart rate (overdrive pacing 90–110 or isoprenaline) for recurrent torsades.', 'Amiodarone prolongs the QT a lot but rarely causes torsades.'] } },
+  ];
+  T.byId = {}; for (const t of T.list) T.byId[t.id] = t;
+
+  EP.Modules = EP.Modules || [];
+  EP.Modules.push({
+    id: 'tox', title: 'Tox & electrolytes',
+    mount(root) {
+      let cur = null, sev = 0.5, variant = null, timer = 0;
+      const player = new EP.Player({ layout: '12', ladder: false });
+      const rail = h('nav.card.rail', { 'aria-label': 'Conditions' }), listEl = h('div', { style: { paddingBottom: '8px' } }); rail.append(listEl);
+      const groups = [...new Set(T.list.map((t) => t.group))];
+      const sel = UI.select(null, groups.map((g) => ({ group: g, items: T.list.filter((t) => t.group === g).map((t) => [t.id, t.name]) })), 'hyperk', (v) => show(v));
+      sel.classList.add('rail-sel'); sel.setAttribute('aria-label', 'Condition');
+      const ctl = h('div.card-b'), meas = h('div'), head = h('div.card-h'), teach = h('div.card-b');
+      function fill() { listEl.innerHTML = ''; for (const g of groups) { listEl.append(h('div.rail-g', g)); for (const t of T.list.filter((x) => x.group === g)) listEl.append(h('button.rail-i', { type: 'button', 'aria-current': String(cur === t), onclick: () => show(t.id) }, t.name)); } }
+      function render(keepT) {
+        const sim = EP.simulate(cur.cfg(sev, variant), 10000), rec = EP.Synth.build(sim, 0, 10000); rec.sim = sim; rec.entry = cur;
+        player.load(rec, { title: cur.name + (cur.unit(sev) ? ' — ' + cur.unit(sev) : ''), t: keepT ? player.t : null });
+        const m = R.measure(rec);
+        meas.innerHTML = ''; meas.append(UI.kv([['Rate', m.vRate, '/min'], ['PR', m.pr, 'ms'], ['QRS', m.qrs, 'ms'], ['QT / QTc', m.qt == null ? null : m.qt + ' / ' + m.qtc, 'ms'], ['Axis', m.axis == null ? null : m.axis + '°']]));
+      }
+      function show(id) {
+        cur = T.byId[id] || T.list[0]; sev = cur.def; variant = cur.variants ? cur.variants[0][0] : null;
+        if (sel.sel) sel.sel.value = cur.id; else sel.value = cur.id;
+        ctl.innerHTML = '';
+        const out = h('b.mono', cur.unit(sev));
+        if (cur.variants) ctl.append(h('div.variants', cur.variants.map(([k, t], i) => { const b = h('button.btn.sm', { type: 'button', 'aria-pressed': String(i === 0), onclick: () => { variant = k; for (const x of b.parentNode.children) x.setAttribute('aria-pressed', String(x === b)); render(); } }, t); return b; })));
+        else if (!cur.fixed) {
+          const rng = h('input', { type: 'range', min: 0, max: 1, step: 0.02, value: sev, 'aria-label': 'Severity', style: { flex: '1', minWidth: '160px' }, oninput: () => { sev = +rng.value; out.textContent = cur.unit(sev); clearTimeout(timer); timer = setTimeout(() => render(true), 90); } });
+          ctl.append(h('div.row', h('span.muted', 'Normal'), rng, h('span.muted', 'Severe'), out), h('p.muted', { style: { fontSize: '12px', marginTop: '6px' } }, 'Drag to move through the stages; the 12-lead is regenerated from the changed conduction and repolarisation.'));
+        } else ctl.append(h('div', out));
+        head.innerHTML = ''; head.append(h('div', h('div.eyebrow', cur.group), h('h2', { style: { fontSize: '17px' } }, cur.name)));
+        teach.innerHTML = ''; teach.append(UI.teach(cur.teach));
+        fill(); render();
+      }
+      root.append(h('div.lab', rail, h('div.stack', sel, h('section.card', ctl), player.ecgCard, meas, h('section.card', head, teach)),
+        h('div.side', player.heartCard || h('div'), h('div.note', 'For any poisoned patient: a 12-lead early and repeated, continuous monitoring, potassium/magnesium/glucose, and a call to the poisons service. Doses here are typical adult figures for teaching — check local guidance.'))));
+      show('hyperk');
+      return { unmount() { player.destroy(); } };
+    },
+  });
+})(globalThis.EP = globalThis.EP || {});
+
+
+/* ---- js/ui-cases.js ---- */
+/* EP Simulator — Clinical scenarios: pharmacological vs electrical management.
+ * A live monitor, a set of interventions, and a simulated physiological response to each. */
+(function (EP) {
+  'use strict';
+  const h = EP.h, UI = EP.UI, Mo = EP.Morph, R = EP.Rhythms;
+  const lqt = { qtc: 600, tShape: { p: 0.74, sl: 0.25, sr: 0.12 }, u: 0.9 };
+
+  const ACT = {
+    vagal: ['Modified Valsalva', 'Manoeuvre'], adenosine: ['Adenosine 6 → 12 mg IV', 'Drug'], bb: ['Metoprolol 5 mg IV', 'Drug'], ccb: ['Diltiazem 20 mg IV', 'Drug'],
+    amio: ['Amiodarone 150 mg IV', 'Drug'], procain: ['Procainamide 15 mg/kg IV', 'Drug'], lido: ['Lidocaine 1 mg/kg IV', 'Drug'], mag: ['Magnesium 2 g IV', 'Drug'],
+    atropine: ['Atropine 1 mg IV', 'Drug'], epi: ['Epinephrine / dopamine infusion', 'Drug'], bicarb: ['Sodium bicarbonate 100 mmol IV', 'Drug'], calcium: ['Calcium gluconate 30 mL 10% IV', 'Drug'],
+    insulin: ['Insulin 10 U + dextrose 25 g', 'Drug'], digoxin: ['Digoxin 500 µg IV', 'Drug'], potassium: ['Replace potassium', 'Drug'],
+    cardiovert: ['Synchronised cardioversion', 'Electricity'], defib: ['Defibrillation (unsynchronised)', 'Electricity'], tcp: ['Transcutaneous pacing', 'Electricity'], overdrive: ['Overdrive pacing 100/min', 'Electricity'],
+    stopdrug: ['Stop QT-prolonging drugs', 'Other'], observe: ['Observe and treat the cause', 'Other'],
+  };
+  // ---- reusable effects (compressed in time for teaching) ----
+  const fx = {
+    avBlock: (ms) => (s, t) => s.blockAVN(t + 500, ms),
+    shock: (sync) => (s, t) => s.shock(t + 700, { sync }),
+    slowAVN: (s, t) => { let k = 0; const step = (tt) => { s.cfg.avn.fast.erp += 55; s.cfg.avn.fast.conceal = 0.2; if (++k < 5) s.schedule(tt + 700, step); }; s.schedule(t + 800, step); },
+    stopVT: (delay, slowFirst) => (s, t) => { const f = s.foci.find((x) => x.reentrant && x.enabled); if (!f) return; if (slowFirst) s.schedule(t + 900, () => { f.cl += slowFirst; }); s.schedule(t + delay, () => { f.enabled = false; }); },
+    vf: (delay) => (s, t) => s.schedule(t + delay, (tt) => s.setVentMode('vf', tt)),
+    pace: (rate, cap) => (s, t) => { s.schedule(t + 600, () => { s._pm = new EP.Pacemaker(s, { mode: 'VVI', lrl: rate, kind: 'tcp', tcpArtifact: true, vOut: 80, vThr: cap ? 60 : 200, vSite: 'rvFreeWall' }); }); },
+    sinusFaster: (s) => { if (s.sinus) s.sinus.cl *= 0.72; },
+  };
+  const bpTable = (rows, dflt) => (hr, sim) => { if (sim.V.mode === 'vf') return [0, 0]; if (sim.V.mode !== 'normal') return [52, 30]; if (sim._collapse) return [58, 34]; for (const [lo, hi, bp] of rows) if (hr >= lo && hr < hi) return bp; return dflt; };
+  const sinusBack = (sim, t) => sim.V.mode === 'normal' && sim.A.mode === 'normal' && sim.out.filter((e) => e.type === 'QRS' && e.t > t - 3600 && e.t < t - 150).every((e) => e.label === 'conducted' && e.rr > 520 && e.wave.qrs < 125) && sim.out.filter((e) => e.type === 'QRS' && e.t > t - 3600).length >= 3;
+
+  const CASES = [
+    { id: 'avnrt', title: 'Palpitations in a 28-year-old', stem: 'Sudden-onset regular palpitations for 40 minutes. Alert, talking, mildly anxious. SpO₂ 99%.', stable: true,
+      cfg: () => ({ sinus: { cl: 800, resp: 0 }, avn: { fast: { erp: 365 }, slow: { min: 205, alpha: 150, tau: 80, erp: 235, conceal: 0, retro: { delay: 200, erp: 330, block: false } } }, foci: [{ id: 'pac', node: 'A', kind: 'coupled', after: 'sinus', coupling: 305, every: 2, site: 'crista', count: 1, label: 'PAC' }] }),
+      bp: bpTable([[150, 400, [112, 70]]], [122, 76]), done: sinusBack,
+      acts: { vagal: ['good', 'First line for a stable regular narrow-complex tachycardia. The modified Valsalva (strain 15 s semi-recumbent, then lie flat with legs raised) converts about 40%.', (s, t) => { if (s.rng() < 0.45) s.blockAVN(t + 600, 900); }],
+        adenosine: ['good', 'Blocks the AV node for a few seconds. The node is part of the circuit, so the tachycardia stops — watch for the brief pause, then sinus rhythm. Warn the patient about chest tightness and flushing; give it fast through a large proximal vein with a flush.', fx.avBlock(2600)],
+        ccb: ['ok', 'Works (it also blocks the node) and lasts longer — a reasonable second line if adenosine fails or the tachycardia recurs. Avoid in heart failure or hypotension.', fx.avBlock(3200)],
+        bb: ['ok', 'Slows and can terminate AV-nodal re-entry; second line.', fx.avBlock(3000)],
+        cardiovert: ['ok', 'It will work, but a stable patient does not need sedation and a shock before trying vagal manoeuvres and adenosine.', fx.shock(true)],
+        amio: ['bad', 'Not indicated: a slow-acting drug with real toxicity for a rhythm that a 10-second AV-nodal block will cure.', null] },
+      debrief: ['Regular, narrow, abrupt onset, no visible P waves (or a pseudo-r′ in V1): AVNRT or AVRT. Both depend on the AV node.', 'Stable → vagal manoeuvre → adenosine → rate-limiting calcium-channel blocker or beta-blocker. Unstable → synchronised cardioversion.', 'Record a 12-lead during termination: how it stops is diagnostic.'] },
+    { id: 'afun', title: 'Breathless with a fast irregular pulse', stem: '74-year-old, 2 hours of dyspnoea. Sitting upright, sweaty, crackles to mid-zones, cold peripheries. SpO₂ 86% on 15 L.', stable: false,
+      cfg: () => ({ sinus: { on: false }, atria: { mode: 'fib', fibMean: 125 }, avn: { fast: { erp: 215, conceal: 0.25, min: 58 } } }),
+      bp: bpTable([[140, 400, [74, 46]], [110, 140, [92, 58]]], [116, 70]), done: sinusBack,
+      acts: { cardiovert: ['good', 'Hypotension and pulmonary oedema caused by the tachyarrhythmia = unstable. Synchronised cardioversion (120–200 J biphasic for AF) is the treatment; sedate if you can do so quickly. Unknown duration does not delay a life-saving shock — anticoagulate afterwards.', fx.shock(true)],
+        ccb: ['bad', 'Diltiazem is a negative inotrope and vasodilator: in a hypotensive patient in pulmonary oedema it deepens the shock.', (s) => { s._collapse = true; }],
+        bb: ['bad', 'A negative inotrope in acute pulmonary oedema with hypotension. The rate may fall but so does the output.', (s) => { s._collapse = true; }],
+        amio: ['ok', 'Acceptable if cardioversion is unavailable or fails, but it takes hours and the patient is deteriorating now.', fx.slowAVN],
+        digoxin: ['bad', 'Too slow (hours) for an unstable patient.', null], adenosine: ['bad', 'Only transient AV block; AF continues. No benefit.', fx.avBlock(1800)] },
+      debrief: ['Unstable = hypotension, pulmonary oedema, ischaemic chest pain or reduced consciousness that is caused by the rhythm. The treatment is electricity regardless of the specific tachycardia.', 'Synchronise on the R wave: an unsynchronised shock on the T wave can cause VF.', 'After cardioversion of AF: anticoagulate for at least 4 weeks whatever the CHA₂DS₂-VASc score.'] },
+    { id: 'afst', title: 'Irregular tachycardia found at pre-op clinic', stem: '68-year-old with hypertension, feels "a bit fluttery" for perhaps a week. Comfortable. SpO₂ 97%.', stable: true,
+      cfg: () => ({ sinus: { on: false }, atria: { mode: 'fib', fibMean: 135 }, avn: { fast: { erp: 250, conceal: 0.3, min: 60 } } }),
+      bp: bpTable([[0, 400, [134, 82]]], [134, 82]), done: (sim, t) => { const q = sim.out.filter((e) => e.type === 'QRS' && e.t > t - 5000); return sim._rated && q.length > 2 && 60000 / ((q[q.length - 1].t - q[0].t) / (q.length - 1)) < 108; },
+      acts: { bb: ['good', 'Stable AF of uncertain duration: control the rate (beta-blocker or diltiazem) and start anticoagulation by CHA₂DS₂-VASc. Rhythm control can be planned safely later.', (s, t) => { s._rated = true; fx.slowAVN(s, t); }],
+        ccb: ['good', 'Rate control with a rate-limiting calcium-channel blocker — appropriate when LV function is preserved.', (s, t) => { s._rated = true; fx.slowAVN(s, t); }],
+        cardiovert: ['bad', 'He is stable and the AF has lasted more than 48 hours without anticoagulation: left atrial appendage thrombus is possible. Cardioversion now risks stroke — anticoagulate for 3 weeks or exclude thrombus by TEE first.', fx.shock(true)],
+        amio: ['bad', 'Pharmacological cardioversion carries the same embolic risk as electrical cardioversion.', null],
+        adenosine: ['bad', 'Transiently slows the ventricles and shows the fibrillatory baseline; it does not treat AF.', fx.avBlock(1800)],
+        digoxin: ['ok', 'Controls resting rate slowly; useful in heart failure or the sedentary, weak on exertion.', (s, t) => { s._rated = true; fx.slowAVN(s, t); }] },
+      debrief: ['Three separate questions in AF: is the patient unstable (shock)? what is the stroke risk (anticoagulate)? rate or rhythm strategy?', 'The 48-hour rule: beyond it, no elective cardioversion — electrical or chemical — without 3 weeks of anticoagulation or a TEE.', 'Lenient rate control (resting < 110/min) is adequate for most.'] },
+    { id: 'wpwaf', title: 'Very fast, broad and irregular', stem: '22-year-old collapsed at a party; now awake, light-headed. Previously told he had "an extra wire". SpO₂ 98%.', stable: true,
+      cfg: () => ({ sinus: { on: false }, atria: { mode: 'fib', fibMean: 120 }, avn: { fast: { erp: 330, conceal: 0.4 } }, ap: R.apCfg('leftLateral', { erp: 215 }) }),
+      bp: bpTable([[190, 400, [92, 56]], [120, 190, [104, 64]]], [120, 72]), done: sinusBack,
+      acts: { procain: ['good', 'Procainamide slows conduction and prolongs refractoriness in the accessory pathway: the pre-excited rate falls and AF often terminates. (Ibutilide is the alternative.)', (s, t) => { s.schedule(t + 1500, () => { s.cfg.ap.erp = 420; }); s.schedule(t + 3800, () => { s.cfg.ap.block = true; s.cfg.ap.retro.block = true; }); s.schedule(t + 6500, (tt) => s.setAtrialMode('normal', tt)); }],
+        cardiovert: ['good', 'Always correct for pre-excited AF, and mandatory if there is any instability.', fx.shock(true)],
+        adenosine: ['bad', 'Blocking the AV node removes its competing (and concealed retrograde) input to the pathway, and adenosine shortens atrial refractoriness. Every fibrillatory impulse now goes down the pathway → ventricular fibrillation.', (s, t) => { s.cfg.avn.fast.block = true; s.cfg.ap.erp = 175; fx.vf(3200)(s, t); }],
+        ccb: ['bad', 'Verapamil and diltiazem block the node and vasodilate (reflex sympathetic drive shortens the pathway\'s refractory period): faster pre-excited conduction → VF.', (s, t) => { s.cfg.avn.fast.block = true; s.cfg.ap.erp = 175; fx.vf(3400)(s, t); }],
+        bb: ['bad', 'An AV-nodal blocker: it does nothing to the pathway and removes the node\'s protective competition.', (s, t) => { s.cfg.avn.fast.block = true; s.cfg.ap.erp = 190; fx.vf(5200)(s, t); }],
+        digoxin: ['bad', 'Blocks the node AND shortens the accessory pathway refractory period. Contraindicated.', (s, t) => { s.cfg.avn.fast.block = true; s.cfg.ap.erp = 170; fx.vf(3600)(s, t); }],
+        amio: ['bad', 'IV amiodarone acts first as an AV-nodal blocker and vasodilator; cases of VF are reported. Avoid in pre-excited AF.', (s, t) => { s.cfg.avn.fast.block = true; s.cfg.ap.erp = 185; fx.vf(5600)(s, t); }],
+        defib: ['ok', 'Unsynchronised shock is the treatment once he is in VF. For AF with a pulse, synchronise.', fx.shock(false)] },
+      debrief: ['FBI — Fast, Broad, Irregular — is pre-excited AF until proven otherwise. The QRS width varies beat to beat and the shortest R-R can be under 250 ms.', 'Never give AV-nodal blockers. Procainamide or ibutilide if stable; synchronised cardioversion if not.', 'A pathway that can conduct this fast needs ablation.'] },
+    { id: 'vtst', title: 'Regular wide-complex tachycardia, talking', stem: '66-year-old, anterior MI 4 years ago, EF 30%. Palpitations and mild dizziness for 30 minutes. Alert. SpO₂ 96%.', stable: true,
+      cfg: () => ({ sinus: { cl: 780, resp: 0 }, avn: { fast: { retro: { block: true } } }, hps: { retro: { delay: 60, erp: 200 } }, foci: [{ id: 'vt', node: 'V', cl: 345, site: 'lvInfBase', label: 'VT', startAt: 60, reentrant: true }] }),
+      bp: bpTable([[150, 400, [106, 66]]], [124, 76]), done: sinusBack,
+      acts: { procain: ['good', 'Best evidence for stable monomorphic VT (PROCAMIO): slows and terminates the circuit. Watch blood pressure and QRS/QT; avoid in severe heart failure or long QT.', fx.stopVT(4200, 70)],
+        amio: ['good', 'Reasonable, especially with poor LV function, though it terminates VT less often and more slowly than procainamide.', fx.stopVT(6500, 45)],
+        cardiovert: ['good', 'Sedation and synchronised cardioversion is definitive and appropriate at any point — and the default if drugs fail or he deteriorates.', fx.shock(true)],
+        lido: ['ok', 'Second line; most useful in ischaemic VT. Low efficacy for scar-related VT.', (s, t) => { if (s.rng() < 0.3) fx.stopVT(4000)(s, t); }],
+        adenosine: ['ok', 'Safe in a REGULAR monomorphic wide-complex tachycardia and can be diagnostic: no change here, which supports VT. It does not treat it.', fx.avBlock(2200)],
+        ccb: ['bad', 'Calcium-channel blockers given for "SVT with aberrancy" to a patient in VT cause vasodilatation and negative inotropy → cardiovascular collapse.', (s, t) => { s._collapse = true; fx.vf(6000)(s, t); }],
+        bb: ['ok', 'Not a terminating drug here, but beta-blockade is central to preventing recurrence and to treating electrical storm.', null],
+        defib: ['bad', 'He has a pulse and an organised rhythm: synchronise. An unsynchronised shock risks VF.', fx.vf(900)] },
+      debrief: ['A wide-complex tachycardia in someone with structural heart disease is VT. Being awake with a blood pressure does not make it SVT.', 'Stable monomorphic VT: procainamide, amiodarone, or elective synchronised cardioversion. Never verapamil or diltiazem.', 'Look for AV dissociation, capture and fusion beats to confirm; then think about the trigger (ischaemia, electrolytes) and an ICD.'] },
+    { id: 'vtun', title: 'Wide-complex tachycardia with chest pain', stem: '59-year-old, crushing chest pain, grey and clammy, responds to voice only. SpO₂ unrecordable.', stable: false,
+      cfg: () => ({ sinus: { cl: 700, resp: 0 }, avn: { fast: { retro: { block: true } } }, hps: { retro: { delay: 60, erp: 180 } }, foci: [{ id: 'vt', node: 'V', cl: 280, site: 'lvAntWall', label: 'VT', startAt: 60, reentrant: true }] }),
+      bp: bpTable([[170, 400, [66, 38]]], [108, 64]), done: sinusBack,
+      acts: { cardiovert: ['good', 'Unstable VT with a pulse: immediate synchronised cardioversion, 100–200 J biphasic, escalating. Do not wait for IV access or drugs.', fx.shock(true)],
+        defib: ['ok', 'If synchronisation fails or delays you in a peri-arrest patient, an unsynchronised shock is acceptable — and it is the treatment the moment the pulse is lost.', fx.shock(false)],
+        amio: ['bad', 'A 10-minute infusion in a patient who is about to arrest. Drugs come after the shock, to prevent recurrence.', null],
+        procain: ['bad', 'Vasodilating and slow to give — contraindicated in hypotension.', (s) => { s._collapse = true; }],
+        adenosine: ['bad', 'Wastes time; no effect on VT.', null], lido: ['bad', 'Too slow and too weak for an unstable patient.', null] },
+      debrief: ['Unstable tachycardia with a pulse → synchronised cardioversion. No pulse → defibrillate and start CPR.', 'After return of an organised rhythm: amiodarone, correct potassium and magnesium, and treat the cause — here probably acute coronary occlusion.'] },
+    { id: 'tdp', title: 'Recurrent syncope on the ward', stem: '61-year-old woman on methadone, started ondansetron and clarithromycin 2 days ago. Vomiting. K⁺ 3.0, Mg²⁺ 1.4 mg/dL. Brief blackouts.', stable: true,
+      cfg: () => ({ sinus: { cl: 1150, resp: 0, sd: 0 }, vent: { mods: lqt }, script: [{ t: 0, do: (s) => { let n = 0; s.on('V', (ev) => { if (ev.label !== 'conducted' || s._safe || s.V.mode !== 'normal') return; if (++n % 4 === 3 && ev.rr > 900) s.schedule(ev.t + 590, (t) => { s.contribV(t, { type: 'focus', spec: Mo.spec('lvAntWall'), label: 'PVC' }); s.schedule(t + 150, (tt) => { if (!s._safe) { s.setVentMode('tdp', tt); s.schedule(tt + 2600, (t3) => { if (s.V.mode === 'tdp') s.setVentMode('normal', t3); }); } }); }); }); } }] }),
+      bp: bpTable([[0, 400, [118, 70]]], [118, 70]), done: (sim, t) => sim._safe && sim.V.mode === 'normal' && t - sim._safeAt > 6000,
+      acts: { mag: ['good', 'Magnesium 2 g IV over a few minutes is first line for torsades even when the level is normal: it suppresses the early after-depolarisations that trigger each run. Repeat and follow with an infusion.', (s, t) => { s.schedule(t + 1500, (tt) => { s._safe = true; s._safeAt = tt; }); }],
+        overdrive: ['good', 'A faster heart rate shortens the QT and abolishes the pauses that set up each run. Temporary pacing at 90–110/min (or isoprenaline in acquired long QT) is the treatment for recurrent torsades despite magnesium.', (s, t) => { s.schedule(t + 800, (tt) => { s._safe = true; s._safeAt = tt; s.cfg.vent.mods = Object.assign({}, lqt, { qtc: 520 }); s._pm = new EP.Pacemaker(s, { mode: 'AAI', lrl: 100, kind: 'temp' }); }); }],
+        potassium: ['ok', 'Essential — aim for 4.5–5.0 mmol/L — but it works over hours. Give it with, not instead of, magnesium.', null],
+        stopdrug: ['ok', 'Essential: three hERG-blocking drugs on board (methadone, ondansetron, clarithromycin — which also raises methadone levels). But stopping them does not treat the next few hours.', null],
+        amio: ['bad', 'Amiodarone prolongs the QT further. The reflex "wide-complex tachycardia → amiodarone" is wrong when the baseline QT is long.', (s) => { s.cfg.vent.mods = Object.assign({}, lqt, { qtc: 660 }); }],
+        procain: ['bad', 'Class Ia: blocks IKr, prolongs the QT, makes torsades worse.', (s) => { s.cfg.vent.mods = Object.assign({}, lqt, { qtc: 670 }); }],
+        defib: ['ok', 'Correct for a sustained or pulseless run (unsynchronised — there is no R wave to synchronise to). These runs are self-terminating; shocking them does not stop the next one.', fx.shock(false)],
+        bb: ['bad', 'Slowing the heart lengthens the QT and the pauses in ACQUIRED long QT. (Beta-blockers are for congenital long QT.)', (s) => { if (s.sinus) s.sinus.cl = 1350; }] },
+      debrief: ['Polymorphic VT with a long baseline QT = torsades: magnesium, potassium, pace or isoprenaline, stop the drugs.', 'Polymorphic VT with a normal QT = ischaemia until proven otherwise: beta-blocker, amiodarone, revascularisation.', 'The distinction is made on the sinus beats before the run, not during it.'] },
+    { id: 'chb', title: 'Collapse with a pulse of 30', stem: '81-year-old, two syncopal episodes today. Drowsy, cool, cap refill 5 s. SpO₂ 93%.', stable: false,
+      cfg: () => ({ sinus: { cl: 760 }, hps: { block: true }, foci: [{ id: 'esc', node: 'V', cl: 2000, site: 'fascPost', label: 'escape', startAt: 500, sd: 0.02 }] }),
+      bp: bpTable([[0, 38, [70, 38]], [38, 55, [88, 50]]], [112, 64]), done: (sim, t) => { const q = sim.out.filter((e) => e.type === 'QRS' && e.t > t - 5000); return q.length > 4; },
+      acts: { tcp: ['good', 'Symptomatic infranodal complete heart block: pace. Transcutaneous pacing now (with analgesia), confirm mechanical capture on the arterial trace, and arrange a transvenous wire and a permanent system.', fx.pace(70, true)],
+        atropine: ['ok', 'Reasonable to try while pads go on, but the block is below the AV node: atropine speeds the sinus node (more P waves) without changing the ventricular rate — and can worsen infranodal block.', fx.sinusFaster],
+        epi: ['ok', 'A chronotrope infusion (epinephrine 2–10 µg/min, dopamine 5–20 µg/kg/min or isoprenaline) can speed a ventricular escape as a bridge when pacing is not immediately available.', (s) => { const f = s.focus('esc'); if (f) f.cl = 1250; }],
+        adenosine: ['bad', 'An AV-nodal blocker in complete heart block.', null], bb: ['bad', 'Suppresses the only pacemaker keeping this patient alive.', (s) => { const f = s.focus('esc'); if (f) f.cl = 3000; }],
+        amio: ['bad', 'Never suppress an escape rhythm: a slow wide rhythm with independent P waves is the patient\'s rescue pacemaker, not VT.', (s) => { const f = s.focus('esc'); if (f) f.enabled = false; }],
+        cardiovert: ['bad', 'There is nothing to cardiovert.', null] },
+      debrief: ['Wide escape at 30/min with a faster independent atrial rate = infranodal complete heart block. The treatment is pacing; drugs are bridges.', 'Atropine helps nodal-level block (narrow escape, inferior MI, vagal). Expect nothing below the node.', 'Look for reversible causes: hyperkalaemia, drugs, ischaemia, Lyme disease.'] },
+    { id: 'hyperk', title: 'Missed dialysis, slow wide rhythm', stem: '57-year-old on haemodialysis, missed two sessions. Weak, nauseated. Point-of-care K⁺ 8.2 mmol/L.', stable: false,
+      cfg: () => ({ sinus: { cl: 1350 }, atria: { pAmp: 0 }, avn: { fast: { min: 190 } }, vent: { slow: 2.6, mods: { tAdd: [41, -29, 20], kappa: 0.25, tShape: { p: 0.6, sl: 0.2, sr: 0.14 }, jtScale: 0.5, stFrac: 0.4 } } }),
+      bp: bpTable([[0, 400, [86, 48]]], [86, 48]), done: (sim, t) => sim._ca && t - sim._caAt > 5000,
+      acts: { calcium: ['good', 'Calcium antagonises the membrane effect of potassium within 1–3 minutes: watch the QRS narrow. It buys 30–60 minutes and does not lower the potassium — repeat if the ECG relapses.', (s, t) => { let k = 0; s._ca = true; s._caAt = t; const step = (tt) => { k++; s.cfg.vent.slow = Math.max(1.15, 2.6 - 0.36 * k); s.cfg.atria.pAmp = Math.min(0.8, 0.2 * k); s.cfg.avn.fast.min = Math.max(110, 190 - 20 * k); s.cfg.vent.mods = { tAdd: [36, -26, 18], kappa: 0.35, tShape: { p: 0.62, sl: 0.1, sr: 0.08 } }; if (s.sinus) s.sinus.cl = Math.max(950, 1350 - 100 * k); if (k < 4) s.schedule(tt + 1100, step); }; s.schedule(t + 1200, step); }],
+        insulin: ['ok', 'Shifts potassium into cells: starts in 15 minutes, lowers K⁺ by ≈ 0.6–1.0 mmol/L for a few hours. Necessary — but calcium comes first when the QRS is wide.', null],
+        bicarb: ['ok', 'Helps only if there is a significant metabolic acidosis; not a substitute for calcium and insulin.', null],
+        tcp: ['bad', 'Hyperkalaemia raises the capture threshold: pacing frequently fails to capture until potassium is treated.', fx.pace(70, false)],
+        amio: ['bad', 'A further sodium/potassium-channel blocker in a heart that is already failing to conduct → asystole. A slow, wide, bizarre rhythm in a renal patient is not VT.', (s, t) => fx.vf(3000)(s, t)],
+        procain: ['bad', 'Sodium-channel blockade on top of potassium-induced sodium-channel inactivation.', (s, t) => fx.vf(3000)(s, t)],
+        atropine: ['bad', 'No effect on a sinoventricular rhythm caused by hyperkalaemia.', null] },
+      debrief: ['Wide + slow + renal failure = hyperkalaemia. Treat on the ECG before the laboratory result.', 'Order: calcium (protect the heart) → insulin-dextrose and salbutamol (shift) → dialysis (remove).', 'Antiarrhythmics and pacing fail until potassium falls.'] },
+    { id: 'tca', title: 'Overdose with seizures', stem: '34-year-old found with empty amitriptyline packets. GCS 9, dilated pupils, dry flushed skin, one seizure. pH 7.21.', stable: false,
+      cfg: () => ({ sinus: { cl: 470, resp: 0 }, avn: { fast: { min: 85, erp: 230 } }, hps: { pattern: 'rbbb', erp: 240 }, vent: { slow: 1.75, mods: { qtc: 470 } } }),
+      bp: bpTable([[0, 400, [84, 46]]], [84, 46]), done: (sim, t) => sim._bic && t - sim._bicAt > 5000,
+      acts: { bicarb: ['good', 'Sodium bicarbonate 1–2 mmol/kg boluses until the QRS narrows (target pH 7.50–7.55). Sodium loading overcomes the channel block and alkalinisation reduces drug binding.', (s, t) => { let k = 0; s._bic = true; s._bicAt = t; const step = (tt) => { k++; s.cfg.vent.slow = Math.max(1.08, 1.75 - 0.22 * k); if (k >= 2) s.cfg.hps.pattern = 'irbbb'; if (k >= 3) s.cfg.hps.pattern = 'normal'; if (k < 3) s.schedule(tt + 1300, step); }; s.schedule(t + 1200, step); }],
+        procain: ['bad', 'Class Ia = more sodium-channel blockade. Contraindicated with class Ic as well.', (s, t) => { s.cfg.vent.slow = 2.4; fx.vf(4500)(s, t); }],
+        amio: ['bad', 'Adds sodium- and potassium-channel block and hypotension. Avoid; lidocaine is the antiarrhythmic if bicarbonate fails.', (s) => { s.cfg.vent.slow = 2.1; }],
+        bb: ['bad', 'Worsens hypotension and conduction block.', (s) => { s._collapse = true; }],
+        cardiovert: ['bad', 'This is sinus tachycardia with a poisoned His-Purkinje system. A shock does not remove the drug.', fx.shock(true)],
+        lido: ['ok', 'Second line for ventricular arrhythmias after bicarbonate: a class Ib agent that competes with the tricyclic for the channel with faster kinetics.', null],
+        adenosine: ['bad', 'No role.', null] },
+      debrief: ['Sodium-channel blocker toxidrome: wide QRS, tall terminal R in aVR, tachycardia, hypotension, seizures.', 'Bicarbonate is both the antidote and the antiarrhythmic. Benzodiazepines for seizures; noradrenaline for hypotension; lipid emulsion and ECMO for refractory cases.', 'QRS > 100 ms: seizures likely. > 160 ms: ventricular arrhythmias likely.'] },
+  ];
+
+  EP.Modules = EP.Modules || [];
+  EP.Modules.push({
+    id: 'cases', title: 'Cases',
+    mount(root) {
+      let cs = CASES[0], sim, live, used = {}, solved = false;
+      const canvas = h('canvas', { 'aria-label': 'Bedside monitor' }), liveBox = h('div.live', canvas);
+      const strip = new EP.LiveStrip(canvas, { channels: [{ lead: 1 }, { lead: 6 }, { key: 'pulse', label: 'Arterial pressure' }], windowMs: 9000, rowMm: 21 });
+      const vit = h('div.vitals'), stem = h('div.card-b'), acts = h('div.card-b'), log = h('div.findings'), deb = h('div');
+      const rail = h('nav.card.rail', { 'aria-label': 'Cases' }), listEl = h('div', { style: { padding: '6px 0 8px' } }); rail.append(listEl);
+      const sel = UI.select(null, CASES.map((c) => [c.id, c.title]), cs.id, (v) => start(v)); sel.classList.add('rail-sel'); sel.setAttribute('aria-label', 'Case');
+      function fill() { listEl.innerHTML = ''; listEl.append(h('div.rail-g', 'Scenarios')); for (const c of CASES) listEl.append(h('button.rail-i', { type: 'button', 'aria-current': String(c === cs), onclick: () => start(c.id) }, c.title, h('small', c.stable ? 'haemodynamically stable' : 'unstable'))); }
+      function tick(t) {
+        if (Math.floor(t / 500) === Math.floor((t - 20) / 500)) return;
+        const q = sim.out.filter((e) => e.type === 'QRS' && e.t > t - 5000 && e.t < t - 120);
+        let hr = q.length > 1 ? Math.round(60000 / ((q[q.length - 1].t - q[0].t) / (q.length - 1))) : q.length ? 12 : 0;
+        if (sim.V.mode !== 'normal') hr = 0;
+        const bp = cs.bp(hr, sim);
+        vit.innerHTML = '';
+        vit.append(h('div', h('div.k', 'Heart rate'), h('div.v' + (hr > 150 || hr < 40 ? '.bad' : ''), sim.V.mode !== 'normal' ? '—' : String(hr))), h('div', h('div.k', 'Blood pressure'), h('div.v' + (bp[0] < 90 ? '.bad' : ''), bp[0] ? bp[0] + '/' + bp[1] : 'no pulse')),
+          h('div', h('div.k', 'Status'), h('div.v' + (bp[0] < 90 ? '.bad' : ''), { style: { fontSize: '13px' } }, bp[0] === 0 ? 'cardiac arrest — CPR' : bp[0] < 90 ? 'unstable' : 'stable')));
+        if (!solved && cs.done(sim, t)) { solved = true; debrief(true); }
+      }
+      function debrief(ok) {
+        deb.innerHTML = '';
+        deb.append(h('section.card', h('div.card-h', h('h3', ok ? 'Stabilised — debrief' : 'Debrief')), h('div.card-b.prose', UI.list(cs.debrief))));
+      }
+      function start(id) {
+        cs = CASES.find((c) => c.id === id) || CASES[0]; used = {}; solved = false;
+        if (sel.sel) sel.sel.value = cs.id; else sel.value = cs.id;
+        sim = new EP.HeartSim(cs.cfg());
+        if (live) live.setSim(sim); else live = new EP.Live({ sim, strips: [strip], pulse: true, noPulse: (b) => b.rr < 250 || sim._collapse, onTick: tick }).start();
+        stem.innerHTML = ''; stem.append(h('div.row', h('span.pill' + (cs.stable ? '.good' : '.bad'), cs.stable ? 'stable' : 'unstable'), h('h2', { style: { fontSize: '16px' } }, cs.title)), h('p', { style: { marginTop: '6px' } }, cs.stem), h('p.muted', { style: { marginTop: '6px', fontSize: '13px' } }, 'Choose what to do. The monitor responds; every choice is explained.'));
+        acts.innerHTML = '';
+        const groups = {};
+        for (const k in cs.acts) (groups[ACT[k][1]] = groups[ACT[k][1]] || []).push(k);
+        for (const g of ['Electricity', 'Drug', 'Manoeuvre', 'Other']) {
+          if (!groups[g]) continue;
+          acts.append(h('div.eyebrow', { style: { margin: '2px 0 6px' } }, g === 'Drug' ? 'Drugs' : g), h('div.variants', { style: { marginBottom: '10px' } }, groups[g].map((k) => h('button.btn.sm', { type: 'button', onclick: (ev) => act(k, ev.currentTarget) }, ACT[k][0]))));
+        }
+        log.innerHTML = ''; log.append(h('div.muted', 'Nothing given yet.')); deb.innerHTML = '';
+        deb.append(h('button.btn.sm', { type: 'button', onclick: () => debrief(false) }, 'Show the teaching points'));
+        fill();
+      }
+      function act(k, btn) {
+        const a = cs.acts[k];
+        if (!Object.keys(used).length) log.innerHTML = '';
+        used[k] = true; btn.setAttribute('aria-pressed', 'true');
+        if (a[2]) a[2](sim, live.t + 150);
+        log.prepend(h('div.finding', h('span.pill' + (a[0] === 'good' ? '.good' : a[0] === 'bad' ? '.bad' : '.warn'), a[0] === 'good' ? 'right call' : a[0] === 'bad' ? 'harmful' : 'second line'), h('div', h('b', ACT[k][0]), h('div.muted', a[1]))));
+      }
+      root.append(h('div.lab.lab2', rail, h('div.stack', sel,
+        h('div.sim', h('div.sim-main',
+          h('section.card', stem),
+          h('section.card', h('div.card-h', h('h3', 'Monitor — II, V1, arterial line'), h('span.grow'), h('button.btn.sm', { type: 'button', onclick: () => start(cs.id) }, 'Restart case')), liveBox, h('div.card-b', vit)),
+          h('section.card', h('div.card-h', h('h3', 'Interventions')), acts)),
+          h('div.sim-main', h('section.card', h('div.card-h', h('h3', 'What happened')), h('div.card-b', log)), deb,
+            h('div.note', h('b', 'The one rule. '), 'If the patient is unstable because of the rhythm — shock a tachycardia, pace a bradycardia. Drugs are for stable patients and for keeping the rhythm afterwards.'))))));
+      start(cs.id);
+      return { unmount() { live.destroy(); if (strip.ro) strip.ro.disconnect(); } };
+    },
+  });
+
+  // ---------------------------------------------------------------------------------------------
+  // Quiz: name the rhythm
+  EP.Modules.push({
+    id: 'quiz', title: 'Quiz',
+    mount(root) {
+      const canvas = h('canvas', { 'aria-label': 'Unknown ECG' }), box = h('div.ecg-scroll', canvas);
+      const view = new EP.ECGView(canvas, { layout: '12', strips: [1], ladder: false });
+      const opts = h('div.opts'), fb = h('div'), scoreEl = h('span.mono', '0 / 0');
+      let score = UI.store.get('quiz', { right: 0, total: 0 }), cur = null, answered = false;
+      const pool = R.list.filter((r) => !['sinus-arr'].includes(r.id));
+      const show = () => { scoreEl.textContent = score.right + ' / ' + score.total; };
+      function next() {
+        answered = false; cur = pool[Math.floor(Math.random() * pool.length)];
+        const same = pool.filter((r) => r.group === cur.group && r !== cur).sort(() => Math.random() - 0.5).slice(0, 2);
+        const other = pool.filter((r) => r.group !== cur.group).sort(() => Math.random() - 0.5).slice(0, 2);
+        const choices = same.concat(other, [cur]).sort(() => Math.random() - 0.5);
+        const rec = R.record(cur, { params: {} });
+        view.set({ ladder: false }); view.setRecording(rec);
+        opts.innerHTML = ''; fb.innerHTML = '';
+        for (const c of choices) opts.append(h('button.opt', { type: 'button', onclick: (ev) => {
+          if (answered) return; answered = true; score.total++;
+          for (const b of opts.children) { b.disabled = true; if (b.textContent === cur.name) b.classList.add('right'); }
+          if (c === cur) score.right++; else ev.currentTarget.classList.add('wrong');
+          UI.store.set('quiz', score); show();
+          view.set({ ladder: true });
+          fb.append(h('div.note' + (c === cur ? '.good' : '.bad'), h('b', c === cur ? 'Correct. ' : 'This is ' + cur.name + '. '), cur.teach.ecg[0]),
+            h('div.prose', { style: { marginTop: '10px', fontSize: '13px' } }, h('h4', 'What to look for'), UI.list(cur.teach.ecg)),
+            h('div.row', { style: { marginTop: '10px' } }, h('button.btn.primary', { type: 'button', onclick: next }, 'Next ECG'), h('button.btn', { type: 'button', onclick: () => { UI.store.set('rhythm', cur.id); EP.go('rhythms', true); } }, 'Open in Rhythm Lab')));
+        } }, c.name));
+      }
+      root.append(h('div.sim', h('div.sim-main', h('section.card', h('div.card-h', h('h2', 'Name the rhythm'), h('span.grow'), h('span.muted', 'Score'), scoreEl, h('button.btn.sm', { type: 'button', onclick: () => { score = { right: 0, total: 0 }; UI.store.set('quiz', score); show(); } }, 'Reset')), box,
+        h('div.card-b', h('p.muted', { style: { fontSize: '13px' } }, 'Use the calipers: drag across the trace. The ladder diagram appears after you answer.')))),
+        h('div.sim-main', h('section.card', h('div.card-h', h('h3', 'Your answer')), h('div.card-b', opts, h('div', { style: { marginTop: '10px' } }, fb))))));
+      show(); next();
+      return { unmount() { if (view.ro) view.ro.disconnect(); } };
     },
   });
 })(globalThis.EP = globalThis.EP || {});
