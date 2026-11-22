@@ -277,10 +277,11 @@
   Mo.atrial = function (sp) {
     // sp: { seeds: [{p|site, t}], speed }
     let key = 'a' + (sp.speed || 0);
-    for (const s of sp.seeds) { const p = s.site ? Mo.ASITES[s.site].p : s.p; key += '|' + p[0].toFixed(2) + ',' + p[1].toFixed(2) + ',' + p[2].toFixed(2) + '@' + (s.t || 0); }
+    const pt = (s) => (typeof s.site === 'string' ? Mo.ASITES[s.site].p : (s.site || s.p));
+    for (const s of sp.seeds) { const p = pt(s); key += '|' + p[0].toFixed(2) + ',' + p[1].toFixed(2) + ',' + p[2].toFixed(2) + '@' + (s.t || 0); }
     let r = acache.get(key);
     if (r) return r;
-    const seeds = sp.seeds.map((s) => ({ v: M.nearestAtrial(s.site ? Mo.ASITES[s.site].p : s.p), t: s.t || 0 }));
+    const seeds = sp.seeds.map((s) => ({ v: M.nearestAtrial(pt(s)), t: s.t || 0 }));
     const T = M.atrialActivate(seeds, sp);
     const d = M.atrialDipole(T);
     r = { T, vcg: d.vcg, n: d.n, t0: d.t0, tmin: d.tmin, tmax: d.tmax, dur: d.dur, key };

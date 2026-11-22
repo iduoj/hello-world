@@ -1,0 +1,16 @@
+<!doctype html><meta charset="utf-8"><title>dev ecg</title>
+<style>body{margin:12px;font:13px sans-serif;background:#fff} .w{margin-bottom:14px} canvas{display:block}</style>
+<div id="root"></div>
+<script src="../js/util.js"></script><script src="../js/geometry.js"></script><script src="../js/model.js"></script>
+<script src="../js/morph.js"></script><script src="../js/heartsim.js"></script><script src="../js/synth.js"></script>
+<script src="../js/rhythms.js"></script><script src="../js/ecgview.js"></script>
+<script>
+const q = new URLSearchParams(location.search), ids = (q.get('id') || 'nsr').split(','), mode = q.get('mode') || '12';
+for (const id of ids) {
+  const rec = EP.Rhythms.record(id);
+  const d = document.createElement('div'); d.className = 'w';
+  d.innerHTML = '<b>' + EP.Rhythms.byId[id].name + '</b> ' + JSON.stringify(EP.Rhythms.measure(rec)) + '<div><canvas></canvas></div>';
+  document.getElementById('root').appendChild(d);
+  new EP.ECGView(d.querySelector('canvas'), mode === '12' ? { layout: '12', strips: [1], ladder: true } : { layout: 'strip', strips: [1, 6], ladder: true, rowMm: 22 }).setRecording(rec);
+}
+</script>

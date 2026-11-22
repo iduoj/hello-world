@@ -19,7 +19,7 @@
   M.OTW = 0.3;                         // RV outflow tract dipole weight
   M.BASE_FADE = 0.7;                   // dipole weight tapers to zero over this many cm at the cut base
   M.VP = 0.215;                        // Purkinje-layer velocity, cm/ms (2.4 m/s)
-  M.VA = 0.105;                        // atrial velocity, cm/ms
+  M.VA = 0.135;                        // atrial velocity, cm/ms
   M.KV = 0.066;                        // dipole → mV calibration, ventricles
   M.KA = 0.011;                        // dipole → mV calibration, atria
 
