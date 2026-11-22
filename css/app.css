@@ -144,3 +144,37 @@ table.tbl td { padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-
   .brand small { display: none; }
 }
 @media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; } }
+
+/* ---- simulators (pacemaker, temporary pacing, ICD, cases) ---- */
+.sim { display: grid; grid-template-columns: minmax(0, 1fr) minmax(300px, 380px); gap: 14px; align-items: start; }
+.sim-main { display: grid; gap: 14px; min-width: 0; }
+.live { background: var(--ecg-paper); border-radius: 0 0 6px 6px; overflow: hidden; }
+.live canvas { display: block; }
+.ctl { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 10px; align-items: center; font-size: 13px; }
+.ctl label { color: var(--muted); }
+.ctl input[type="range"] { width: 100%; grid-column: 1 / -1; margin: 0 0 6px; }
+.ctl .val { font: 500 13px/1 var(--mono); font-variant-numeric: tabular-nums; }
+.ctl select { grid-column: 1 / -1; width: 100%; margin-bottom: 6px; }
+.findings { display: grid; gap: 6px; }
+.finding { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 8px; align-items: start; font-size: 13px; }
+.finding .pill { margin-top: 2px; }
+.two { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; }
+.three { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; }
+.opts { display: grid; gap: 6px; }
+.opt { text-align: left; border: 1px solid var(--line); background: var(--surface); border-radius: 5px; padding: 8px 10px; cursor: pointer; min-height: 40px; }
+.opt:hover { border-color: var(--accent); }
+.opt.right { border-color: var(--good); background: color-mix(in srgb, var(--good) 12%, transparent); }
+.opt.wrong { border-color: var(--bad); background: color-mix(in srgb, var(--bad) 10%, transparent); }
+.opt:disabled { cursor: default; opacity: 0.85; }
+.dial { display: grid; gap: 2px; justify-items: center; }
+.dial .num { font: 500 22px/1 var(--mono); font-variant-numeric: tabular-nums; }
+.dial .unit { font-size: 11px; color: var(--muted); }
+.box { border: 1px solid var(--line); border-radius: 8px; background: var(--surface-2); padding: 12px; display: grid; gap: 12px; }
+.box-lcd { background: #0f1a14; color: #7ef0a8; border-radius: 5px; padding: 8px 10px; font: 500 13px/1.5 var(--mono); display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; text-align: center; }
+.box-lcd b { display: block; font-size: 20px; }
+.vitals { display: grid; grid-template-columns: repeat(auto-fit, minmax(84px, 1fr)); gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: 5px; overflow: hidden; }
+.vitals > div { background: var(--surface); padding: 6px 8px; }
+.vitals .k { font: 600 10px/1.2 var(--cond); letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.vitals .v { font: 500 18px/1.2 var(--mono); font-variant-numeric: tabular-nums; }
+.vitals .v.bad { color: var(--bad); }
+@media (max-width: 980px) { .sim { grid-template-columns: minmax(0, 1fr); } }

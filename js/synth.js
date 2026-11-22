@@ -80,7 +80,7 @@
   S.gen = function (seg) { return seg._gen || (seg._gen = GEN[seg.type](seg)); };
 
   const SPIKE_VEC = { A: [0.12, -0.5, 0.28], V: [0.36, -0.5, 0.46] };
-  const SPIKE_AMP = { bipolar: 0.55, unipolar: 2.6, temp: 1.6, tcp: 7 };
+  const SPIKE_AMP = { bipolar: 0.9, unipolar: 2.8, temp: 1.6, tcp: 6 };
 
   /* Build a recording for [t0, t1) ms. opts: { fs, noise } */
   S.build = function (sim, t0, t1, opts) {

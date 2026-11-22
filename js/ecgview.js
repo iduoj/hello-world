@@ -39,7 +39,7 @@
       this.o = Object.assign({ layout: '12', speed: 25, gain: 10, strips: [1], ladder: false, markers: false, minPx: 2.5, maxPx: 5.4, rowMm: 27, calipers: true }, o || {});
       this.rec = null; this.cursor = null; this.cal = null; this.cells = [];
       this._bind();
-      if (typeof ResizeObserver !== 'undefined') { this.ro = new ResizeObserver(() => this.resize()); this.ro.observe(canvas.parentElement); }
+      if (typeof ResizeObserver !== 'undefined' && canvas.parentElement) { this.ro = new ResizeObserver(() => this.resize()); this.ro.observe(canvas.parentElement); }
       this.resize();
     }
     set(o) { Object.assign(this.o, o); this.resize(); }
@@ -48,7 +48,7 @@
     durMs() { return this.rec ? this.rec.t1 - this.rec.t0 : 10000; }
     resize() {
       const o = this.o, par = this.c.parentElement;
-      const avail = Math.max(200, par.clientWidth || 800);
+      const avail = Math.max(200, (par && par.clientWidth) || 800);
       const dur = this.durMs() / 1000;
       const left = 7, right = 2;
       const wmm = left + dur * o.speed + right;
@@ -276,7 +276,7 @@
       this.c = canvas; this.ctx = canvas.getContext('2d');
       this.o = Object.assign({ channels: [{ lead: 1 }], windowMs: 8000, gain: 10, rowMm: 24, markers: false, ladder: false, fs: 250 }, o || {});
       this.reset();
-      if (typeof ResizeObserver !== 'undefined') { this.ro = new ResizeObserver(() => this.resize()); this.ro.observe(canvas.parentElement); }
+      if (typeof ResizeObserver !== 'undefined' && canvas.parentElement) { this.ro = new ResizeObserver(() => this.resize()); this.ro.observe(canvas.parentElement); }
       this.resize();
     }
     reset() {
@@ -284,9 +284,9 @@
       this.n = n; this.buf = this.o.channels.map(() => new Float32Array(n)); this.head = 0; this.tHead = 0; this.items = [];
     }
     resize() {
-      const o = this.o, par = this.c.parentElement, W = Math.max(240, par.clientWidth || 600);
+      const o = this.o, par = this.c.parentElement, W = Math.max(240, (par && par.clientWidth) || 600);
       const mm = W / ((o.windowMs / 1000) * 25);
-      const H = Math.round((o.channels.length * o.rowMm + (o.markers ? 9 : 0) + 4) * Math.max(mm, 2.2));
+      const H = Math.round((o.channels.length * o.rowMm + (o.markers ? 9 : 0) + (o.timers ? 13 : 0) + 4) * Math.max(mm, 2.2));
       const dpr = Math.min(2.5, globalThis.devicePixelRatio || 1);
       this.g = { W, H, mm, row: o.rowMm * Math.max(mm, 2.2), pxPerMs: W / o.windowMs };
       this.c.width = Math.round(W * dpr); this.c.height = Math.round(H * dpr); this.c.style.width = W + 'px'; this.c.style.height = H + 'px'; this.dpr = dpr;
@@ -303,7 +303,7 @@
         this.head = (this.head + 1) % this.n;
       }
       this.tHead = rec.t1;
-      for (const ev of rec.events) if ((ev.type === 'mark' || ev.type === 'spike') && ev.t >= rec.t0 && ev.t < rec.t1) this.items.push(ev);
+      for (const ev of rec.events) if ((ev.type === 'mark' || ev.type === 'spike' || ev.type === 'timer' || ev.type === 'shock') && ev.t >= rec.t0 && ev.t < rec.t1) this.items.push(ev);
       const cut = this.tHead - o.windowMs - 500;
       while (this.items.length && this.items[0].t < cut) this.items.shift();
     }
@@ -330,7 +330,7 @@
           const k = this.n - 1 - Math.round((this.tHead - ev.t) / (1000 / o.fs)); if (k < 0) continue;
           const v = b[(this.head + k) % this.n];
           const sv = { A: [0.12, -0.5, 0.28], V: [0.36, -0.5, 0.46] }[ev.ch] || [0.3, -0.5, 0.4];
-          const amp = EP.Leads.project(sv[0], sv[1], sv[2], ch.lead) * ({ bipolar: 0.55, unipolar: 2.6, temp: 1.6, tcp: 7 }[ev.kind] || 0.55);
+          const amp = EP.Leads.project(sv[0], sv[1], sv[2], ch.lead) * ({ bipolar: 0.9, unipolar: 2.8, temp: 1.6, tcp: 6 }[ev.kind] || 0.9);
           ctx.beginPath(); ctx.moveTo(x, y0 - v * mv); ctx.lineTo(x, y0 - (v + amp) * mv); ctx.stroke();
         }
         ctx.fillStyle = ch.key ? (ch.color || col.pulse) : col.label;
@@ -347,7 +347,23 @@
         }
         ctx.textAlign = 'left';
       }
+      if (o.timers) {
+        const mmx = Math.max(g.mm, 2.2), y = (o.channels.length * o.rowMm + (o.markers ? 9 : 0)) * mmx + 4;
+        const lanes = { AVD: 0, PVARP: 1, VRP: 2 }, cols = { AVD: col.cursor, PVARP: col.slow, VRP: col.tier };
+        ctx.font = `600 ${Math.max(9, g.mm * 2.2)}px ${col.font}`; ctx.textBaseline = 'middle';
+        for (const k in lanes) { ctx.fillStyle = col.label; ctx.fillText(k, 6, y + (lanes[k] + 0.5) * mmx * 3.6); }
+        for (const ev of this.items) {
+          if (ev.type !== 'timer' || lanes[ev.name] == null) continue;
+          const x0 = g.W - (this.tHead - ev.t0) * g.pxPerMs, x1 = g.W - (this.tHead - Math.min(ev.t1, this.tHead)) * g.pxPerMs;
+          if (x1 < 46) continue;
+          ctx.fillStyle = cols[ev.name]; ctx.globalAlpha = 0.75;
+          ctx.fillRect(Math.max(46, x0), y + lanes[ev.name] * mmx * 3.6 + mmx * 0.6, Math.max(1, x1 - Math.max(46, x0)), mmx * 2.4);
+          ctx.globalAlpha = 1;
+        }
+      }
     }
+    /* Freeze-frame helpers for the UI */
+    visibleEvents() { return this.items; }
   }
   EP.LiveStrip = LiveStrip;
   EP.cssColors = cssColors; EP.drawGrid = drawGrid;
