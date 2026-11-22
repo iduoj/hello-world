@@ -1,0 +1,24 @@
+<!doctype html><meta charset="utf-8"><title>dev xray</title>
+<style>body{margin:0;font:12px sans-serif;background:#ddd} .row{display:flex;flex-wrap:wrap;gap:6px;padding:6px} .x{width:560px;height:640px;position:relative;background:#000} .v{width:520px;height:500px;position:relative;background:#e9e6e2}
+.xr-marks span{position:absolute;color:#ddd;font:600 12px sans-serif}.h3d-labels{position:absolute;inset:0;pointer-events:none;overflow:hidden}.h3d-label{position:absolute;left:0;top:0;font:600 11px sans-serif;background:rgba(255,255,255,.75);padding:1px 5px;border-radius:3px;white-space:nowrap}</style>
+<div class="row"><div class="x" id="pa"></div><div class="x" id="lat"></div><div class="v" id="h"></div></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="../js/util.js"></script><script src="../js/geometry.js"></script><script src="../js/model.js"></script>
+<script src="../js/morph.js"></script><script src="../js/heartsim.js"></script><script src="../js/synth.js"></script>
+<script src="../js/rhythms.js"></script><script src="../js/ecgview.js"></script><script src="../js/heart3d.js"></script><script src="../js/devices3d.js"></script>
+<script>
+EP.Morph.init();
+const q = new URLSearchParams(location.search), kind = q.get('k') || 'ddd';
+const P = {
+  ddd: { gen: 'pm', leads: [{ route: 'raa', name: 'RA lead' }, { route: 'rvApex', name: 'RV lead' }] },
+  crt: { gen: 'icd', leads: [{ route: 'raa', name: 'RA' }, { route: 'rvApex', name: 'RV coil', coil: [0.8, 6.5], svcCoil: true }, { route: 'cs', name: 'LV lead' }] },
+  sicd: { sicd: 'ok' },
+  micra: { caps: [{ name: 'Micra', tip: EP.G.L(3.3, 0.3, 4.4), from: EP.G.L(4.7, 0.3, 2.6), len: 2.6 }] },
+  twid: { gen: 'pm', twiddler: true, leads: [{ route: 'raa', name: 'RA' }, { route: 'rvApex', name: 'RV' }] },
+  asd: { gen: 'pm', leads: [{ route: 'raa', name: 'RA' }, { route: 'lvViaASD', name: 'V lead in LV' }], pneumothorax: true },
+};
+const hw = EP.Hardware.build(P[kind]);
+const a = new EP.XRay(document.getElementById('pa')); a.setHardware(hw);
+const b = new EP.XRay(document.getElementById('lat')); b.setHardware(hw); b.setView('lat');
+const h = new EP.Heart3D(document.getElementById('h'), {}); h.setOpts({ opacity: 0.35 }); EP.Hardware.add3D(h, hw); h.setView('chest', true); h.cam.dist = 70; h.cam.target.set(3, 5, 0); h.invalidate();
+</script>

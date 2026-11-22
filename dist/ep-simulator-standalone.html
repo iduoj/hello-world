@@ -111,6 +111,7 @@ table.tbl td { padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-
 
 /* ---- rhythm lab ---- */
 .lab { display: grid; grid-template-columns: 236px minmax(0, 1fr) minmax(320px, 430px); gap: 14px; align-items: start; }
+.lab.lab2 { grid-template-columns: 236px minmax(0, 1fr); }
 .rail { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 58px); max-height: calc(100vh - 74px); overflow: auto; }
 .rail input[type="search"] { width: 100%; }
 .rail-g { font: 600 10.5px/1.2 var(--cond); letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); padding: 12px 10px 4px; }
@@ -145,7 +146,7 @@ table.tbl td { padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-
   .side { grid-column: 2; position: static; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); }
 }
 @media (max-width: 820px) {
-  .lab { grid-template-columns: minmax(0, 1fr); }
+  .lab, .lab.lab2 { grid-template-columns: minmax(0, 1fr); }
   .rail { display: none; }
   .rail-sel { display: block; width: 100%; }
   .side { grid-column: 1; }
@@ -153,6 +154,50 @@ table.tbl td { padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-
   .brand small { display: none; }
 }
 @media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; } }
+
+/* ---- simulators (pacemaker, temporary pacing, ICD, cases) ---- */
+.sim { display: grid; grid-template-columns: minmax(0, 1fr) minmax(300px, 380px); gap: 14px; align-items: start; }
+.sim-main { display: grid; gap: 14px; min-width: 0; }
+.live { background: var(--ecg-paper); border-radius: 0 0 6px 6px; overflow: hidden; }
+.live canvas { display: block; }
+.ctl { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 10px; align-items: center; font-size: 13px; }
+.ctl label { color: var(--muted); }
+.ctl input[type="range"] { width: 100%; grid-column: 1 / -1; margin: 0 0 6px; }
+.ctl .val { font: 500 13px/1 var(--mono); font-variant-numeric: tabular-nums; }
+.ctl select { grid-column: 1 / -1; width: 100%; margin-bottom: 6px; }
+.findings { display: grid; gap: 6px; }
+.finding { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 8px; align-items: start; font-size: 13px; }
+.finding .pill { margin-top: 2px; }
+.two { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; }
+.three { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; }
+.opts { display: grid; gap: 6px; }
+.opt { text-align: left; border: 1px solid var(--line); background: var(--surface); border-radius: 5px; padding: 8px 10px; cursor: pointer; min-height: 40px; }
+.opt:hover { border-color: var(--accent); }
+.opt.right { border-color: var(--good); background: color-mix(in srgb, var(--good) 12%, transparent); }
+.opt.wrong { border-color: var(--bad); background: color-mix(in srgb, var(--bad) 10%, transparent); }
+.opt:disabled { cursor: default; opacity: 0.85; }
+.dial { display: grid; gap: 2px; justify-items: center; }
+.dial .num { font: 500 22px/1 var(--mono); font-variant-numeric: tabular-nums; }
+.dial .unit { font-size: 11px; color: var(--muted); }
+.box { border: 1px solid var(--line); border-radius: 8px; background: var(--surface-2); padding: 12px; display: grid; gap: 12px; }
+.box-lcd { background: #0f1a14; color: #7ef0a8; border-radius: 5px; padding: 8px 10px; font: 500 13px/1.5 var(--mono); display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; text-align: center; }
+.box-lcd b { display: block; font-size: 20px; }
+.vitals { display: grid; grid-template-columns: repeat(auto-fit, minmax(84px, 1fr)); gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: 5px; overflow: hidden; }
+.vitals > div { background: var(--surface); padding: 6px 8px; }
+.vitals .k { font: 600 10px/1.2 var(--cond); letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.vitals .v { font: 500 18px/1.2 var(--mono); font-variant-numeric: tabular-nums; }
+.vitals .v.bad { color: var(--bad); }
+@media (max-width: 980px) { .sim { grid-template-columns: minmax(0, 1fr); } }
+
+/* ---- devices ---- */
+.dev-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 14px; }
+.xr { position: relative; background: #000; border-radius: 6px 6px 0 0; overflow: hidden; height: 400px; filter: contrast(1.12) brightness(1.04); }
+.xr-marks span { position: absolute; color: #d6d6d6; font: 600 11px/1 var(--cond); letter-spacing: 0.08em; }
+.variants { display: flex; flex-wrap: wrap; gap: 6px; }
+.variants .btn.bad[aria-pressed="true"] { background: color-mix(in srgb, var(--bad) 14%, transparent); border-color: var(--bad); color: var(--bad); }
+.signs { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1px; background: var(--line); border-top: 1px solid var(--line); }
+.signs > div { background: var(--surface); padding: 10px 12px; font-size: 13px; }
+.signs h4 { font: 600 10.5px/1.2 var(--cond); letter-spacing: 0.09em; text-transform: uppercase; color: var(--muted); margin-bottom: 4px; }
 
 </style>
 </head>
@@ -1757,7 +1802,7 @@ table.tbl td { padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-
   S.gen = function (seg) { return seg._gen || (seg._gen = GEN[seg.type](seg)); };
 
   const SPIKE_VEC = { A: [0.12, -0.5, 0.28], V: [0.36, -0.5, 0.46] };
-  const SPIKE_AMP = { bipolar: 0.55, unipolar: 2.6, temp: 1.6, tcp: 7 };
+  const SPIKE_AMP = { bipolar: 0.9, unipolar: 2.8, temp: 1.6, tcp: 6 };
 
   /* Build a recording for [t0, t1) ms. opts: { fs, noise } */
   S.build = function (sim, t0, t1, opts) {
@@ -2165,6 +2210,319 @@ table.tbl td { padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-
 })(globalThis.EP = globalThis.EP || {});
 
 
+/* ---- js/device.js ---- */
+/* EP Simulator — implantable / temporary device logic and the real-time run loop.
+ *
+ * EP.Pacemaker(sim, cfg)  timing-cycle engine attached to a HeartSim: senses through the simulated
+ *                         leads, paces through sim.pace(), writes markers ('AS','AP','AR','VS','VP',…)
+ *                         and timer bars to the event log.
+ * EP.ICD(sim, cfg)        rate-zone detection, ATP and shock.
+ * EP.Live                 advances a sim in real time and feeds LiveStrip(s).
+ */
+(function (EP) {
+  'use strict';
+  const Mo = EP.Morph, M = EP.Model;
+
+  const PM_DEF = {
+    mode: 'DDD', lrl: 60, url: 130, avdP: 180, avdS: 150, pvarp: 250, vrp: 240, arp: 300, pvab: 110, vBlank: 30,
+    aOut: 2.5, vOut: 2.5, aThr: 0.8, vThr: 0.8,           // volts (or mA for temporary pacing)
+    aSens: 0.5, vSens: 2.5, pAmp: 2.6, rAmp: 10, tAmp: 1.2, ffr: 0.3,   // mV
+    aSite: 'raa', vSite: 'rvApex', vSpec: null, kind: 'bipolar',
+    hyst: 0, modeSwitch: true, msRate: 175, magnet: false, magnetRate: 85, safetyPace: true, crosstalk: false,
+    pvcExt: false, noiseV: 0, noiseA: 0, noOutput: false, tcpArtifact: false,
+  };
+  const HAS = {
+    AOO: { pa: 1 }, AAI: { pa: 1, sa: 1 }, VOO: { pv: 1 }, VVI: { pv: 1, sv: 1 }, VDD: { pv: 1, sa: 1, sv: 1, track: 1 },
+    DOO: { pa: 1, pv: 1 }, DDI: { pa: 1, pv: 1, sa: 1, sv: 1 }, DDD: { pa: 1, pv: 1, sa: 1, sv: 1, track: 1 }, OFF: {}, ODO: { sa: 1, sv: 1 },
+  };
+
+  class Pacemaker {
+    constructor(sim, cfg) {
+      this.sim = sim; this.c = Object.assign({}, PM_DEF, cfg || {});
+      this.tok = { a: 0, v: 0, async: 0 };
+      this.lastV = -1e7; this.lastA = -1e7; this.vrpEnd = -1; this.pvarpEnd = -1; this.aBlank = -1; this.vBlankEnd = -1;
+      this.inAVD = false; this.aaInt = []; this.switched = false; this.stats = { ap: 0, vp: 0, as: 0, vs: 0 };
+      this.vVox = M.nearest((Mo.SITES[this.c.vSite] || { p: this.c.vSite }).p, 'any');
+      sim.on('A', (e) => this._onA(e)); sim.on('V0', (e) => this._onV(e));
+      this._ownA = -1; this._ownV = -1;
+      this.restart(sim.t + 5);
+      this._noise();
+    }
+    get mode() {
+      const c = this.c;
+      if (c.magnet) return { DDD: 'DOO', DDI: 'DOO', VDD: 'VOO', VVI: 'VOO', AAI: 'AOO' }[c.mode] || c.mode;
+      if (this.switched && (c.mode === 'DDD' || c.mode === 'VDD')) return c.mode === 'DDD' ? 'DDI' : 'VVI';
+      return c.mode;
+    }
+    get lri() { return 60000 / (this.c.magnet ? this.c.magnetRate : this.c.lrl); }
+    get uri() { return 60000 / this.c.url; }
+    set(o) { const m0 = this.c.mode, mg = this.c.magnet; Object.assign(this.c, o); if (o.vSite) this.vVox = M.nearest((Mo.SITES[this.c.vSite] || { p: this.c.vSite }).p, 'any'); if (this.c.mode !== m0 || this.c.magnet !== mg) { this.switched = false; this.restart(this.sim.t + 5); } }
+    mark(t, ch, text) { this.sim.emit({ t, type: 'mark', ch, text }); }
+    timer(name, t0, t1) { this.sim.emit({ t: t0, type: 'timer', name, t0, t1 }); }
+    restart(t) {
+      this.tok.a++; this.tok.v++; this.tok.async++; this.inAVD = false;
+      const m = this.mode, cap = HAS[m] || {};
+      if (m === 'AOO' || m === 'VOO' || m === 'DOO') {
+        const tk = this.tok.async;
+        const beat = (tt) => {
+          if (tk !== this.tok.async) return;
+          if (m === 'AOO') this._paceA(tt, true);
+          else if (m === 'VOO') this._paceV(tt, true);
+          else { this._paceA(tt, true); this.sim.schedule(tt + this.c.avdP, (t2) => { if (tk === this.tok.async) this._paceV(t2, true); }); }
+          this.sim.schedule(tt + this.lri, beat);
+        };
+        this.sim.schedule(t + 200, beat);
+      } else if (m === 'AAI') this._armA(t + this.lri);
+      else if (cap.pv) this._cycle(t, 'init');
+    }
+    _armA(t) { const tk = ++this.tok.a; this.sim.schedule(t, (tt) => { if (tk === this.tok.a) this._paceA(tt); }); }
+    _armV(t) { const tk = ++this.tok.v; this.vDue = t; this.sim.schedule(t, (tt) => { if (tk === this.tok.v) this._paceV(tt); }); }
+
+    // ---- sensing inputs from the heart ----
+    _onA(e) {
+      if (e.t === this._ownA) return;
+      const cap = HAS[this.mode] || {};
+      if (!cap.sa) return;
+      const amp = this.c.pAmp * (e.drive === 'fib' ? 0.25 + 0.5 * this.sim.rng() : e.drive === 'flutter' ? 0.7 : 1);
+      const ts = e.t + (e.lat ? e.lat(this.c.aSite) : 20);
+      this.sim.schedule(ts, (t) => this._senseA(t, amp));
+    }
+    _onV(e) {
+      const own = e.t === this._ownV;
+      const cap = HAS[this.mode] || {};
+      // T-wave on the ventricular channel (oversensed only if larger than the programmed sensitivity)
+      if (cap.sv && this.c.tAmp >= this.c.vSens) { const tt = e.t + 250 + 0.12 * Math.min(1200, e.rr || 800); this.sim.schedule(tt, (t) => this._senseV(t, this.c.tAmp, 'T')); }
+      // far-field R wave on the atrial channel
+      if (cap.sa && this.c.ffr >= this.c.aSens) this.sim.schedule(e.t + 40, (t) => this._senseA(t, this.c.ffr, 'FFR'));
+      if (own || !cap.sv) return;
+      const lat = e.act && e.act.T[this.vVox] < Infinity ? Math.max(0, e.act.T[this.vVox]) : 30;
+      const pvc = e.c && (e.c.type === 'focus');
+      this.sim.schedule(e.t + lat, (t) => this._senseV(t, this.c.rAmp * (pvc ? 1.2 : 1), pvc ? 'PVC' : 'R'));
+    }
+    _noise() {
+      const tick = (t) => {
+        const c = this.c, cap = HAS[this.mode] || {};
+        if (c.noiseV > 0 && cap.sv && this.sim.rng() < 0.5) this._senseV(t, c.noiseV * (0.6 + 0.8 * this.sim.rng()), 'noise');
+        if (c.noiseA > 0 && cap.sa && this.sim.rng() < 0.5) this._senseA(t, c.noiseA * (0.6 + 0.8 * this.sim.rng()), 'noise');
+        this.sim.schedule(t + 60 + 140 * this.sim.rng(), tick);
+      };
+      this.sim.schedule(this.sim.t + 100, tick);
+    }
+    _senseA(t, amp, src) {
+      const c = this.c, m = this.mode, cap = HAS[m] || {};
+      if (!cap.sa || amp < c.aSens) return;
+      if (t < this.aBlank) return;
+      // atrial-rate monitor (uses refractory senses too)
+      this.aaInt.push(t - this.lastA); if (this.aaInt.length > 8) this.aaInt.shift(); this.lastA = t;
+      this._modeSwitch(t);
+      if (m === 'AAI') { if (t - this._aRef < c.arp) { this.mark(t, 'A', 'AR'); return; } this._aRef = t; this.mark(t, 'A', 'AS'); this.stats.as++; this._armA(t + (c.hyst ? 60000 / c.hyst : this.lri)); return; }
+      if (t < this.pvarpEnd) { this.mark(t, 'A', 'AR'); return; }
+      this.mark(t, 'A', 'AS'); this.stats.as++;
+      this.tok.a++;                                   // inhibit the pending atrial pace
+      if (cap.track && !this.inAVD) {
+        this.inAVD = true;
+        const due = Math.max(t + c.avdS, this.lastV + this.uri);
+        this.timer('AVD', t, due);
+        this._armV(due);
+      }
+    }
+    _senseV(t, amp, src) {
+      const c = this.c, m = this.mode, cap = HAS[m] || {};
+      if (!cap.sv || amp < c.vSens) return;
+      if (t < this.vBlankEnd) return;
+      if (t < this.vrpEnd) return;
+      // crosstalk window: a ventricular sense right after an atrial pace triggers a committed safety pace
+      if (c.safetyPace && this._apAt != null && t - this._apAt < 110 && t - this._apAt >= 0 && (m === 'DDD' || m === 'DDI')) {
+        this.mark(t, 'V', 'VS');
+        const tk = ++this.tok.v; this.sim.schedule(this._apAt + 110, (tt) => { if (tk === this.tok.v) this._paceV(tt, false, 'VSP'); });
+        return;
+      }
+      this.mark(t, 'V', 'VS'); this.stats.vs++;
+      this.tok.v++; this.tok.a++;
+      this._cycle(t, src === 'PVC' && !this.inAVD ? 'PVC' : 'VS');
+    }
+    _modeSwitch(t) {
+      const c = this.c;
+      if (!c.modeSwitch || !(c.mode === 'DDD' || c.mode === 'VDD') || this.aaInt.length < 6) return;
+      const lim = 60000 / c.msRate, fast = this.aaInt.filter((x) => x < lim).length;
+      if (!this.switched && fast >= 5) { this.switched = true; this.mark(t, 'V', 'MS'); this.inAVD = false; this.tok.v++; this._cycle(Math.max(this.lastV, t - this.lri * 0.5), 'ms'); }
+      else if (this.switched && fast === 0 && this.aaInt.length >= 8) { this.switched = false; this.mark(t, 'V', 'MS'); }
+    }
+
+    // ---- outputs ----
+    _paceA(t, async) {
+      const c = this.c, m = this.mode;
+      this._apAt = t; this.stats.ap++;
+      if (!c.noOutput) { this._ownA = t; this.sim.pace(t, 'A', { site: c.aSite, captured: c.aOut >= c.aThr, kind: c.kind }); }
+      this.mark(t, 'A', 'AP');
+      this.lastA = t; this.aaInt.push(999); if (this.aaInt.length > 8) this.aaInt.shift();
+      this.vBlankEnd = t + c.vBlank;
+      if (c.crosstalk) this.sim.schedule(t + c.vBlank + 12, (tt) => this._senseV(tt, 99, 'xtalk'));
+      if (async) return;
+      if (m === 'AAI') { this._aRef = t; this._armA(t + this.lri); return; }
+      if (m === 'DDD' || m === 'DDI') {
+        if (m === 'DDD') { this.inAVD = true; this.timer('AVD', t, t + c.avdP); this._armV(t + c.avdP); }
+        // DDI: the ventricular pace was already armed at the lower rate interval
+      }
+    }
+    _paceV(t, async, label) {
+      const c = this.c;
+      this.stats.vp++;
+      let res = false;
+      if (!c.noOutput) {
+        this._ownV = t;
+        res = this.sim.pace(t, 'V', { site: c.vSite, spec: c.vSpec || undefined, captured: c.vOut >= c.vThr, kind: c.kind });
+        if (res === false) this._ownV = -1;
+        if (c.tcpArtifact) this.sim.emit({ t, type: 'art', wave: tcpArtifact() });
+      }
+      this.mark(t, 'V', label || 'VP');
+      this.lastCapture = res;
+      if (!async) this._cycle(t, 'VP');
+      else { this.lastV = t; }
+    }
+    /* Start the timing cycle that follows a ventricular event (sensed or paced). */
+    _cycle(t, kind) {
+      const c = this.c, m = this.mode;
+      this.lastV = t; this.inAVD = false; this._apAt = null;
+      this.vrpEnd = t + c.vrp; this.timer('VRP', t, t + c.vrp);
+      if (m === 'VVI') { this._armV(t + (kind === 'VS' && c.hyst ? 60000 / c.hyst : this.lri)); return; }
+      const pv = c.pvarp + (kind === 'PVC' && c.pvcExt ? 150 : 0);
+      this.pvarpEnd = t + pv; this.aBlank = t + c.pvab; this.timer('PVARP', t, t + pv);
+      if (m === 'VDD') { this._armV(t + this.lri); return; }
+      if (m === 'DDD') { const va = this.lri - c.avdP; this.timer('VA', t, t + va); this._armA(t + va); this.tok.v++; return; }
+      if (m === 'DDI') { const va = this.lri - c.avdP; this._armA(t + va); this._armV(t + this.lri); return; }
+    }
+  }
+  /* Transcutaneous pacing artefact: a wide, decaying deflection after every stimulus (it can masquerade as a QRS). */
+  let _tcp = null;
+  function tcpArtifact() {
+    if (_tcp) return _tcp;
+    const n = 190, w = new Float32Array(3 * n), d = [0.25, -0.75, 0.6];
+    for (let i = 0; i < n; i++) {
+      const x = i - 4; if (x < 0) continue;
+      const v = (x < 22 ? -1.6 * (1 - x / 44) : 0.75 * Math.exp(-(x - 22) / 34) - 0.12 * Math.exp(-(x - 22) / 80));
+      w[i * 3] = d[0] * v; w[i * 3 + 1] = d[1] * v; w[i * 3 + 2] = d[2] * v;
+    }
+    return (_tcp = { n, pre: 0, vcg: w, adds: null });
+  }
+  EP.Pacemaker = Pacemaker;
+  EP.Pacemaker.DEF = PM_DEF;
+  EP.Pacemaker.MODES = HAS;
+
+  // ---------------------------------------------------------------------------------------------
+  /* ICD: rate-zone detection on the ventricular channel, ATP, shock.
+   * cfg: { vtRate, vfRate, nid (intervals to detect), atp (bursts before shock), atpPct, shock (bool), on } */
+  class ICD {
+    constructor(sim, cfg) {
+      this.sim = sim; this.c = Object.assign({ vtRate: 170, vfRate: 220, nidVT: 12, nidVF: 9, atp: 2, atpPct: 0.85, atpN: 8, shock: true, on: true, vSite: 'rvApex', sens: 0.4, tOver: false, noise: 0, svtDisc: true }, cfg || {});
+      this.iv = []; this.last = -1e7; this.state = 'monitor'; this.atpGiven = 0; this.log = []; this.vVox = M.nearest(Mo.SITES[this.c.vSite].p, 'any');
+      sim.on('V0', (e) => {
+        const lat = e.act && e.act.T[this.vVox] < Infinity ? Math.max(0, e.act.T[this.vVox]) : 30;
+        sim.schedule(e.t + lat, (t) => this._sense(t, e));
+        if (this.c.tOver) sim.schedule(e.t + 270, (t) => this._sense(t, null, 'T'));
+      });
+      sim.on('Vmode', (e) => { if (e.mode !== 'normal') this._fibTick(e.t); });
+      if (this.c.noise) { const nz = (t) => { if (sim.rng() < this.c.noise) this._sense(t, null, 'noise'); sim.schedule(t + 90 + 120 * sim.rng(), nz); }; sim.schedule(sim.t + 500, nz); }
+    }
+    _fibTick(t) {
+      // during VF / polymorphic VT the device sees rapid, irregular electrograms
+      const s = this.sim;
+      if (s.V.mode === 'normal') return;
+      this._sense(t, null, 'VF');
+      s.schedule(t + 170 + 60 * s.rng(), (tt) => this._fibTick(tt));
+    }
+    mark(t, text) { this.sim.emit({ t, type: 'mark', ch: 'V', text }); }
+    _sense(t, e, src) {
+      const c = this.c;
+      if (!c.on || this.state === 'charging' || this.state === 'atp') { this.last = t; return; }
+      const iv = t - this.last; this.last = t;
+      if (iv < 120) return;
+      const vtI = 60000 / c.vtRate, vfI = 60000 / c.vfRate;
+      const zone = iv <= vfI ? 'F' : iv <= vtI ? 'T' : 'S';
+      this.mark(t, zone === 'F' ? 'FS' : zone === 'T' ? 'TS' : 'VS');
+      this.iv.push({ iv, zone, e, src }); if (this.iv.length > 18) this.iv.shift();
+      const recent = this.iv.slice(-c.nidVF * 4 / 3 | 0), nF = recent.filter((x) => x.zone === 'F').length;
+      const lastN = this.iv.slice(-c.nidVT), nT = lastN.filter((x) => x.zone !== 'S').length;
+      if (nF >= c.nidVF) return this._detect(t, 'VF');
+      if (lastN.length >= c.nidVT && nT >= c.nidVT) {
+        // SVT discriminators: sudden onset, stability, morphology (here: was the rhythm conducted from above?)
+        const supra = lastN.filter((x) => x.e && x.e.c && (x.e.c.type === 'hps' || x.e.c.type === 'ap')).length;
+        if (c.svtDisc && supra > lastN.length * 0.7) { if (!this._withheld || t - this._withheld > 4000) { this.mark(t, 'SVT'); this.log.push({ t, what: 'Therapy withheld — discriminators classify the rhythm as supraventricular' }); this._withheld = t; } return; }
+        return this._detect(t, 'VT');
+      }
+      if (zone === 'S' && this.iv.slice(-4).every((x) => x.zone === 'S')) { if (this.atpGiven) this.log.push({ t, what: 'Episode terminated' }); this.atpGiven = 0; }
+    }
+    _detect(t, kind) {
+      const c = this.c, s = this.sim;
+      this.iv.length = 0;
+      this.mark(t, kind === 'VF' ? 'FD' : 'TD');
+      if (kind === 'VT' && this.atpGiven < c.atp) {
+        this.atpGiven++; this.state = 'atp';
+        const cl = Math.max(200, (60000 / this._rate(s)) * c.atpPct - 10 * (this.atpGiven - 1));
+        this.log.push({ t, what: `VT detected → ATP burst ${this.atpGiven} (${c.atpN} pulses at ${Math.round(cl)} ms)` });
+        let captured = 0;
+        for (let i = 0; i < c.atpN; i++) s.schedule(t + 60 + i * cl, (tt) => { const r = s.pace(tt, 'V', { site: c.vSite, kind: 'bipolar' }); this.mark(tt, 'TP'); if (r) captured++; if (i === c.atpN - 1) { this.state = 'monitor'; this._afterATP(tt, captured); } });
+        return;
+      }
+      if (!c.shock) { this.log.push({ t, what: kind + ' detected — shock therapy is programmed off' }); return; }
+      this.state = 'charging'; this.mark(t, 'CHG');
+      this.log.push({ t, what: kind + ' detected → charging' });
+      s.schedule(t + (kind === 'VF' ? 2600 : 2200), (tt) => {
+        this.state = 'monitor';
+        // reconfirm: abort if the arrhythmia stopped during charging
+        const still = s.V.mode !== 'normal' || s.foci.some((f) => f.node === 'V' && f.reentrant && f.enabled && f.fired > 0 && tt - s.V.last < 600 && tt >= f.startAt) || this.c.tOver || this.c.noise;
+        if (!still) { this.mark(tt, 'ABT'); this.log.push({ t: tt, what: 'Charge aborted — rhythm no longer meets criteria' }); return; }
+        s.shock(tt, { j: 35 }); this.mark(tt, 'CD'); this.log.push({ t: tt, what: 'Shock delivered' }); this.atpGiven = 0;
+      });
+    }
+    _rate(s) { const f = s.foci.find((x) => x.node === 'V' && x.reentrant && x.enabled); return f ? 60000 / f.cl : 180; }
+    _afterATP(t, captured) {
+      // Overdrive pacing that captures enters the circuit and collides with the tachycardia wave.
+      const s = this.sim, f = s.foci.find((x) => x.node === 'V' && x.reentrant && x.enabled);
+      if (!f) return;
+      const p = f.atpSuccess == null ? 0.75 : f.atpSuccess;
+      if (captured >= 3 && s.rng() < p) { f.enabled = false; this.log.push({ t, what: 'ATP terminated the tachycardia — no shock needed' }); }
+      else if (f.accelerate && s.rng() < f.accelerate) { f.cl = Math.max(220, f.cl * 0.8); this.log.push({ t, what: 'ATP accelerated the tachycardia' }); }
+    }
+  }
+  EP.ICD = ICD;
+
+  // ---------------------------------------------------------------------------------------------
+  /* Real-time runner. o: { sim, strips:[LiveStrip], speed, pulse (bool), onTick(t), noPulse(beat) } */
+  class Live {
+    constructor(o) {
+      this.o = Object.assign({ speed: 1, fs: 250, lead: 140 }, o);
+      this.sim = o.sim; this.t = this.sim.t; this.running = false; this._last = 0;
+      const loop = (now) => { this._raf = requestAnimationFrame(loop); this._frame(now); };
+      this._raf = requestAnimationFrame(loop);
+    }
+    start() { this.running = true; this._last = 0; return this; }
+    stop() { this.running = false; return this; }
+    destroy() { cancelAnimationFrame(this._raf); }
+    setSim(sim) { this.sim = sim; this.t = sim.t; for (const s of this.o.strips) s.reset(); }
+    _frame(now) {
+      if (!this.running) { this._last = now; return; }
+      const dt = Math.min(80, now - (this._last || now)); this._last = now;
+      if (dt <= 0) return;
+      this.advance(dt * this.o.speed);
+    }
+    /* Advance by ms of simulated time (also used directly by tests). */
+    advance(ms) {
+      const o = this.o, sim = this.sim, t0 = this.t, t1 = t0 + ms;
+      sim.runUntil(t1 + o.lead);
+      const rec = EP.Synth.build(sim, t0, t1, { fs: o.fs, noise: 0.008 });
+      const extra = o.pulse ? { pulse: EP.Synth.pulse(sim, t0, t1, o.fs, { noPulse: o.noPulse }) } : null;
+      for (const s of o.strips) { s.push(rec, extra); s.draw(); }
+      this.t = t1;
+      // drop old events so the log stays small
+      if (sim.out.length > 600) { const cut = t1 - 9000; let k = 0; while (k < sim.out.length && sim.out[k].t < cut) k++; if (k) sim.out.splice(0, k); }
+      if (o.onTick) o.onTick(t1, rec);
+    }
+  }
+  EP.Live = Live;
+})(globalThis.EP = globalThis.EP || {});
+
+
 /* ---- js/ecgview.js ---- */
 /* EP Simulator — ECG paper rendering on canvas.
  *   EP.ECGView   static recording: standard 12-lead sheet or stacked rhythm strips, with optional
@@ -2207,7 +2565,7 @@ table.tbl td { padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-
       this.o = Object.assign({ layout: '12', speed: 25, gain: 10, strips: [1], ladder: false, markers: false, minPx: 2.5, maxPx: 5.4, rowMm: 27, calipers: true }, o || {});
       this.rec = null; this.cursor = null; this.cal = null; this.cells = [];
       this._bind();
-      if (typeof ResizeObserver !== 'undefined') { this.ro = new ResizeObserver(() => this.resize()); this.ro.observe(canvas.parentElement); }
+      if (typeof ResizeObserver !== 'undefined' && canvas.parentElement) { this.ro = new ResizeObserver(() => this.resize()); this.ro.observe(canvas.parentElement); }
       this.resize();
     }
     set(o) { Object.assign(this.o, o); this.resize(); }
@@ -2216,7 +2574,7 @@ table.tbl td { padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-
     durMs() { return this.rec ? this.rec.t1 - this.rec.t0 : 10000; }
     resize() {
       const o = this.o, par = this.c.parentElement;
-      const avail = Math.max(200, par.clientWidth || 800);
+      const avail = Math.max(200, (par && par.clientWidth) || 800);
       const dur = this.durMs() / 1000;
       const left = 7, right = 2;
       const wmm = left + dur * o.speed + right;
@@ -2444,7 +2802,7 @@ table.tbl td { padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-
       this.c = canvas; this.ctx = canvas.getContext('2d');
       this.o = Object.assign({ channels: [{ lead: 1 }], windowMs: 8000, gain: 10, rowMm: 24, markers: false, ladder: false, fs: 250 }, o || {});
       this.reset();
-      if (typeof ResizeObserver !== 'undefined') { this.ro = new ResizeObserver(() => this.resize()); this.ro.observe(canvas.parentElement); }
+      if (typeof ResizeObserver !== 'undefined' && canvas.parentElement) { this.ro = new ResizeObserver(() => this.resize()); this.ro.observe(canvas.parentElement); }
       this.resize();
     }
     reset() {
@@ -2452,9 +2810,9 @@ table.tbl td { padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-
       this.n = n; this.buf = this.o.channels.map(() => new Float32Array(n)); this.head = 0; this.tHead = 0; this.items = [];
     }
     resize() {
-      const o = this.o, par = this.c.parentElement, W = Math.max(240, par.clientWidth || 600);
+      const o = this.o, par = this.c.parentElement, W = Math.max(240, (par && par.clientWidth) || 600);
       const mm = W / ((o.windowMs / 1000) * 25);
-      const H = Math.round((o.channels.length * o.rowMm + (o.markers ? 9 : 0) + 4) * Math.max(mm, 2.2));
+      const H = Math.round((o.channels.length * o.rowMm + (o.markers ? 9 : 0) + (o.timers ? 13 : 0) + 4) * Math.max(mm, 2.2));
       const dpr = Math.min(2.5, globalThis.devicePixelRatio || 1);
       this.g = { W, H, mm, row: o.rowMm * Math.max(mm, 2.2), pxPerMs: W / o.windowMs };
       this.c.width = Math.round(W * dpr); this.c.height = Math.round(H * dpr); this.c.style.width = W + 'px'; this.c.style.height = H + 'px'; this.dpr = dpr;
@@ -2471,7 +2829,7 @@ table.tbl td { padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-
         this.head = (this.head + 1) % this.n;
       }
       this.tHead = rec.t1;
-      for (const ev of rec.events) if ((ev.type === 'mark' || ev.type === 'spike') && ev.t >= rec.t0 && ev.t < rec.t1) this.items.push(ev);
+      for (const ev of rec.events) if ((ev.type === 'mark' || ev.type === 'spike' || ev.type === 'timer' || ev.type === 'shock') && ev.t >= rec.t0 && ev.t < rec.t1) this.items.push(ev);
       const cut = this.tHead - o.windowMs - 500;
       while (this.items.length && this.items[0].t < cut) this.items.shift();
     }
@@ -2498,7 +2856,7 @@ table.tbl td { padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-
           const k = this.n - 1 - Math.round((this.tHead - ev.t) / (1000 / o.fs)); if (k < 0) continue;
           const v = b[(this.head + k) % this.n];
           const sv = { A: [0.12, -0.5, 0.28], V: [0.36, -0.5, 0.46] }[ev.ch] || [0.3, -0.5, 0.4];
-          const amp = EP.Leads.project(sv[0], sv[1], sv[2], ch.lead) * ({ bipolar: 0.55, unipolar: 2.6, temp: 1.6, tcp: 7 }[ev.kind] || 0.55);
+          const amp = EP.Leads.project(sv[0], sv[1], sv[2], ch.lead) * ({ bipolar: 0.9, unipolar: 2.8, temp: 1.6, tcp: 6 }[ev.kind] || 0.9);
           ctx.beginPath(); ctx.moveTo(x, y0 - v * mv); ctx.lineTo(x, y0 - (v + amp) * mv); ctx.stroke();
         }
         ctx.fillStyle = ch.key ? (ch.color || col.pulse) : col.label;
@@ -2515,7 +2873,23 @@ table.tbl td { padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-
         }
         ctx.textAlign = 'left';
       }
+      if (o.timers) {
+        const mmx = Math.max(g.mm, 2.2), y = (o.channels.length * o.rowMm + (o.markers ? 9 : 0)) * mmx + 4;
+        const lanes = { AVD: 0, PVARP: 1, VRP: 2 }, cols = { AVD: col.cursor, PVARP: col.slow, VRP: col.tier };
+        ctx.font = `600 ${Math.max(9, g.mm * 2.2)}px ${col.font}`; ctx.textBaseline = 'middle';
+        for (const k in lanes) { ctx.fillStyle = col.label; ctx.fillText(k, 6, y + (lanes[k] + 0.5) * mmx * 3.6); }
+        for (const ev of this.items) {
+          if (ev.type !== 'timer' || lanes[ev.name] == null) continue;
+          const x0 = g.W - (this.tHead - ev.t0) * g.pxPerMs, x1 = g.W - (this.tHead - Math.min(ev.t1, this.tHead)) * g.pxPerMs;
+          if (x1 < 46) continue;
+          ctx.fillStyle = cols[ev.name]; ctx.globalAlpha = 0.75;
+          ctx.fillRect(Math.max(46, x0), y + lanes[ev.name] * mmx * 3.6 + mmx * 0.6, Math.max(1, x1 - Math.max(46, x0)), mmx * 2.4);
+          ctx.globalAlpha = 1;
+        }
+      }
     }
+    /* Freeze-frame helpers for the UI */
+    visibleEvents() { return this.items; }
   }
   EP.LiveStrip = LiveStrip;
   EP.cssColors = cssColors; EP.drawGrid = drawGrid;
@@ -2586,6 +2960,7 @@ table.tbl td { padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-
     base: { az: 2.6, el: 0.75, dist: 44, target: [0.6, 0.2, -1.2] },
     inferior: { az: 0.5, el: -1.1, dist: 46, target: [1.5, -1, 0] },
     chest: { az: 0, el: 0.02, dist: 120, target: [0, 3, -2] },
+    device: { az: 0.12, el: 0.06, dist: 84, target: [2.6, 5.2, 0] },
     chestLat: { az: 1.5708, el: 0.02, dist: 120, target: [0, 3, -2] },
   };
 
@@ -3040,6 +3415,280 @@ table.tbl td { padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-
 })(globalThis.EP = globalThis.EP || {});
 
 
+/* ---- js/devices3d.js ---- */
+/* EP Simulator — device hardware geometry: generators, leads, leadless capsules, thoracic skeleton,
+ * and a simulated chest radiograph (orthographic "X-ray" rendering of the same 3D objects).
+ *
+ * EP.Hardware.build(parts)      → { gens, leads, caps, pads } in world coordinates
+ * EP.Hardware.add3D(heart, hw)  → adds meshes + labels to a Heart3D; returns { remove() }
+ * new EP.XRay(el)               .setHardware(hw, extras) .setView('pa' | 'lat')
+ */
+(function (EP) {
+  'use strict';
+  if (typeof THREE === 'undefined') { EP.Hardware = null; EP.XRay = null; return; }
+  const G = EP.G, V = EP.V, Mo = EP.Morph, L = G.L;
+  const HW = (EP.Hardware = {});
+  const v3 = (p) => new THREE.Vector3(p[0], p[1], p[2]);
+
+  // ---- anatomical routes ------------------------------------------------------------------------
+  const GEN_L = [10.6, 12.2, 6.9];
+  const AX_L = [[9.2, 14.4, 6.4], [7.2, 15.5, 5.2], [4.2, 14.9, 2.6], [0.6, 13.2, 0.5], [-2.5, 11.3, -1.0], [-3.4, 9.0, -1.7], [-3.5, 5.6, -1.6], [-3.5, 2.9, -1.4]];
+  const IJ_R = [[-4.8, 22, 2.8], [-4.2, 17, 0.8], [-3.6, 12, -1.3], [-3.4, 9.0, -1.7], [-3.5, 5.6, -1.6], [-3.5, 2.9, -1.4]];
+  const RA_IN = [[-3.45, 0.7, -1.1], [-2.8, -1.1, -0.7]];
+  const TV = () => G.LM.tricuspid;
+  const loop = (c, r, turns) => { const o = []; for (let i = 0; i <= turns * 10; i++) { const a = (i / 10) * 2 * Math.PI + 0.6; o.push([c[0] + r * Math.cos(a), c[1] + r * 0.9 * Math.sin(a), c[2] - 0.35]); } return o; };
+  const R = (HW.routes = {
+    raa: () => [[-3.7, 0.9, -1.0], [-3.95, -0.6, -0.35], [-3.55, -0.5, 0.65], [-2.8, 0.7, 1.1], [-2.3, 1.75, 1.25]],
+    rvApex: () => RA_IN.concat([TV(), L(4.45, 0.45, 1.8), L(4.3, 0.5, 3.6), L(3.9, 0.5, 5.3), L(3.45, 0.5, 6.45)]),
+    rvSeptal: () => RA_IN.concat([TV(), L(4.5, 0.4, 1.6), L(4.3, 0.2, 2.7), L(3.75, 0.05, 3.3), L(3.22, 0.0, 3.4)]),
+    rvot: () => RA_IN.concat([TV(), L(4.6, -0.4, 1.6), L(4.2, -1.8, 1.6), L(3.4, -3.0, 1.3), L(2.6, -3.4, 1.15)]),
+    lbb: () => RA_IN.concat([TV(), L(4.5, 0.3, 1.5), L(4.2, 0.0, 2.2), L(3.4, -0.15, 2.25), L(2.3, -0.2, 2.2)]),
+    his: () => [[-3.3, 0.4, -1.1], [-2.3, -0.8, -0.6], V.lerp([-2.3, -0.8, -0.6], G.LM.his, 0.6), G.LM.his],
+    cs: () => {
+      const p = [[-3.4, 0.2, -1.2], [-3.0, -1.8, -1.6], G.LM.csOs];
+      for (const d of [50, 80, 110, 140, 165]) p.push(V.addS(G.ringPoint(G.ANNULI.mitral, (d * Math.PI) / 180, 1.95), G.A, -0.45));
+      p.push(L(-3.25, 0.75, 0.6), L(-3.3, 0.7, 1.7), L(-3.2, 0.6, 2.8));
+      return p;
+    },
+    // malpositions
+    rvBackInRA: () => [[-3.5, 0.6, -1.1], [-3.2, -1.2, -0.9], [-2.6, -2.0, -0.4], [-1.9, -1.9, 0.3]],
+    raDown: () => [[-3.6, 0.9, -1.1], [-3.8, -0.8, -1.0], [-3.6, -2.2, -1.2]],
+    perforated: () => RA_IN.concat([TV(), L(4.45, 0.45, 1.8), L(4.3, 0.5, 3.6), L(3.9, 0.5, 5.3), L(3.4, 0.5, 6.9), L(3.5, 0.9, 8.1)]),
+    midCardiacVein: () => [[-3.4, 0.2, -1.2], [-3.0, -1.8, -1.6], G.LM.csOs, L(2.9, 2.75, 0.6), L(2.3, 2.95, 1.9), L(1.7, 2.75, 3.3)],
+    lvViaASD: () => [[-3.3, 1.2, -1.6], G.LM.fossaOvalis, [0.2, 0.0, -3.3], G.LM.mitral, L(0.1, 0.5, 2.5), L(0.2, 1.0, 4.8), L(0.3, 1.5, 6.2)],
+    csBackInRA: () => [[-3.4, 0.2, -1.2], [-3.0, -1.8, -1.6], G.LM.csOs, V.addS(G.ringPoint(G.ANNULI.mitral, (50 * Math.PI) / 180, 1.95), G.A, -0.45)],
+    anteriorVein: () => {
+      const p = [[-3.4, 0.2, -1.2], [-3.0, -1.8, -1.6], G.LM.csOs];
+      for (const d of [50, 90, 130, 170, 210, 250]) p.push(V.addS(G.ringPoint(G.ANNULI.mitral, (d * Math.PI) / 180, 1.95), G.A, -0.45));
+      p.push(L(0.9, -3.15, 1.2), L(1.4, -3.05, 2.6), L(1.7, -2.8, 4.0));
+      return p;
+    },
+    tvpCoiled: () => [[-3.5, 0.8, -1.1], [-4.4, -0.8, -0.6], [-3.6, -2.0, 0.2], [-2.4, -1.0, 0.4], [-2.9, 0.6, -0.2], [-4.0, 0.2, -0.6]],
+  });
+  HW.sites = { rvApex: 'rvApex', rvSeptal: 'rvMidSeptum', rvot: 'rvotSeptal', lbb: 'lbbArea', midCardiacVein: 'midCardiacVein', lvViaASD: 'lvInfApical', cs: 'lvLatEpi', anteriorVein: 'lvAntWall' };
+
+  /* parts: { gen:'pm'|'icd'|'crt'|null, access:'left'|'ij', leads:[{route, name, coil:[fromEnd0,fromEnd1], svcCoil, gap}], caps:[{name, tip, from, len}],
+   *          sicd, evicd, pads, twiddler, genAt } */
+  HW.build = function (parts) {
+    const hw = { gens: [], leads: [], caps: [], pads: [], notes: [] };
+    const big = parts.gen === 'icd' || parts.gen === 'crtd';
+    const gp = parts.genAt || GEN_L;
+    if (parts.gen) hw.gens.push({ pos: gp, size: big ? [6.6, 5.4, 1.2] : [4.7, 4.3, 0.75], name: big ? 'ICD generator' : 'Pulse generator' });
+    const ax = parts.access === 'ij' ? IJ_R : AX_L;
+    (parts.leads || []).forEach((ld, i) => {
+      let pts;
+      if (parts.twiddler) {
+        // leads wound round the generator and retracted
+        pts = loop(gp, 2.9 + i * 0.35, 3.2).concat(ax.slice(0, ld.route === 'raa' ? 6 : 8));
+        if (ld.route !== 'raa') pts.push([-3.5, 1.2, -1.2], [-3.2, -0.6, -0.9]);
+      } else {
+        const head = parts.gen ? [[gp[0] - 0.4 + i * 0.25, gp[1] + 2.3, gp[2] - 0.1]].concat(loop([gp[0] + 0.2, gp[1] - 0.2, gp[2] - 0.5], 2.5 + i * 0.3, 1)) : [];
+        pts = head.concat(ax, R[ld.route]());
+      }
+      const o = { pts, name: ld.name, r: ld.coil || ld.svcCoil ? 0.13 : 0.1, coils: [], tip: pts[pts.length - 1], gap: ld.gap, gapAt: ld.gapAt, route: ld.route };
+      if (ld.coil) o.coils.push({ kind: 'end', from: ld.coil[0], to: ld.coil[1] });
+      if (ld.svcCoil) o.coils.push({ kind: 'world', a: [-3.4, 10.2, -1.5], b: [-3.5, 4.4, -1.6] });
+      hw.leads.push(o);
+    });
+    for (const c of parts.caps || []) hw.caps.push(c);
+    if (parts.sicd) {
+      const m = parts.sicd === 'bad';
+      hw.gens.push({ pos: m ? [12.4, -5.5, 6.2] : [15.4, -3.2, -1.2], size: [7.6, 6.4, 1.3], name: 'S-ICD generator', rotY: m ? 0.5 : 1.45 });
+      const pts = m ? [[12, -6.5, 6.8], [8, -8.2, 8.8], [4.6, -8.4, 9.8], [4.9, -3, 10.2], [5.2, 5.5, 9.6]] : [[14.2, -5.2, 3.4], [9.5, -7.6, 8.2], [2.2, -8.0, 10.2], [1.7, -3, 10.5], [1.6, 5.8, 9.9]];
+      hw.leads.push({ pts, name: 'Subcutaneous lead', r: 0.16, coils: [{ kind: 'end', from: 0.4, to: 8.6 }], tip: pts[pts.length - 1], sub: true });
+    }
+    if (parts.evicd) {
+      hw.gens.push({ pos: [15.3, -3.4, -1.0], size: [6.6, 5.6, 1.2], name: 'EV-ICD generator', rotY: 1.45 });
+      const pts = [[14.2, -5.4, 3.2], [9, -8.4, 7.6], [2.4, -9.2, 8.4], [0.8, -7.2, 7.5], [1.5, -4.2, 7.3], [0.4, -1.6, 7.4], [1.3, 1.2, 7.4], [0.7, 3.6, 7.5]];
+      hw.leads.push({ pts, name: 'Substernal lead', r: 0.15, coils: [{ kind: 'end', from: 0.3, to: 9 }], tip: pts[pts.length - 1], sub: true });
+    }
+    for (const p of parts.pads || []) hw.pads.push(p);
+    hw.pneumothorax = !!parts.pneumothorax;
+    return hw;
+  };
+
+  // ---- mesh helpers -------------------------------------------------------------------------------
+  function leadMeshes(ld, mats) {
+    const out = [];
+    const curve = new THREE.CatmullRomCurve3(ld.pts.map(v3), false, 'centripetal', 0.5);
+    const len = curve.getLength(), seg = Math.max(40, Math.round(len * 6));
+    if (ld.gap || ld.gapAt) {
+      // conductor fracture: draw the lead in two pieces with a short gap
+      const u = ld.gapAt ? nearestU(curve, v3(ld.gapAt)) : ld.gap / len;
+      for (const [a, b] of [[0, u - 0.004], [u + 0.004, 1]]) {
+        const pts = []; for (let i = 0; i <= 80; i++) pts.push(curve.getPointAt(a + (b - a) * (i / 80)));
+        out.push(new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 160, ld.r, 8, false), mats.lead));
+      }
+    } else out.push(new THREE.Mesh(new THREE.TubeGeometry(curve, seg, ld.r, 8, false), mats.lead));
+    for (const c of ld.coils) {
+      let a, b;
+      if (c.kind === 'end') { a = 1 - c.to / len; b = 1 - c.from / len; }
+      else { a = nearestU(curve, v3(c.a)); b = nearestU(curve, v3(c.b)); if (a > b) { const t = a; a = b; b = t; } }
+      const pts = []; for (let i = 0; i <= 40; i++) pts.push(curve.getPointAt(EP.clamp(a + (b - a) * (i / 40), 0, 1)));
+      out.push(new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 60, ld.r * 2.0, 10, false), mats.coil));
+    }
+    // tip electrode + ring
+    const tip = new THREE.Mesh(new THREE.SphereGeometry(ld.r * 1.7, 10, 8), mats.metal); tip.position.copy(curve.getPointAt(1)); out.push(tip);
+    if (!ld.sub) { const ring = new THREE.Mesh(new THREE.SphereGeometry(ld.r * 1.5, 10, 8), mats.metal); ring.position.copy(curve.getPointAt(Math.max(0, 1 - 1.1 / len))); out.push(ring); }
+    return out;
+  }
+  function nearestU(curve, p) { let best = 0, bd = 1e9; for (let i = 0; i <= 200; i++) { const d = curve.getPointAt(i / 200).distanceTo(p); if (d < bd) { bd = d; best = i / 200; } } return best; }
+  function genMesh(g, mat, detailMat) {
+    const grp = new THREE.Group();
+    const body = new THREE.Mesh(new THREE.CylinderGeometry(g.size[0] / 2, g.size[0] / 2, g.size[2], 28), mat);
+    body.rotation.x = Math.PI / 2; body.scale.set(1, 1, g.size[1] / g.size[0]);
+    grp.add(body);
+    const header = new THREE.Mesh(new THREE.BoxGeometry(g.size[0] * 0.62, g.size[1] * 0.26, g.size[2] * 0.9), detailMat || mat);
+    header.position.set(-g.size[0] * 0.08, g.size[1] * 0.5, 0); grp.add(header);
+    if (detailMat) { const batt = new THREE.Mesh(new THREE.CylinderGeometry(g.size[0] * 0.3, g.size[0] * 0.3, g.size[2] * 1.02, 20), detailMat); batt.rotation.x = Math.PI / 2; batt.position.set(g.size[0] * 0.05, -g.size[1] * 0.1, 0); grp.add(batt); }
+    grp.position.copy(v3(g.pos)); if (g.rotY) grp.rotation.y = g.rotY;
+    return grp;
+  }
+  function capMesh(c, mat) {
+    const dir = V.norm(V.sub(c.tip, c.from)), len = c.len || 2.6;
+    const m = new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.34, len, 14), mat);
+    const mid = V.addS(c.tip, dir, -len / 2);
+    m.position.copy(v3(mid)); m.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), v3(dir));
+    return m;
+  }
+
+  /* Add hardware to a Heart3D scene. */
+  HW.add3D = function (heart, hw, o) {
+    o = o || {};
+    const grp = heart.group('devices');
+    while (grp.children.length) grp.remove(grp.children[0]);
+    const mats = {
+      lead: new THREE.MeshStandardMaterial({ color: 0x2c3e55, roughness: 0.45, metalness: 0.2 }),
+      coil: new THREE.MeshStandardMaterial({ color: 0xd5dae1, roughness: 0.4, metalness: 0.3 }),
+      metal: new THREE.MeshStandardMaterial({ color: 0xf0f2f5, roughness: 0.35, metalness: 0.3 }),
+      gen: new THREE.MeshStandardMaterial({ color: 0xc3cad3, roughness: 0.45, metalness: 0.25 }),
+      pad: new THREE.MeshStandardMaterial({ color: 0xe9e2c8, roughness: 0.9, transparent: true, opacity: 0.6, side: THREE.DoubleSide }),
+    };
+    const labels = [];
+    for (const g of hw.gens) { grp.add(genMesh(g, mats.gen)); labels.push(heart.addLabel(g.name, [g.pos[0], g.pos[1] + 3.4, g.pos[2]], 'dev')); }
+    for (const ld of hw.leads) { for (const m of leadMeshes(ld, mats)) grp.add(m); if (ld.name) labels.push(heart.addLabel(ld.name, ld.tip, 'dev')); }
+    for (const c of hw.caps) { grp.add(capMesh(c, mats.metal)); labels.push(heart.addLabel(c.name, c.tip, 'dev')); }
+    for (const p of hw.pads) { const m = new THREE.Mesh(new THREE.PlaneGeometry(p.size[0], p.size[1]), mats.pad); m.position.copy(v3(p.pos)); if (p.rotY) m.rotation.y = p.rotY; grp.add(m); labels.push(heart.addLabel(p.name, p.pos, 'dev')); }
+    if (o.chest !== false) for (const m of skeleton(new THREE.MeshStandardMaterial({ color: 0xd9d4c8, roughness: 0.8, transparent: true, opacity: 0.22, depthWrite: false }))) grp.add(m);
+    heart.invalidate();
+    return { remove() { while (grp.children.length) grp.remove(grp.children[0]); for (const l of labels) l.remove(); heart.invalidate(); } };
+  };
+
+  // ---- thoracic skeleton (shared by the 3D overlay and the radiograph) ------------------------------
+  let _skel = null;
+  function skelGeoms() {
+    if (_skel) return _skel;
+    const g = { ribs: [], spine: [], clav: [], sternum: [] };
+    for (let i = 0; i < 10; i++) {
+      const y0 = 18.2 - i * 2.85, k = Math.sin(Math.PI * (i + 1.4) / 12.5);
+      const Rx = 5.6 + 9.2 * Math.pow(k, 0.8), Rz = 5.2 + 4.6 * k, drop = 5.2 + 0.35 * i, fmax = i < 7 ? 0.9 : 0.9 - 0.07 * (i - 6);
+      for (const sgn of [-1, 1]) {
+        const pts = [];
+        for (let q = 0; q <= 18; q++) { const f = 0.07 + (fmax - 0.07) * (q / 18), ph = f * Math.PI; pts.push(new THREE.Vector3(sgn * Rx * Math.pow(Math.sin(ph), 0.85), y0 - drop * Math.pow(f, 1.5), -0.6 - Rz * Math.cos(ph))); }
+        g.ribs.push(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 40, 0.5, 6, false));
+      }
+    }
+    for (let i = 0; i < 15; i++) { const b = new THREE.BoxGeometry(3.7, 2.1, 2.9); b.translate(0, 21.5 - i * 2.75, -9.4); g.spine.push(b); const sp = new THREE.BoxGeometry(0.9, 1.3, 2.4); sp.translate(0, 21.2 - i * 2.75, -12); g.spine.push(sp); }
+    for (const sgn of [-1, 1]) g.clav.push(new THREE.TubeGeometry(new THREE.CatmullRomCurve3([new THREE.Vector3(sgn * 1.7, 15.7, 7.4), new THREE.Vector3(sgn * 6.5, 16.4, 6.6), new THREE.Vector3(sgn * 11.5, 17.3, 3.4), new THREE.Vector3(sgn * 15.6, 18.0, 0.4)]), 24, 0.72, 7, false));
+    const st = new THREE.BoxGeometry(3.3, 13.5, 1.1); st.translate(0, 6.6, 9.3); g.sternum.push(st);
+    const mn = new THREE.BoxGeometry(5.2, 4.6, 1.2); mn.translate(0, 15.3, 8.6); g.sternum.push(mn);
+    return (_skel = g);
+  }
+  function skeleton(mat) {
+    const g = skelGeoms(), out = [];
+    for (const k of ['ribs', 'spine', 'clav', 'sternum']) for (const geo of g[k]) out.push(new THREE.Mesh(geo, mat));
+    return out;
+  }
+
+  // ---- simulated radiograph ---------------------------------------------------------------------------
+  function xmat(gain, pw, rim, blending) {
+    return new THREE.ShaderMaterial({
+      uniforms: { gain: { value: gain }, pw: { value: pw }, rim: { value: rim || 0 } },
+      vertexShader: 'varying vec3 vN; void main(){ vN = normalize(normalMatrix * normal); gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
+      fragmentShader: 'uniform float gain; uniform float pw; uniform float rim; varying vec3 vN; void main(){ float d = abs(normalize(vN).z); float v = gain * (pow(d, pw) + rim * pow(1.0 - d, 2.5)); gl_FragColor = vec4(vec3(v), 1.0); }',
+      blending: blending || THREE.AdditiveBlending, depthTest: false, depthWrite: false, transparent: true, side: THREE.FrontSide,
+    });
+  }
+  function ellip(c, r, mat) { const m = new THREE.Mesh(new THREE.SphereGeometry(1, 40, 28), mat); m.position.set(c[0], c[1], c[2]); m.scale.set(r[0], r[1], r[2]); return m; }
+
+  class XRay {
+    constructor(el) {
+      this.el = el;
+      const r = (this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false, preserveDrawingBuffer: true }));
+      r.setPixelRatio(Math.min(2, globalThis.devicePixelRatio || 1)); r.setClearColor(0x000000, 1);
+      r.domElement.style.display = 'block'; r.domElement.style.width = '100%'; r.domElement.style.height = '100%';
+      el.appendChild(r.domElement);
+      this.scene = new THREE.Scene();
+      this.cam = new THREE.OrthographicCamera(-18, 18, 25, -17, -200, 200);
+      this.view = 'pa';
+      this._base();
+      this.hwGroup = new THREE.Group(); this.scene.add(this.hwGroup);
+      this.marks = document.createElement('div'); this.marks.className = 'xr-marks'; el.appendChild(this.marks);
+      if (typeof ResizeObserver !== 'undefined') { this.ro = new ResizeObserver(() => this.render()); this.ro.observe(el); }
+      this.render();
+    }
+    dispose() { if (this.ro) this.ro.disconnect(); this.renderer.dispose(); this.el.innerHTML = ''; }
+    _base() {
+      const s = this.scene, A = EP.Anatomy;
+      const add = (m, order) => { m.renderOrder = order; s.add(m); return m; };
+      add(ellip([0, 3, -0.6], [17.6, 31, 12.2], xmat(0.27, 0.45)), 1);                       // soft tissue
+      add(ellip([-7.6, 6.0, -1.5], [6.3, 13.4, 8.3], xmat(0.72, 0.8, 0, THREE.SubtractiveBlending)), 2);   // right lung
+      this.lungL = add(ellip([8.0, 6.4, -1.5], [5.9, 13.0, 8.3], xmat(0.72, 0.8, 0, THREE.SubtractiveBlending)), 2);
+      add(ellip([-7.5, -16.2, 0], [10.2, 8.8, 10.6], xmat(0.3, 0.7)), 3);                     // right hemidiaphragm / liver
+      add(ellip([8.2, -17.6, 0], [9.6, 8.6, 10.6], xmat(0.27, 0.7)), 3);
+      add(ellip([0, 9, -2.4], [3.2, 13, 7.2], xmat(0.1, 0.7)), 3);                             // mediastinum
+      const hg = new THREE.BufferGeometry();
+      hg.setAttribute('position', new THREE.BufferAttribute(A.muscle.pos, 3)); hg.setAttribute('normal', new THREE.BufferAttribute(A.muscle.nrm, 3)); hg.setIndex(new THREE.BufferAttribute(A.muscle.idx, 1));
+      add(new THREE.Mesh(hg, xmat(0.15, 0.5)), 3);
+      for (const k of ['aorta', 'pa', 'veins']) {
+        const vm = G.mesh(G.sdVessels[k], G.BOUNDS[k], 0.34), vg = new THREE.BufferGeometry();
+        vg.setAttribute('position', new THREE.BufferAttribute(vm.pos, 3)); vg.setAttribute('normal', new THREE.BufferAttribute(vm.nrm, 3)); vg.setIndex(new THREE.BufferAttribute(vm.idx, 1));
+        add(new THREE.Mesh(vg, xmat(k === 'aorta' ? 0.07 : 0.035, 0.6)), 3);
+      }
+      const sk = skelGeoms();
+      for (const geo of sk.ribs) add(new THREE.Mesh(geo, xmat(0.085, 0.6, 2.4)), 4);
+      for (const geo of sk.spine) add(new THREE.Mesh(geo, xmat(0.06, 0.4)), 4);
+      for (const geo of sk.clav) add(new THREE.Mesh(geo, xmat(0.12, 0.6, 1.8)), 4);
+      this.sternum = sk.sternum.map((geo) => add(new THREE.Mesh(geo, xmat(0.05, 0.4)), 4));
+      // pneumothorax (hidden unless needed): extra-dark apical crescent + visceral pleural line
+      this.ptx = add(ellip([9.6, 11.5, -1.5], [4.3, 8.2, 7.6], xmat(0.55, 0.6, 0, THREE.SubtractiveBlending)), 5);
+      const pl = new THREE.Mesh(new THREE.TorusGeometry(4.3, 0.07, 6, 40, Math.PI * 0.95), new THREE.MeshBasicMaterial({ color: 0xbbbbbb }));
+      pl.position.set(8.2, 8.8, 0); pl.rotation.z = 0.35; pl.scale.set(1, 1.75, 1); pl.renderOrder = 9; s.add(pl); this.ptxLine = pl;
+      this.ptx.visible = false; pl.visible = false;
+    }
+    setHardware(hw) {
+      const g = this.hwGroup;
+      while (g.children.length) g.remove(g.children[0]);
+      this.hw = hw;
+      const nd = { depthTest: false, depthWrite: false, transparent: true };   // transparent pass so they draw after the lungs
+      const metal = new THREE.MeshBasicMaterial(Object.assign({ color: 0xffffff }, nd)), body = new THREE.MeshBasicMaterial(Object.assign({ color: 0xd0d0d0 }, nd)), dark = new THREE.MeshBasicMaterial(Object.assign({ color: 0x8a8a8a }, nd)), wire = new THREE.MeshBasicMaterial(Object.assign({ color: 0xf4f4f4 }, nd));
+      if (hw) {
+        for (const ge of hw.gens) { const m = genMesh(ge, body, dark); m.traverse((x) => { x.renderOrder = 10; }); g.add(m); }
+        for (const ld of hw.leads) for (const m of leadMeshes(Object.assign({}, ld, { r: ld.r * 1.5 }), { lead: wire, coil: metal, metal })) { m.renderOrder = 11; g.add(m); }
+        for (const c of hw.caps) { const m = capMesh(c, metal); m.renderOrder = 11; g.add(m); }
+        for (const p of hw.pads) { const m = new THREE.Mesh(new THREE.PlaneGeometry(p.size[0], p.size[1]), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.16, side: THREE.DoubleSide })); m.position.copy(v3(p.pos)); if (p.rotY) m.rotation.y = p.rotY; m.renderOrder = 9; g.add(m); }
+      }
+      this.ptx.visible = this.ptxLine.visible = !!(hw && hw.pneumothorax);
+      this.render();
+    }
+    setView(v) { this.view = v; this.render(); }
+    render() {
+      const w = Math.max(60, this.el.clientWidth), hgt = Math.max(60, this.el.clientHeight), cam = this.cam, lat = this.view === 'lat';
+      this.renderer.setSize(w, hgt, false);
+      const H = 42, W = H * (w / hgt);
+      cam.left = -W / 2; cam.right = W / 2; cam.top = 25; cam.bottom = 25 - H;
+      if (lat) { cam.position.set(60, 0, -0.5); cam.up.set(0, 1, 0); cam.lookAt(0, 0, -0.5); }
+      else { cam.position.set(0.5, 0, 60); cam.up.set(0, 1, 0); cam.lookAt(0.5, 0, 0); }
+      cam.updateProjectionMatrix();
+      for (const m of this.sternum) m.material.uniforms.gain.value = lat ? 0.16 : 0.05;
+      this.renderer.render(this.scene, cam);
+      this.marks.innerHTML = lat ? '<span style="left:8px;top:6px">LATERAL</span><span style="left:8px;bottom:6px">anterior</span><span style="right:8px;bottom:6px">posterior</span>' : '<span style="left:8px;top:6px">PA</span><span style="right:10px;top:6px">L</span>';
+    }
+  }
+  EP.XRay = XRay;
+})(globalThis.EP = globalThis.EP || {});
+
+
 /* ---- js/ui.js ---- */
 /* EP Simulator — shared UI helpers and the ECG + 3D "player". */
 (function (EP) {
@@ -3246,6 +3895,623 @@ table.tbl td { padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-
       root.append(h('div.lab', rail, h('div.stack', sel, player.ecgCard, meas, ctrl, teachCard), h('div.side', player.heartCard, tips)));
       show(UI.store.get('rhythm', 'nsr'));
       return { unmount() { player.destroy(); } };
+    },
+  });
+})(globalThis.EP = globalThis.EP || {});
+
+
+/* ---- js/ui-devices.js ---- */
+/* EP Simulator — Devices: hardware in 3D, simulated chest radiograph, paced 12-lead, correct vs
+ * malpositioned variants and what gives each away. */
+(function (EP) {
+  'use strict';
+  const h = EP.h, UI = EP.UI, Mo = EP.Morph, G = EP.G;
+  const L = G.L;
+  const CHB = () => ({ fast: { block: true, retro: { block: true } } });
+  const ESC = () => ({ id: 'esc', node: 'V', cl: 1900, site: 'fascPost', label: 'escape', startAt: 500, sd: 0.02 });
+  const P_CHB = () => ({ sinus: { cl: 810, resp: 0.01 }, avn: CHB(), foci: [ESC()] });
+  const P_AF = () => ({ sinus: { on: false }, atria: { mode: 'fib', fibAmp: 0.8 }, avn: CHB(), foci: [ESC()] });
+  const P_NSR = () => ({ sinus: { cl: 850 } });
+  const RA = { route: 'raa', name: 'RA lead' };
+  const CLAV = [7.2, 15.5, 5.2];
+
+  /* Malposition / complication variants shared by transvenous systems. */
+  function tvVariants(o) {
+    const leads = (rv, ra) => (o.dual ? [ra || RA] : []).concat([rv]).concat(o.extra || []);
+    const v = [
+      { id: 'dislodge', name: 'RV lead dislodged', bad: true, parts: { leads: leads({ route: 'rvBackInRA', name: 'RV lead (displaced)' }) }, pm: { vThr: 9, rAmp: 1.4 },
+        signs: { pa: 'The ventricular tip no longer reaches the apex: it lies near the tricuspid valve / low right atrium, medial to where it was on the post-implant film. Always compare with the previous film.', lat: 'Tip no longer anterior and inferior; redundant loop in the right atrium.', ecg: 'Ventricular spikes without QRS complexes (failure to capture), escape rhythm, and no VS markers on native beats (under-sensing). May intermittently capture the atrium.', check: 'Threshold very high or no capture at maximum output; R wave small; impedance usually unchanged.' } },
+      { id: 'perf', name: 'RV perforation', bad: true, parts: { leads: leads({ route: 'perforated', name: 'RV lead (through the wall)' }) }, pm: { vThr: 4.2, rAmp: 3 },
+        signs: { pa: 'Tip projects at or beyond the edge of the cardiac silhouette, further out than on the implant film; look for a new enlarged heart shadow (effusion) or left pleural effusion.', lat: 'Tip beyond the anterior heart border, reaching the retrosternal fat.', ecg: 'Intermittent or lost capture; occasionally a change to an RBBB-like paced morphology if the left ventricular epicardium is captured.', check: 'Rising threshold, falling R wave, chest pain, hiccups or abdominal twitching (diaphragmatic pacing), pericardial rub. Echo/CT; do not pull the lead outside theatre.' } },
+      { id: 'cs', name: 'Lead in a cardiac vein', bad: true, parts: { leads: leads({ route: 'midCardiacVein', name: 'V lead in middle cardiac vein' }) }, pm: { vSite: 'midCardiacVein', vThr: 1.6 },
+        signs: { pa: 'Deceptively normal: the tip overlies the ventricle. The lead often takes a higher, more horizontal course across the heart than an apical lead.', lat: 'The giveaway — the lead runs POSTERIORLY toward the spine (coronary sinus lies in the posterior AV groove) instead of anteriorly toward the sternum.', ecg: 'Paced QRS has a right bundle branch block pattern (the left ventricle is activated first) instead of the expected LBBB pattern.', check: 'Threshold often higher; phrenic nerve stimulation possible. Confirm with lateral film or echo.' } },
+      { id: 'asd', name: 'Lead in the left ventricle', bad: true, parts: { leads: leads({ route: 'lvViaASD', name: 'V lead crossing the atrial septum' }) }, pm: { vSite: 'lvInfApical' },
+        signs: { pa: 'Lead crosses the midline higher than usual (through a PFO/ASD, or via the subclavian artery and aortic valve) and the tip lies further left and higher than an RV apical lead.', lat: 'Lead courses posteriorly, through the left atrium and mitral valve, toward the posterior left ventricle.', ecg: 'RBBB-pattern paced QRS. A dominant R in V1 during "RV" pacing must make you ask where the lead is (first repeat V1–V2 one interspace lower: septal RV pacing can give a small r).', check: 'Thresholds may be perfect. The danger is thromboembolic stroke: anticoagulate and plan extraction or lifelong anticoagulation.' } },
+      { id: 'fracture', name: 'Lead fracture', bad: true, parts: { leads: leads({ route: o.rv, name: 'RV lead (fractured)', gapAt: CLAV }) }, pm: { noiseV: 7, intermittent: 0.5 },
+        signs: { pa: 'A break or sharp kink in the conductor, classically where the lead passes between the clavicle and first rib (subclavian crush) — magnify that region.', lat: 'May only be visible in one projection.', ecg: 'Pauses with no spikes (noise is over-sensed and inhibits output) and/or spikes that never arrive. In an ICD: non-physiological short intervals → inappropriate shocks.', check: 'Impedance > 2000 Ω (or abrupt rise), noise on the electrogram that changes with arm movement or pocket manipulation.' } },
+      { id: 'twiddler', name: 'Twiddler\'s syndrome', bad: true, parts: { twiddler: true, leads: leads({ route: o.rv, name: 'Leads wound round the generator' }) }, pm: { vThr: 9, aThr: 9, rAmp: 1, pAmp: 0.2 },
+        signs: { pa: 'Leads coiled like a spring around a rotated generator; tips retracted out of the heart into the SVC or subclavian vein.', lat: 'Same — no lead reaches the ventricle.', ecg: 'Loss of capture and sensing in every lead; may stimulate the phrenic nerve, pectoral muscle or brachial plexus (rhythmic arm twitching).', check: 'Often a loose pocket in an elderly or confused patient. Needs lead repositioning and pocket revision.' } },
+      { id: 'ptx', name: 'Pneumothorax after implant', bad: true, parts: { pneumothorax: true, leads: leads({ route: o.rv, name: 'RV lead' }) }, pm: {},
+        signs: { pa: 'Thin visceral pleural line with no lung markings beyond it, on the side of venous access — usually apical on an upright film. Leads are in normal position.', lat: 'Usually not seen.', ecg: 'Normal device function.', check: 'After subclavian puncture: pleuritic pain, dyspnoea, hypoxia. Small → observe with oxygen; large or symptomatic → drain.' } },
+    ];
+    if (o.dual) v.splice(1, 0, { id: 'raDis', name: 'Atrial lead dislodged', bad: true, parts: { leads: [{ route: 'raDown', name: 'RA lead (J lost)' }, { route: o.rv, name: 'RV lead' }].concat(o.extra || []) }, pm: { aThr: 9, pAmp: 0.2 },
+      signs: { pa: 'The atrial lead has lost its J: instead of curving up into the appendage the tip points down toward the low right atrium / IVC, or has flipped up into the SVC.', lat: 'Tip no longer anterior and superior in the appendage.', ecg: 'Atrial spikes without P waves; native P waves not tracked (no AS markers), so the ventricle is paced at the lower rate, dissociated from the atria.', check: 'Atrial threshold unobtainable, P wave tiny. May capture the ventricle if it falls through the tricuspid valve.' } });
+    return v;
+  }
+  const OK = (pa, lat, ecg, check, name) => ({ id: 'ok', name: name || 'Correct position', parts: {}, pm: {}, signs: { pa, lat, ecg, check } });
+
+  const D = (EP.Devices = {});
+  D.groups = [{ id: 'tv', name: 'Transvenous pacemakers' }, { id: 'csp', name: 'Physiological pacing' }, { id: 'll', name: 'Leadless pacemakers' }, { id: 'icd', name: 'Defibrillators' }, { id: 'temp', name: 'Temporary' }];
+  D.list = [
+    { id: 'vvi', group: 'tv', name: 'Single-chamber ventricular', sub: 'VVI(R) · one RV lead', parts: () => ({ gen: 'pm', leads: [{ route: 'rvApex', name: 'RV lead' }] }), patient: P_AF, pm: { mode: 'VVI', lrl: 70, vSite: 'rvApex' },
+      teach: { what: 'One lead in the right ventricle. Paces when the ventricular rate falls below the lower rate; ignores the atria. Chosen for permanent atrial fibrillation with a slow ventricular response or as simple back-up pacing.',
+        key: ['Paced QRS from the RV apex: LBBB morphology (the right ventricle goes first) with a superior axis (negative in II, III, aVF) because activation travels from the apex up.', 'In sinus rhythm VVI pacing loses AV synchrony — atrial contraction against closed valves causes pacemaker syndrome (cannon waves, dyspnoea, hypotension).', 'A high burden of RV apical pacing dyssynchronises the left ventricle and can cause pacing-induced cardiomyopathy (≈ 10–20% when pacing > 20–40%).'] },
+      variants: [OK('Generator below the left clavicle. One lead: subclavian → brachiocephalic → SVC → right atrium → across the tricuspid valve, tip at the RV apex, left of the spine and pointing down and to the patient\'s left, with a gentle curve of slack in the atrium.', 'Tip anterior and inferior, heading toward the sternum.', 'Spike → wide QRS: LBBB pattern, negative in II/III/aVF, positive in I and aVL.', 'Threshold < 1 V, R wave > 5 mV, impedance 300–1200 Ω.'),
+        { id: 'septal', name: 'RV septal position', parts: { leads: [{ route: 'rvSeptal', name: 'RV septal lead' }] }, pm: { vSite: 'rvMidSeptum' }, signs: { pa: 'Tip higher than an apical lead, overlying the mid cardiac shadow rather than reaching the apex.', lat: 'Tip points POSTERIORLY toward the spine (the septum lies behind the RV cavity); a tip pointing anteriorly at this level is on the free wall.', ecg: 'Still LBBB pattern but narrower, with a more normal/inferior axis than apical pacing.', check: 'A deliberate alternative to the apex — not a malposition.' } }].concat(tvVariants({ rv: 'rvApex' })) },
+    { id: 'ddd', group: 'tv', name: 'Dual-chamber', sub: 'DDD(R) · RA + RV leads', parts: () => ({ gen: 'pm', leads: [RA, { route: 'rvApex', name: 'RV lead' }] }), patient: P_CHB, pm: { mode: 'DDD', lrl: 60, vSite: 'rvApex' },
+      teach: { what: 'A J-shaped lead in the right atrial appendage and a lead in the right ventricle. The device can pace and sense both chambers, so it keeps atrium and ventricle in sequence: the standard system for AV block and for sinus node disease.',
+        key: ['Four states: AS–VS (inhibited), AS–VP (tracking P waves), AP–VS (atrial pacing with native conduction), AP–VP (sequential pacing).', 'The atrial lead sits anteriorly in the appendage: its tip sweeps side-to-side with atrial contraction on fluoroscopy.', 'Programming aims to minimise unnecessary ventricular pacing when conduction is intact.'] },
+      variants: [OK('Two leads. The atrial lead makes a "J", turning up and medially into the right atrial appendage; the ventricular lead continues across the tricuspid valve to the RV apex.', 'Atrial tip anterior and superior (the appendage is the most anterior part of the atrium); ventricular tip anterior and inferior.', 'P wave → (sensed AV delay) → spike → wide LBBB-pattern QRS. Atrial spike before the P when the sinus rate is below the lower rate.', 'Atrial: threshold < 1.5 V, P > 1.5–2 mV. Ventricular: threshold < 1 V, R > 5 mV.')].concat(tvVariants({ rv: 'rvApex', dual: true })) },
+    { id: 'lbbap', group: 'csp', name: 'Left bundle branch area pacing', sub: 'deep septal lead', parts: () => ({ gen: 'pm', leads: [RA, { route: 'lbb', name: 'LBB-area lead' }] }), patient: P_CHB, pm: { mode: 'DDD', lrl: 60, vSite: 'lbbArea' },
+      teach: { what: 'A thin lead is screwed from the right side deep into the interventricular septum, 1.5–2 cm below the His bundle, until its tip reaches the left ventricular subendocardium where the left bundle fans out. Capturing the left conduction system activates the left ventricle through its own Purkinje network: a near-normal QRS with stable, low thresholds — and it can correct left bundle branch block.',
+        key: ['The left ventricle is activated before the right, so V1 shows a terminal R (Qr or rSR′) — a right-bundle-delay pattern is the expected, desirable finding.', 'Stimulus to peak R in V5–V6 (LV activation time) < 75–80 ms and constant at high and low output; V6–V1 interpeak interval > 33–44 ms support true left-bundle capture.', 'Paced QRS typically 110–125 ms. Alternative to biventricular pacing for resynchronisation and to RV pacing when a high pacing burden is expected.', 'Specific risks: septal perforation into the LV cavity, septal artery injury, late lead fracture at the septal hinge.'] },
+      variants: [OK('Ventricular tip over the upper-mid septum, shorter intracardiac course than an apical lead; the distal lead runs almost horizontally toward the patient\'s left.', 'Tip directed posteriorly and buried in the septum, perpendicular to it (best appreciated in an LAO view).', 'Narrow paced QRS (≈ 115 ms) with terminal R in V1, tall R in V5–V6 with short stimulus-to-peak time, normal or inferior axis.', 'Threshold typically < 1 V; unipolar impedance > 500 Ω; a left bundle potential 15–30 ms before the QRS may be recorded.'),
+        { id: 'shallow', name: 'Not deep enough (RV septal pacing)', bad: true, parts: { leads: [RA, { route: 'rvSeptal', name: 'Lead on the right side of the septum' }] }, pm: { vSite: 'rvMidSeptum' }, signs: { pa: 'Indistinguishable on the PA film.', lat: 'Tip at the right septal surface rather than buried in it.', ecg: 'Wider QRS with a QS or "W" pattern in V1 and no terminal R: the right side of the septum is being paced, so activation crosses the septum through muscle. Long stimulus-to-peak R in V6.', check: 'This is conventional septal pacing — acceptable for bradycardia, but it does not resynchronise.' } },
+        { id: 'through', name: 'Perforation into the LV cavity', bad: true, parts: { leads: [RA, { route: 'lbb', name: 'Tip through the septum' }] }, pm: { vThr: 5.5, rAmp: 2.5 }, signs: { pa: 'Often unremarkable.', lat: 'Tip beyond the left septal border into the LV cavity (contrast through the sheath or echo shows it).', ecg: 'Abrupt loss of capture or very high threshold.', check: 'Unipolar tip impedance falls (< 400–450 Ω), current of injury disappears, R wave drops. Reposition at a new site.' } }].concat(tvVariants({ rv: 'lbb', dual: true }).filter((x) => ['raDis', 'dislodge', 'fracture', 'ptx'].includes(x.id))) },
+    { id: 'his', group: 'csp', name: 'His bundle pacing', sub: 'selective vs non-selective', parts: () => ({ gen: 'pm', leads: [RA, { route: 'his', name: 'His lead' }] }), patient: P_CHB, pm: { mode: 'DDD', lrl: 60, vSite: 'hisBundle', vSpec: () => ({ seeds: Mo.hps({ t: 42 }), purkLV: 1, purkRV: 1 }) },
+      teach: { what: 'The lead is fixed on the His bundle at the AV septum, so the stimulus travels down both bundle branches exactly as a native beat does. It is the most physiological form of ventricular pacing, limited by higher and less stable thresholds, small sensed R waves, and the risk of over-sensing atrial signals.',
+        key: ['Selective capture: only the His bundle is captured — an isoelectric interval equal to the HV interval (35–55 ms) separates spike and QRS, and the QRS is identical to the native one.', 'Non-selective capture: adjacent septal muscle is captured as well — no isoelectric interval, a slurred "pseudo-delta" onset, slightly wider QRS but a rapid, normal terminal portion.', 'As output is reduced one of the two is lost first: the QRS morphology changes at threshold.', 'Largely superseded by left bundle branch area pacing for reliability; still used when the block is within the His.'] },
+      variants: [OK('Ventricular lead tip high on the septum at the level of the tricuspid annulus, medial to an RV apical position, with a short intracardiac course.', 'Tip at the AV junction, superior and central.', 'Selective capture: spike, a short flat interval, then a narrow QRS identical to the patient\'s conducted QRS.', 'Threshold often 1–2.5 V; R wave 1–4 mV; program sensing carefully.', 'Selective capture'),
+        { id: 'ns', name: 'Non-selective capture', parts: {}, pm: { vSpec: () => Mo.fuse([{ spec: Mo.siteSpec({ p: G.LM.his, kind: 'any' }), t: 0 }, { spec: { seeds: Mo.hps({ t: 40 }), purkLV: 1, purkRV: 1 }, t: 0 }]) }, signs: { pa: 'Same lead position.', lat: 'Same lead position.', ecg: 'No isoelectric interval: the QRS starts at the spike with a slurred pseudo-delta wave (local septal muscle), then completes rapidly over the conduction system. Slightly wider than native.', check: 'Clinically equivalent to selective capture and gives a safety net if His capture is lost.' } },
+        { id: 'loss', name: 'Loss of His capture', bad: true, parts: {}, pm: { vSpec: () => Mo.siteSpec({ p: G.LM.his, kind: 'any' }) }, signs: { pa: 'Lead position may look unchanged.', lat: 'Unchanged.', ecg: 'Wide QRS of septal myocardial pacing: the conduction system is no longer captured (threshold rise), only the muscle next to the lead.', check: 'His threshold has risen above output — common in follow-up. Increase output or revise to a left bundle area position.' } }] },
+    { id: 'crt', group: 'csp', name: 'Cardiac resynchronisation (biventricular)', sub: 'CRT-P / CRT-D · RA + RV + LV leads', parts: () => ({ gen: 'icd', leads: [RA, { route: 'rvApex', name: 'RV lead', coil: [0.8, 6.2] }, { route: 'cs', name: 'LV lead (coronary vein)' }] }), patient: P_CHB,
+      pm: { mode: 'DDD', lrl: 60, avdS: 110, avdP: 130, vSite: 'rvApex', vSpec: () => Mo.fuse([{ spec: Mo.spec('rvApex'), t: 0 }, { spec: Mo.spec('lvLatEpi'), t: 0 }]) },
+      teach: { what: 'In left bundle branch block the lateral left ventricular wall is activated last and contracts against a septum that is already relaxing. A third lead, passed through the coronary sinus into a lateral or posterolateral vein, paces that late wall at the same time as the right ventricular lead paces the septum.',
+        key: ['Indication: symptomatic HFrEF (EF ≤ 35%) on optimal therapy with LBBB and QRS ≥ 150 ms (weaker evidence 120–149 ms or non-LBBB).', 'It only works if both ventricles are actually captured nearly 100% of the time: AF with rapid conduction, frequent PVCs and long AV delays all steal pacing.', 'On the 12-lead, look for evidence that the LV lead is capturing: a Q or QS in lead I and a dominant R in V1 are typical; a positive lead I with QS in V1 means RV-only pacing.', 'Phrenic nerve stimulation (the nerve runs over the lateral LV) is the lead-specific complication: hiccup-like twitching in time with pacing.'] },
+      variants: [OK('Three leads. The LV lead enters the coronary sinus low in the right atrium, runs along the back of the heart, then down the LEFT heart border, well separated from the RV tip.', 'The key view: the LV lead courses POSTERIORLY (toward the spine) while the RV lead goes anteriorly. Wide separation of the two tips predicts good resynchronisation.', 'Biventricular paced QRS: narrower than RV pacing, negative (Q/QS) in lead I, rightward or superior axis, R wave in V1.', 'LV threshold often 1–2 V; check for phrenic stimulation at high output.'),
+        { id: 'lvloss', name: 'LV lead dislodged', bad: true, parts: { leads: [RA, { route: 'rvApex', name: 'RV lead', coil: [0.8, 6.2] }, { route: 'csBackInRA', name: 'LV lead (pulled back)' }] }, pm: { vSpec: () => Mo.spec('rvApex') }, signs: { pa: 'The LV lead no longer runs down the left heart border: its tip has retracted into the body of the coronary sinus or the right atrium.', lat: 'No lead in the posterior position.', ecg: 'The paced QRS reverts to RV apical morphology: wider, LBBB pattern, lead I becomes positive, V1 becomes QS. Compare with the post-implant ECG.', check: 'LV channel: no capture. Symptoms of heart failure return. The commonest lead complication of CRT (≈ 5%).' } },
+        { id: 'anterior', name: 'LV lead in an anterior vein', bad: true, parts: { leads: [RA, { route: 'rvApex', name: 'RV lead', coil: [0.8, 6.2] }, { route: 'anteriorVein', name: 'LV lead (anterior interventricular vein)' }] }, pm: { vSpec: () => Mo.fuse([{ spec: Mo.spec('rvApex'), t: 0 }, { spec: Mo.spec('lvAntWall'), t: 0 }]) }, signs: { pa: 'LV lead tip lies medially over the heart rather than on the lateral border.', lat: 'LV lead is ANTERIOR, close to the RV lead — the two tips are not separated.', ecg: 'Little narrowing of the QRS; inferior axis.', check: 'Captures normally but paces the early-activated anterior wall, not the late lateral wall: a common cause of CRT "non-response".' } }].concat(tvVariants({ rv: 'rvApex', dual: true, extra: [{ route: 'cs', name: 'LV lead' }] }).filter((x) => ['fracture', 'twiddler'].includes(x.id))) },
+    { id: 'micra', group: 'll', name: 'Micra VR / Micra AV', sub: 'leadless, RV septum', parts: () => ({ caps: [{ name: 'Micra', tip: L(3.3, 0.25, 4.3), from: L(4.7, 0.3, 2.5), len: 2.6 }] }), patient: P_CHB, pm: { mode: 'VDD', lrl: 50, url: 105, vSite: 'rvMidSeptum', avdS: 160 },
+      teach: { what: 'A 2.6 cm, 0.8 mL capsule holding battery, circuit and electrodes, delivered through a 27 Fr femoral sheath and anchored in the right ventricular septum by four nitinol tines. No pocket, no leads — so no pocket infection, lead fracture or tricuspid lead interference.',
+        key: ['Micra VR is VVIR. Micra AV adds VDD: its accelerometer detects the mechanical signal of atrial contraction (A4, the "atrial kick") and times ventricular pacing to it — AV synchrony without an atrial lead, up to sinus rates of about 105–115/min.', 'It cannot pace the atrium: not suitable when sinus node disease is the main problem.', 'Deploy on the septum, not the apex or free wall (perforation risk). "Pull-and-hold" test: at least 2 of 4 tines must be seen to engage.', 'At end of battery life (≈ 8–13 years, longer for Micra AV2/VR2) it is switched off and a new one placed alongside.'] },
+      variants: [OK('No generator and no leads. A small dense capsule over the right ventricle, lying obliquely with its tip toward the septum, left of the spine.', 'Capsule anterior, tip directed posteriorly/leftward into the septum.', 'VDD (Micra AV): each P wave followed by a paced QRS with septal morphology — LBBB pattern, narrower and with a less superior axis than apical pacing. VVI (Micra VR): paced QRS unrelated to P waves.', 'Threshold ≤ 1 V at 0.24 ms at implant; R wave > 5 mV; impedance 400–1500 Ω.'),
+        { id: 'embol', name: 'Dislodged — embolised to the pulmonary artery', bad: true, parts: { caps: [{ name: 'Capsule in the pulmonary artery', tip: [5.6, 5.8, -3.9], from: [3.2, 5.3, -2.2], len: 2.6 }] }, pm: { vThr: 99, rAmp: 0, mode: 'VVI' }, signs: { pa: 'The capsule is no longer over the right ventricle: it projects over the left hilum / pulmonary artery.', lat: 'Capsule at hilar level, posterior to its expected position.', ecg: 'Complete loss of capture and sensing; the patient is left with the underlying rhythm.', check: 'Rare (< 0.1–0.2%) but pacing-dependent patients need immediate temporary pacing and percutaneous snare retrieval.' } },
+        { id: 'apical', name: 'Apical / free-wall deployment', bad: true, parts: { caps: [{ name: 'Capsule at the apex', tip: L(3.5, 0.5, 6.5), from: L(4.4, 0.5, 4.4), len: 2.6 }] }, pm: { vSite: 'rvApex' }, signs: { pa: 'Capsule low and far left, at the apex.', lat: 'Capsule tip anterior rather than toward the septum.', ecg: 'Apical paced morphology: wider QRS, superior axis.', check: 'Works electrically, but the thin apex and free wall are where perforation and tamponade occur — the reason the septum is targeted.' } }] },
+    { id: 'aveir', group: 'll', name: 'AVEIR VR / AVEIR DR', sub: 'leadless, single or dual chamber', parts: () => ({ caps: [{ name: 'AVEIR ventricular', tip: L(3.3, 0.2, 4.6), from: L(4.8, 0.3, 1.6), len: 3.8 }, { name: 'AVEIR atrial', tip: [-2.5, 1.5, 1.05], from: [-3.9, 0.2, -1.0], len: 3.2 }] }), patient: P_CHB, pm: { mode: 'DDD', lrl: 60, vSite: 'rvMidSeptum', aSite: 'raa' },
+      teach: { what: 'A leadless capsule fixed with an active screw-in helix rather than tines. The ventricular device (VR) can be used alone; adding an atrial capsule in the base of the right atrial appendage makes AVEIR DR — the first dual-chamber leadless system.',
+        key: ['The two capsules talk to each other on every beat using low-energy conducted pulses through blood and tissue ("i2i"), giving true DDD(R): atrial pacing and sensing, AV-sequential pacing, mode switching.', 'Electrical measurements can be mapped BEFORE the helix is deployed, so the device is repositioned without damaging tissue.', 'Designed for long-term retrieval via its docking button, and an existing VR can be upgraded to DR later.', 'Atrial capsule alone (AVEIR AR) is an AAI(R) pacemaker for isolated sinus node disease.'] },
+      variants: [OK('Two capsules and nothing else: a longer one over the right ventricle and a shorter one over the right atrium, pointing up and medially toward the appendage.', 'Atrial capsule anterior and superior; ventricular capsule anterior with its tip toward the septum.', 'DDD behaviour without leads: AS–VP in complete heart block; AP–VP when the sinus rate is below the lower rate.', 'Standard thresholds/sensing for each capsule plus a check that i2i communication succeeds on > 90% of beats.'),
+        { id: 'vr', name: 'AVEIR VR only (single chamber)', parts: { caps: [{ name: 'AVEIR VR', tip: L(3.3, 0.2, 4.6), from: L(4.8, 0.3, 1.6), len: 3.8 }] }, pm: { mode: 'VVI', lrl: 60 }, signs: { pa: 'A single capsule over the right ventricle; longer and thinner than a Micra and with a visible docking button at its proximal end.', lat: 'Tip toward the septum.', ecg: 'VVI pacing: paced QRS unrelated to P waves.', check: 'Used for AF with bradycardia or infrequent pacing needs.' } },
+        { id: 'i2i', name: 'Loss of i2i communication', bad: true, parts: {}, pm: { pAmp: 0.1, aThr: 0.8 }, signs: { pa: 'Capsules in normal position (communication depends on their relative orientation and distance, and on posture).', lat: 'Normal.', ecg: 'The ventricular capsule stops receiving atrial events: P-synchronous pacing is lost and it paces at the lower rate (VVI behaviour) while the atrial capsule carries on independently.', check: 'Device report shows a low i2i success rate; reprogram signal strength. Each capsule still protects against asystole on its own.' } }] },
+    { id: 'icd', group: 'icd', name: 'Transvenous ICD', sub: 'single or dual coil', parts: () => ({ gen: 'icd', leads: [{ route: 'rvApex', name: 'RV defibrillation lead', coil: [0.8, 6.2], svcCoil: true }] }), patient: P_NSR, pm: { mode: 'VVI', lrl: 40, vSite: 'rvApex' },
+      teach: { what: 'A pacemaker with a capacitor. The right ventricular lead carries pace/sense electrodes at its tip and a long shocking coil; the shock passes between the RV coil and the generator can ("hot can"), plus an SVC coil on dual-coil leads, so that current crosses the ventricular septum and left ventricle.',
+        key: ['It can do everything a pacemaker does, plus anti-tachycardia pacing (ATP) and cardioversion/defibrillation up to ≈ 35–40 J.', 'Left-sided implants give the best vector (the heart sits between coil and can).', 'Single-coil leads are now preferred: easier to extract, similar efficacy.', 'A magnet over an ICD suspends tachycardia detection and therapy; it does NOT make it pace asynchronously.', 'Open the ICD tab to work through detection zones, discriminators, ATP and shocks.'] },
+      variants: [OK('Larger generator. The lead is thicker, with a dense coil along its distal 5–6 cm in the right ventricle (and a second coil in the SVC–brachiocephalic region if dual-coil). Tip at the RV apex or septum.', 'RV coil anterior; the whole coil should be beyond the tricuspid valve.', 'Sinus rhythm with no pacing (back-up VVI 40). Shock artefact and ATP are shown in the ICD tab.', 'Pace/sense values as for a pacemaker; shock impedance 30–90 Ω; R wave ideally > 5–7 mV so fine VF is sensed.'),
+        { id: 'single', name: 'Single-coil lead', parts: { leads: [{ route: 'rvApex', name: 'RV single-coil lead', coil: [0.8, 6.2] }] }, pm: {}, signs: { pa: 'Only one coil, in the right ventricle.', lat: 'RV coil anterior.', ecg: 'Unchanged.', check: 'Shock vector: RV coil → can.' } },
+        { id: 'fracture', name: 'Lead fracture → inappropriate shocks', bad: true, parts: { leads: [{ route: 'rvApex', name: 'RV lead (fractured)', coil: [0.8, 6.2], svcCoil: true, gapAt: CLAV }] }, pm: {}, signs: { pa: 'Discontinuity or kink of the conductor, usually near the clavicle or at the tricuspid annulus.', lat: 'May need magnified or multiple views.', ecg: 'Surface ECG shows sinus rhythm while the device charges and shocks: it is counting make-break noise as VF.', check: 'Very short non-physiological V–V intervals (< 140 ms), high pace/sense impedance, noise reproducible with arm movement. Emergency: tape a magnet over the generator to stop shocks.' } }].concat(tvVariants({ rv: 'rvApex', extra: [] }).filter((x) => ['dislodge', 'twiddler'].includes(x.id)).map((x) => Object.assign({}, x, { parts: Object.assign({}, x.parts, { leads: x.parts.leads.map((l) => Object.assign({ coil: [0.8, 6.2] }, l)) }) }))) },
+    { id: 'sicd', group: 'icd', name: 'Subcutaneous ICD', sub: 'nothing inside the heart', parts: () => ({ sicd: 'ok' }), patient: P_NSR, pm: { mode: 'OFF' },
+      teach: { what: 'Generator in the left mid-axillary line over the 5th–6th intercostal space; the lead is tunnelled under the skin to the xiphoid and up the left sternal border. The shock (80 J) passes between the parasternal coil and the can with the heart in between. No hardware touches the heart or veins.',
+        key: ['For patients who need defibrillation but not pacing: young patients, channelopathies, HCM, difficult venous access, previous device infection.', 'It cannot pace for bradycardia, cannot deliver ATP, and cannot resynchronise (only ≈ 30 s of post-shock transthoracic pacing).', 'It senses a surface-ECG-like signal from three vectors (primary, secondary, alternate); T-wave over-sensing is the classic cause of inappropriate shocks — hence the pre-implant screening ECG.', 'Position decides the shock threshold: generator posterior, coil central, minimal fat underneath (PRAETORIAN score).'] },
+      variants: [OK('Generator overlying the left lateral chest wall at the level of the cardiac apex; a vertical coil along the left parasternal border from xiphoid to the manubriosternal junction. No intracardiac leads.', 'Generator projected over or behind the mid-thorax (posterior to the mid-axillary line); coil directly on the sternum with little tissue between them and the ribs.', 'Sinus rhythm; no pacing spikes ever (except briefly after a shock).', 'Sensing vector with the best R:T ratio selected automatically; shock impedance checked at implant.'),
+        { id: 'bad', name: 'Poor position (high defibrillation threshold)', bad: true, parts: { sicd: 'bad' }, pm: { mode: 'OFF' }, signs: { pa: 'Generator sits anteriorly/inferiorly over the apex instead of the lateral chest wall; the coil lies lateral to the sternum.', lat: 'Generator ANTERIOR to the mid-axillary line. The shock now passes across the front of the chest and largely misses the left ventricle.', ecg: 'Unchanged.', check: 'High PRAETORIAN score → failed conversion testing. Fat under the coil or can has the same effect. Needs repositioning.' } }] },
+    { id: 'evicd', group: 'icd', name: 'Extravascular ICD', sub: 'substernal lead', parts: () => ({ evicd: true }), patient: P_NSR, pm: { mode: 'OFF' },
+      teach: { what: 'A newer extravascular design: the lead is tunnelled from the xiphoid into the anterior mediastinum, directly behind the sternum and in front of the heart, with the generator in the left mid-axillary line. Being closer to the heart than a subcutaneous coil lets a smaller generator defibrillate with 40 J.',
+        key: ['Unlike the S-ICD it can deliver anti-tachycardia pacing and pause-prevention (asystole) pacing from the substernal electrodes.', 'Still no hardware in the veins or heart; still not suitable for patients who need regular bradycardia pacing or CRT.', 'Not for patients with previous sternotomy (adhesions).', 'Over-sensing of P waves and of muscle noise is the main programming issue.'] },
+      variants: [OK('Generator on the left lateral chest wall; a lead curving from the xiphoid upward over the midline cardiac shadow with an undulating ("epsilon") shape.', 'Diagnostic view: the lead lies immediately BEHIND the sternum, in front of the heart — not on top of the sternum as an S-ICD coil does.', 'Sinus rhythm; pacing spikes only during ATP or pause-prevention pacing.', 'Sensing and pacing capture thresholds from the substernal electrodes are checked at implant; defibrillation tested.')] },
+    { id: 'tvp', group: 'temp', name: 'Temporary transvenous wire', sub: 'right internal jugular → RV apex', parts: () => ({ access: 'ij', leads: [{ route: 'rvApex', name: 'Temporary pacing wire' }] }), patient: P_CHB, pm: { mode: 'VVI', lrl: 70, vSite: 'rvApex', kind: 'temp' },
+      teach: { what: 'A bipolar wire, often balloon-tipped, passed through a sheath in the right internal jugular (straightest route), left subclavian or femoral vein to the right ventricular apex and connected to an external box. A bridge for symptomatic bradycardia until recovery or a permanent system.',
+        key: ['It is not fixed to the heart: dislodgement, rising thresholds and perforation are common, especially beyond 24–48 h. Check threshold and sensing every shift.', 'Paced morphology confirms position: LBBB with superior axis = RV apex.', 'Work through the box settings in the Temporary pacing tab.'] },
+      variants: [OK('Wire descends from the right neck straight down the SVC and right atrium, crosses the tricuspid valve and ends at the RV apex, to the left of the spine. External generator — nothing in the chest wall.', 'Tip anterior and inferior.', 'Spike → wide QRS, LBBB pattern, negative in II/III/aVF.', 'Threshold < 1 mA; output set at 2–3× threshold; sensitivity ≈ 2 mV.'),
+        { id: 'coiled', name: 'Wire coiled in the right atrium', bad: true, parts: { access: 'ij', leads: [{ route: 'tvpCoiled', name: 'Wire looped in the atrium' }] }, pm: { vThr: 99, rAmp: 0.5 }, signs: { pa: 'The wire forms a loop over the right heart border and never crosses to the left of the spine.', lat: 'Tip posterior, in the atrium.', ecg: 'Spikes without QRS complexes; may intermittently capture the atrium (spike → P wave) — which does nothing in complete heart block.', check: 'Advance under fluoroscopy or with the balloon inflated; ECG from the wire tip shows large atrial signals.' } }].concat(tvVariants({ rv: 'rvApex' }).filter((x) => ['perf', 'cs'].includes(x.id)).map((x) => Object.assign({}, x, { parts: Object.assign({}, x.parts, { access: 'ij' }) }))) },
+  ];
+  D.byId = {}; for (const d of D.list) D.byId[d.id] = d;
+
+  /* Simulate a device + variant → recording (and the hardware to draw). */
+  D.make = function (dev, variant) {
+    const parts = Object.assign({}, dev.parts(), variant.parts || {});
+    const hw = EP.Hardware ? EP.Hardware.build(parts) : null;
+    const sim = new EP.HeartSim(dev.patient());
+    const pmc = Object.assign({}, dev.pm, variant.pm || {});
+    if (typeof pmc.vSpec === 'function') pmc.vSpec = pmc.vSpec();
+    let pm = null;
+    if (pmc.mode !== 'OFF') {
+      pm = new EP.Pacemaker(sim, pmc);
+      if (pmc.intermittent) { const flip = (t) => { pm.c.noOutput = sim.rng() < pmc.intermittent; sim.schedule(t + 800 + 1400 * sim.rng(), flip); }; sim.schedule(500, flip); }
+    }
+    const warm = 2500;
+    sim.runUntil(warm + 10400);
+    const rec = EP.Synth.build(sim, warm, warm + 10000);
+    rec.sim = sim;
+    return { rec, hw, pm };
+  };
+
+  EP.Modules = EP.Modules || [];
+  EP.Modules.push({
+    id: 'devices', title: 'Devices',
+    mount(root) {
+      let cur = null, vcur = null, hwHandle = null;
+      const player = new EP.Player({ layout: '12', ladder: false, markers: true });
+      const xrEl = h('div.xr'), xr = EP.XRay ? new EP.XRay(xrEl) : null;
+      const xrSeg = UI.seg([['pa', 'PA'], ['lat', 'Lateral']], 'pa', (v) => xr && xr.setView(v), 'Projection');
+      const rail = h('nav.card.rail', { 'aria-label': 'Devices' }), listEl = h('div', { style: { paddingBottom: '8px' } }); rail.append(listEl);
+      const sel = UI.select(null, D.groups.map((g) => ({ group: g.name, items: D.list.filter((d) => d.group === g.id).map((d) => [d.id, d.name]) })), 'ddd', (v) => show(v));
+      sel.classList.add('rail-sel'); sel.setAttribute('aria-label', 'Device');
+      const varEl = h('div.variants'), signs = h('div.signs'), head = h('div.card-h'), teach = h('div.card-b');
+      const verdict = h('div');
+      function fill() {
+        listEl.innerHTML = '';
+        for (const g of D.groups) {
+          listEl.append(h('div.rail-g', g.name));
+          for (const d of D.list.filter((x) => x.group === g.id)) listEl.append(h('button.rail-i', { type: 'button', 'aria-current': String(cur === d), onclick: () => show(d.id) }, d.name, h('small', d.sub)));
+        }
+      }
+      function setVariant(v) {
+        vcur = v;
+        for (const b of varEl.children) b.setAttribute('aria-pressed', String(b.dataset.id === v.id));
+        const made = D.make(cur, v);
+        if (hwHandle) hwHandle.remove();
+        player.load(made.rec, { title: 'Paced 12-lead — ' + cur.name + (v.id === 'ok' ? '' : ' · ' + v.name) });
+        if (player.heart && made.hw) hwHandle = EP.Hardware.add3D(player.heart, made.hw);
+        if (xr) xr.setHardware(made.hw);
+        signs.innerHTML = '';
+        signs.append(h('div', h('h4', 'Chest X-ray — PA'), v.signs.pa), h('div', h('h4', 'Chest X-ray — lateral'), v.signs.lat), h('div', h('h4', '12-lead / rhythm'), v.signs.ecg), h('div', h('h4', 'Device check & bedside'), v.signs.check));
+        verdict.innerHTML = '';
+        verdict.append(h('span.pill' + (v.bad ? '.bad' : '.good'), v.bad ? 'problem' : 'as intended'));
+      }
+      function show(id) {
+        cur = D.byId[id] || D.byId.ddd;
+        UI.store.set('device', cur.id); if (sel.sel) sel.sel.value = cur.id; else sel.value = cur.id;
+        head.innerHTML = ''; head.append(h('div', h('div.eyebrow', (D.groups.find((g) => g.id === cur.group) || {}).name), h('h2', { style: { fontSize: '17px' } }, cur.name)));
+        teach.innerHTML = ''; teach.append(h('div.prose', h('p', cur.teach.what), h('h4', 'Key points'), UI.list(cur.teach.key)));
+        varEl.innerHTML = '';
+        for (const v of cur.variants) { const b = h('button.btn.sm' + (v.bad ? '.bad' : ''), { type: 'button', 'aria-pressed': 'false', onclick: () => setVariant(v) }, v.name); b.dataset.id = v.id; varEl.append(b); }
+        fill();
+        if (player.heart) { player.setOpacity(0.38); player.heart.setView(cur.parts().gen || cur.id === 'sicd' || cur.id === 'evicd' || cur.id === 'tvp' ? 'device' : 'front'); }
+        setVariant(cur.variants[0]);
+      }
+      const xrCard = h('section.card', xrEl, h('div.h3d-tools', h('div.row', h('b', 'Simulated chest radiograph'), h('span.grow'), xrSeg), h('div.muted', { style: { fontSize: '12px' } }, 'Generated from the same 3D geometry as the model beside it. Viewed as a real film: the patient\'s left is on your right.')));
+      root.append(h('div.lab.lab2', rail,
+        h('div.stack', sel,
+          h('section.card', h('div.card-h', h('h3', 'Position'), verdict, h('span.grow')), h('div.card-b', varEl), signs),
+          h('div.dev-grid', player.heartCard || h('div'), xrCard),
+          player.ecgCard,
+          h('section.card', head, teach))));
+      show(UI.store.get('device', 'ddd'));
+      return { unmount() { player.destroy(); if (xr) xr.dispose(); } };
+    },
+  });
+})(globalThis.EP = globalThis.EP || {});
+
+
+/* ---- js/ui-pacer.js ---- */
+/* EP Simulator — Pacemaker simulator: programmable device on a simulated patient, with a marker
+ * channel, timing-cycle bars, automatic strip interpretation and troubleshooting cases. */
+(function (EP) {
+  'use strict';
+  const h = EP.h, UI = EP.UI;
+  const CHB = () => ({ fast: { block: true, retro: { block: true } } });
+  const ESC = (cl) => ({ id: 'esc', node: 'V', cl: cl || 1850, site: 'fascPost', label: 'escape', startAt: 700, sd: 0.02 });
+
+  const PATIENTS = {
+    chb: { name: 'Complete heart block — sinus 75, escape 32/min', cfg: () => ({ sinus: { cl: 800 }, avn: CHB(), foci: [ESC()] }) },
+    brady: { name: 'Sinus bradycardia 38/min, normal AV conduction', cfg: () => ({ sinus: { cl: 1580, resp: 0.02 } }) },
+    arrest: { name: 'Sinus arrest — junctional escape 34/min', cfg: () => ({ sinus: { on: false }, foci: [{ id: 'j', node: 'H', cl: 1760, label: 'junctional', startAt: 500 }] }) },
+    nsr: { name: 'Sinus rhythm 72/min (device should stay quiet)', cfg: () => ({ sinus: { cl: 833 } }) },
+    first: { name: 'Sinus 68/min with PR 320 ms', cfg: () => ({ sinus: { cl: 880 }, avn: { fast: { min: 215 } } }) },
+    chbFast: { name: 'Complete heart block with sinus tachycardia 138/min', cfg: () => ({ sinus: { cl: 435, resp: 0, sd: 0.004 }, avn: CHB(), foci: [ESC()] }) },
+    afSlow: { name: 'Atrial fibrillation, slow ventricular response', cfg: () => ({ sinus: { on: false }, atria: { mode: 'fib' }, avn: { fast: { erp: 1150, conceal: 0.12 } } }) },
+    afChb: { name: 'Atrial fibrillation with complete heart block', cfg: () => ({ sinus: { on: false }, atria: { mode: 'fib' }, avn: CHB(), foci: [ESC(1900)] }) },
+    retro: { name: 'Sinus node disease, intact retrograde (VA) conduction, PVCs', cfg: () => ({ sinus: { cl: 1500, resp: 0 }, avn: { fast: { retro: { delay: 210, erp: 240, block: false } } }, foci: [{ id: 'pvc', node: 'V', kind: 'coupled', coupling: 640, every: 6, site: 'rvotSeptal', label: 'PVC' }] }) },
+    asys: { name: 'Complete heart block with no escape rhythm', cfg: () => ({ sinus: { cl: 780 }, avn: CHB() }) },
+  };
+
+  const FAULTS = {
+    none: { name: 'No fault', set: {}, imp: [520, 610], batt: '2.78 V (good)' },
+    vDislodge: { name: 'Ventricular lead dislodgement', set: { vThr: 6.5, rAmp: 2.0 }, imp: [520, 480], batt: '2.78 V', dx: 'Ventricular failure to capture and under-sensing',
+      why: 'The tip has lost contact with the endocardium: the capture threshold is far above the programmed output and the sensed R wave is small. Usually early (first weeks). The chest X-ray shows the tip somewhere other than where it was left.',
+      fix: 'Raise the output as a temporary measure if any capture is possible; reposition the lead. If pacing-dependent: transcutaneous / temporary transvenous back-up.' },
+    aDislodge: { name: 'Atrial lead dislodgement', set: { aThr: 7, pAmp: 0.25 }, imp: [430, 610], batt: '2.78 V', dx: 'Atrial failure to capture and under-sensing',
+      why: 'Atrial spikes are not followed by P waves, and native P waves are not seen (no AS markers, so no tracking). The ventricle is still paced, but AV synchrony is lost.',
+      fix: 'Reposition the atrial lead. Meanwhile program VVI/DDI to avoid meaningless atrial output.' },
+    exit: { name: 'Threshold rise (exit block, hyperkalaemia, class Ic drug, MI at the tip)', set: { vThr: 3.4 }, imp: [520, 640], batt: '2.78 V', dx: 'Ventricular failure to capture — threshold now above output',
+      why: 'Lead position and impedance are unchanged but the myocardium needs more energy: inflammation/fibrosis at the tip weeks after implant, hyperkalaemia, acidosis, flecainide/propafenone, or infarction of the paced tissue.',
+      fix: 'Increase the output to restore a 2:1 voltage safety margin and treat the cause (K⁺, pH, drug).' },
+    fracture: { name: 'Conductor fracture', set: { noiseV: 7, intermittent: 0.45 }, imp: [520, '> 2500'], batt: '2.78 V', dx: 'Over-sensing of make-break noise and intermittent failure to output',
+      why: 'The broken conductor ends touch and separate. Each contact generates a non-physiological signal that the device reads as an R wave (inhibition → pauses with no spikes); when open, the stimulus never reaches the heart. Impedance is very high. Classic site: between clavicle and first rib (subclavian crush).',
+      fix: 'Lead replacement. In a pacing-dependent patient program asynchronous pacing (or apply a magnet) so noise cannot inhibit output — it will not fix an open circuit.' },
+    insulation: { name: 'Insulation breach', set: { vThr: 2.1, rAmp: 3.0, noiseV: 3 }, imp: [520, '< 200'], batt: '2.61 V (draining early)', dx: 'Current leak: under-sensing, intermittent non-capture, low impedance',
+      why: 'Current escapes through the defect, so less reaches the tip (threshold appears higher), the electrogram is attenuated, and muscle potentials can enter the circuit. Impedance is low and the battery depletes quickly.',
+      fix: 'Lead revision. Unipolar reprogramming can sometimes temporise an outer-insulation failure.' },
+    tOver: { name: 'T-wave over-sensing', set: { tAmp: 3.4, vrp: 200 }, imp: [520, 610], batt: '2.78 V', dx: 'Ventricular over-sensing — the paced rate is slower than programmed',
+      why: 'The device counts the T wave as a second ventricular event and restarts its timer, so the escape interval is measured from the T wave: the pacing rate falls below the lower rate limit by exactly the QRS-to-T time.',
+      fix: 'Make the ventricular channel less sensitive (higher mV) or lengthen the ventricular refractory period.' },
+    myo: { name: 'Myopotential over-sensing (unipolar sensing)', set: { noiseV: 4.2, kind: 'unipolar' }, imp: [520, 610], batt: '2.78 V', dx: 'Ventricular over-sensing with inhibition — pauses during arm movement',
+      why: 'A unipolar circuit uses the generator can as the anode, so pectoral muscle potentials are in the sensing field. They inhibit ventricular output; in a dual-chamber device they can also be tracked.',
+      fix: 'Reprogram to bipolar sensing or reduce sensitivity (raise the mV value) while keeping a 2:1 margin on the R wave.' },
+    vUnder: { name: 'Ventricular under-sensing', set: { rAmp: 1.7 }, imp: [520, 610], batt: '2.78 V', dx: 'Ventricular under-sensing — spikes march through intrinsic beats',
+      why: 'The R wave at the lead is smaller than the programmed sensitivity (new bundle branch block, infarct, PVC morphology, lead maturation). The device behaves as if asynchronous: stimuli land in the ST-T and cannot capture — or capture on the T wave.',
+      fix: 'Make the channel more sensitive (LOWER the mV value). If the electrogram is tiny, reposition the lead.' },
+    aUnder: { name: 'Atrial under-sensing', set: { pAmp: 0.3 }, imp: [520, 610], batt: '2.78 V', dx: 'Atrial under-sensing — P waves are not tracked; atrial spikes follow native P waves',
+      why: 'The atrial electrogram is below the sensitivity setting, so the device does not start an AV delay after native P waves. It paces the atrium at the lower rate (often uselessly, just after a P wave) and AV synchrony is lost.',
+      fix: 'Increase atrial sensitivity (lower mV value); check for lead dislodgement.' },
+    xtalk: { name: 'Crosstalk (safety pacing off)', set: { crosstalk: true, safetyPace: false }, imp: [520, 610], batt: '2.78 V', dx: 'Crosstalk inhibition — atrial spikes with no ventricular output',
+      why: 'The ventricular channel senses the atrial stimulus and concludes the ventricle has depolarised. Ventricular output is inhibited: in complete heart block that is asystole with atrial spikes marching on. Promoted by high atrial output, high ventricular sensitivity and a short ventricular blanking period.',
+      fix: 'Lengthen ventricular blanking, lower atrial output, reduce ventricular sensitivity, and turn ventricular safety pacing ON (a sense in the crosstalk window then triggers a committed pace at 110 ms).' },
+    ffr: { name: 'Far-field R-wave over-sensing on the atrial lead', set: { ffr: 1.2, pvab: 15 }, imp: [520, 610], batt: '2.78 V', dx: 'Atrial over-sensing of the QRS → false mode switch',
+      why: 'The atrial lead sees the ventricular depolarisation as a second atrial event each cycle. The device calculates an atrial rate twice the real one, declares an atrial tachyarrhythmia and switches to a non-tracking mode — AV synchrony is lost with no arrhythmia present.',
+      fix: 'Lengthen post-ventricular atrial blanking (PVAB) or reduce atrial sensitivity.' },
+    battery: { name: 'Battery at elective replacement / end of life', set: { forceMode: 'VVI', lrl: 65, vOut: 1.6, vThr: 0.9 }, imp: [520, 610], batt: '2.42 V — ERI reached', dx: 'Reversion to VVI at a fixed rate',
+      why: 'To save energy the device has abandoned dual-chamber and rate-response functions and paces VVI at its elective-replacement rate. A magnet rate lower than at implant is the bedside clue. Pacemaker syndrome can appear because AV synchrony is lost.',
+      fix: 'Generator change. Do not confuse with malfunction of the leads — capture and sensing are intact.' },
+  };
+
+  const QUIZ = [
+    { patient: 'chb', pm: { mode: 'DDD' }, fault: 'vDislodge' }, { patient: 'nsr', pm: { mode: 'VVI', lrl: 60 }, fault: 'vUnder' },
+    { patient: 'chb', pm: { mode: 'VVI', lrl: 70 }, fault: 'tOver' }, { patient: 'chb', pm: { mode: 'DDD' }, fault: 'xtalk', force: { aSens: 0.5 }, patientOverride: 'asys2' },
+    { patient: 'chb', pm: { mode: 'VVI', lrl: 70 }, fault: 'fracture' }, { patient: 'chb', pm: { mode: 'DDD' }, fault: 'aUnder' },
+    { patient: 'chb', pm: { mode: 'DDD' }, fault: 'ffr' }, { patient: 'chb', pm: { mode: 'DDD' }, fault: 'battery' }, { patient: 'chb', pm: { mode: 'VVI', lrl: 70 }, fault: 'exit' },
+  ];
+  PATIENTS.asys2 = { name: 'Complete heart block, sinus bradycardia 45/min, no escape', hidden: true, cfg: () => ({ sinus: { cl: 1330 }, avn: CHB() }) };
+
+  /* Read the last few seconds of the strip the way a clinician would. → [[level, title, text]] */
+  function analyze(sim, dev, t) {
+    const W = 9000, ev = sim.out.filter((e) => e.t > t - W && e.t <= t - 160), f = [];
+    const q = ev.filter((e) => e.type === 'QRS'), sp = ev.filter((e) => e.type === 'spike'), mk = ev.filter((e) => e.type === 'mark'), P = ev.filter((e) => e.type === 'P');
+    const cap = EP.Pacemaker.MODES[dev.mode] || {}, lri = dev.lri;
+    const vS = sp.filter((s) => s.ch === 'V'), aS = sp.filter((s) => s.ch === 'A');
+    const paced = (x) => x.label === 'paced' || (x.parts && x.parts.some((p) => p.cap && p.c.type === 'pace'));
+    const intrinsic = q.filter((x) => !paced(x) || x.label === 'fusion');
+    if (!cap.pa && !cap.pv) return [['', 'Pacing off', 'The device is only monitoring.']];
+    // capture
+    const vNc = vS.filter((s) => !s.captured);
+    const func = vNc.filter((s) => q.some((x) => s.t - x.t > -20 && s.t - x.t < 340));
+    const trueNc = vNc.filter((s) => !func.includes(s));
+    if (trueNc.length) f.push(['bad', 'Ventricular failure to capture', `${trueNc.length} of ${vS.length} ventricular stimuli were not followed by a QRS although the ventricle was excitable.`]);
+    else if (vS.length) f.push(['good', 'Ventricular capture', 'Each ventricular stimulus is followed immediately by a wide QRS and a discordant T wave — and by a pulse.']);
+    if (func.length) f.push(['warn', 'Stimulus in the refractory period', `${func.length} stimuli fell on or just after an intrinsic QRS and could not capture. Either the device did not sense that beat (under-sensing) or it is pacing asynchronously (magnet, VOO/DOO).`]);
+    const aNc = aS.filter((s) => !s.captured);
+    const aFunc = aNc.filter((s) => P.some((x) => s.t - x.t > -20 && s.t - x.t < 240));
+    if (aNc.length - aFunc.length > 0) f.push(['bad', 'Atrial failure to capture', 'Atrial stimuli are not followed by P waves.']);
+    else if (aS.length) f.push(['good', 'Atrial capture', 'Each atrial stimulus is followed by a (paced-morphology) P wave.']);
+    // ventricular sensing
+    if (cap.sv) {
+      const vsM = mk.filter((m) => m.text === 'VS');
+      const missed = intrinsic.filter((x) => !vsM.some((m) => m.t - x.t > -30 && m.t - x.t < 190) && x.label !== 'fusion');
+      if (missed.length && intrinsic.length) f.push(['bad', 'Ventricular under-sensing', `${missed.length} intrinsic QRS complexes produced no VS marker; the timer was not reset.`]);
+      const ghost = vsM.filter((m) => !q.some((x) => m.t - x.t > -40 && m.t - x.t < 200));
+      if (ghost.length) f.push(['bad', 'Ventricular over-sensing', `${ghost.length} VS markers do not line up with a QRS (T wave, noise, crosstalk or far-field signal). Output is inhibited and the rate falls below the lower rate limit.`]);
+      if (!missed.length && !ghost.length && intrinsic.length) f.push(['good', 'Ventricular sensing', 'Intrinsic beats are marked VS and inhibit ventricular output.']);
+    }
+    if (cap.sa) {
+      const asM = mk.filter((m) => m.text === 'AS' || m.text === 'AR');
+      const nat = P.filter((x) => x.kind !== 'paced');
+      const missedA = nat.filter((x) => !asM.some((m) => m.t - x.t > -10 && m.t - x.t < 160));
+      if (nat.length >= 3 && missedA.length > nat.length * 0.5) f.push(['bad', 'Atrial under-sensing', 'Native P waves are not marked AS/AR.']);
+      const ghostA = asM.filter((m) => !P.some((x) => m.t - x.t > -20 && m.t - x.t < 170));
+      if (sim.A.mode === 'normal' && ghostA.length >= 3) f.push(['bad', 'Atrial over-sensing', 'Atrial markers without P waves (far-field R wave or noise).']);
+    }
+    // pauses
+    if (cap.pv) {
+      let pause = 0;
+      const all = q.map((x) => x.t).concat(trueNc.map((s) => s.t)).sort((a, b) => a - b);
+      for (let i = 1; i < all.length; i++) if (all[i] - all[i - 1] > lri * 1.18 + 60) pause++;
+      if (all.length && t - 160 - all[all.length - 1] > lri * 1.3 + 100) pause++;
+      if (!all.length) pause++;
+      if (pause) f.push(['bad', 'Pauses longer than the lower rate interval', 'No stimulus was delivered when one was due: over-sensing (inhibition), an open circuit, or battery failure. A magnet restores pacing if the cause is over-sensing.']);
+    }
+    // patterns
+    const txt = mk.map((m) => m.text).join(' ');
+    if (/MS/.test(txt) || dev.switched) f.push(['warn', 'Mode switch', 'A fast atrial rate was detected, so the device stopped tracking the atrium (DDI/VVI behaviour) to avoid rapid ventricular pacing.']);
+    if (cap.track && /AS VP/.test(txt) && !dev.switched) {
+      const ars = (txt.match(/AR/g) || []).length, vps = (txt.match(/VP/g) || []).length;
+      const vv = []; const vpm = mk.filter((m) => m.text === 'VP'); for (let i = 1; i < vpm.length; i++) vv.push(vpm[i].t - vpm[i - 1].t);
+      const atUrl = vv.length > 3 && vv.filter((x) => Math.abs(x - dev.uri) < 25).length >= vv.length * 0.6;
+      const retro = P.filter((x) => x.kind === 'retro').length;
+      if (atUrl && retro >= 3) f.push(['bad', 'Pacemaker-mediated tachycardia', 'Ventricular pacing at the upper rate, each paced beat conducting backwards to the atrium; the retrograde P is sensed after PVARP and triggers the next paced beat. The device is the antegrade limb of a re-entry circuit. A magnet, a longer PVARP, or PVARP extension after a PVC breaks it.']);
+      else if (atUrl && ars >= 1) f.push(['warn', 'Upper rate behaviour — pacemaker Wenckebach', 'The sinus rate exceeds the maximum tracking rate. The device delays each ventricular pace to respect the upper rate, so the AS–VP interval lengthens until a P wave falls in PVARP and is not tracked.']);
+      else if (ars >= 2 && ars >= vps * 0.6) f.push(['warn', 'Upper rate behaviour — 2:1 block', 'The atrial cycle is shorter than the total atrial refractory period (AV delay + PVARP): every other P wave falls in PVARP and is ignored. The paced rate suddenly halves.']);
+      else f.push(['good', 'P-synchronous ventricular pacing', 'Each native P wave (AS) starts the sensed AV delay and is followed by a ventricular pace (VP): AV synchrony is preserved.']);
+    }
+    if (/AP VS/.test(txt)) f.push(['good', 'Atrial pacing with intrinsic conduction', 'The atrium is paced (AP) and the impulse conducts through the patient\'s own AV node (VS) — the ventricular channel is inhibited.']);
+    if (/AP VP/.test(txt)) f.push(['good', 'AV sequential pacing', 'Atrial then ventricular pacing separated by the programmed paced AV delay.']);
+    if (!sp.length && q.length) f.push(['good', 'Complete inhibition', 'The intrinsic rate is above the lower rate limit and conduction is intact: the device senses and does nothing. No spikes is the expected finding.']);
+    if (dev.c.magnet) f.push(['', 'Magnet applied', 'Asynchronous pacing at the magnet rate: sensing is disabled, so stimuli compete with any intrinsic rhythm.']);
+    return f;
+  }
+  EP.pacerAnalyze = analyze;
+
+  const NBG = [['I — chamber paced', 'O none · A atrium · V ventricle · D dual'], ['II — chamber sensed', 'O none · A · V · D dual'], ['III — response to sensing', 'O none · I inhibited · T triggered · D dual (inhibit + trigger)'], ['IV — rate modulation', 'R = sensor-driven rate response'], ['V — multisite pacing', 'O · A · V · D (e.g. biventricular)']];
+  const MODES = [['DDD', 'Paces and senses both chambers. A sensed P inhibits atrial output and triggers a ventricular pace after the AV delay; a sensed R inhibits ventricular output. The workhorse for AV block with a working sinus node.'], ['VVI', 'Ventricular demand pacing. Ignores the atria. For permanent AF with a slow ventricular rate, or as back-up.'], ['AAI', 'Atrial demand pacing. Only for sinus node disease with reliable AV conduction — it cannot rescue AV block.'], ['DDI', 'Paces both chambers, senses both, but never tracks: a sensed P inhibits atrial output only. Used for atrial tachyarrhythmias (and is where mode switch goes).'], ['VDD', 'Senses atrium and ventricle, paces only the ventricle. P-synchronous pacing from a single lead or a leadless device with atrial mechanical sensing; no atrial pacing support.'], ['VOO / DOO / AOO', 'Asynchronous: fixed-rate output, no sensing. Magnet mode; used around electrocautery and MRI in pacing-dependent patients. Risk: stimulus on a T wave.']];
+
+  EP.Modules = EP.Modules || [];
+  EP.Modules.push({
+    id: 'pacemaker', title: 'Pacemaker',
+    mount(root) {
+      const state = { patient: 'chb', fault: 'none', quiz: null, pm: Object.assign({}, EP.Pacemaker.DEF, { mode: 'DDD' }) };
+      let sim, dev, live;
+      const canvas = h('canvas', { 'aria-label': 'Live rhythm strip with marker channel' });
+      const liveBox = h('div.live', canvas);
+      const strip = new EP.LiveStrip(canvas, { channels: [{ lead: 1 }, { key: 'pulse', label: 'Arterial pressure' }], windowMs: 8500, markers: true, timers: true, rowMm: 22 });
+      const findEl = h('div.findings'), interEl = h('div');
+      function devCfg() {
+        const f = FAULTS[state.fault], c = Object.assign({}, state.pm, f.set);
+        if (f.set.forceMode) c.mode = f.set.forceMode;
+        return c;
+      }
+      function rebuild() {
+        sim = new EP.HeartSim(PATIENTS[state.patient].cfg());
+        dev = new EP.Pacemaker(sim, devCfg());
+        const f = FAULTS[state.fault];
+        if (f.set.intermittent) { const flip = (t) => { dev.c.noOutput = sim.rng() < f.set.intermittent; sim.schedule(t + 900 + 1500 * sim.rng(), flip); }; sim.schedule(600, flip); }
+        if (live) live.setSim(sim); else live = new EP.Live({ sim, strips: [strip], pulse: true, onTick: tick }).start();
+        interEl.innerHTML = '';
+      }
+      let lastFind = 0;
+      function tick(t) {
+        if (t - lastFind < 700) return; lastFind = t;
+        const f = analyze(sim, dev, t);
+        findEl.innerHTML = '';
+        for (const [lv, title, text] of f) findEl.append(h('div.finding', h('span.pill' + (lv ? '.' + lv : ''), lv === 'good' ? 'ok' : lv === 'bad' ? 'fault' : lv === 'warn' ? 'note' : 'info'), h('div', h('b', title), h('div.muted', text))));
+        if (!f.length) findEl.append(h('div.muted', 'Collecting a few seconds of rhythm…'));
+        rateEl.textContent = dev.mode + (dev.switched ? ' (switched)' : '');
+      }
+      // ---- controls ----
+      const ctl = h('div.ctl');
+      const setters = {};
+      function num(label, key, min, max, step, unit) {
+        const val = h('span.val', state.pm[key] + ' ' + unit);
+        const inp = h('input', { type: 'range', min, max, step, value: state.pm[key], 'aria-label': label, oninput: () => { state.pm[key] = +inp.value; val.textContent = state.pm[key] + ' ' + unit; dev.set(devCfg()); } });
+        setters[key] = (v) => { state.pm[key] = v; inp.value = v; val.textContent = v + ' ' + unit; };
+        ctl.append(h('label', label), val, inp);
+      }
+      const modeSel = h('select', { 'aria-label': 'Pacing mode', onchange: () => { state.pm.mode = modeSel.value; dev.set(devCfg()); } }, ['DDD', 'VVI', 'AAI', 'DDI', 'VDD', 'DOO', 'VOO', 'AOO', 'ODO'].map((m) => h('option', { value: m }, m === 'ODO' ? 'ODO (sensing only)' : m)));
+      modeSel.value = state.pm.mode;
+      ctl.append(h('label', 'Mode'), h('span.val', ''), modeSel);
+      num('Lower rate', 'lrl', 30, 120, 5, '/min'); num('Upper tracking rate', 'url', 90, 180, 5, '/min');
+      num('Paced AV delay', 'avdP', 80, 350, 10, 'ms'); num('Sensed AV delay', 'avdS', 60, 320, 10, 'ms'); num('PVARP', 'pvarp', 150, 500, 10, 'ms');
+      num('Ventricular output', 'vOut', 0.25, 7.5, 0.25, 'V'); num('Atrial output', 'aOut', 0.25, 7.5, 0.25, 'V');
+      num('Ventricular sensitivity', 'vSens', 0.5, 12, 0.5, 'mV'); num('Atrial sensitivity', 'aSens', 0.1, 4, 0.1, 'mV');
+      const magnet = UI.check('Magnet on the generator', false, (v) => { state.pm.magnet = v; dev.set(devCfg()); });
+      const patSel = UI.select(null, Object.keys(PATIENTS).filter((k) => !PATIENTS[k].hidden).map((k) => [k, PATIENTS[k].name]), state.patient, (v) => { state.patient = v; state.quiz = null; quizBox(); rebuild(); });
+      patSel.setAttribute('aria-label', 'Patient rhythm'); patSel.style.width = '100%';
+      const faultSel = UI.select(null, Object.keys(FAULTS).map((k) => [k, FAULTS[k].name]), 'none', (v) => { state.fault = v; state.quiz = null; quizBox(); rebuild(); faultNote(); });
+      faultSel.setAttribute('aria-label', 'Fault'); faultSel.style.width = '100%';
+      const faultInfo = h('div');
+      function faultNote() {
+        faultInfo.innerHTML = '';
+        const f = FAULTS[state.fault];
+        if (state.fault !== 'none' && !state.quiz) faultInfo.append(h('div.prose', { style: { marginTop: '8px', fontSize: '13px' } }, h('h4', 'What you should see'), h('p', f.dx + '.'), h('h4', 'Why'), h('p', f.why), h('h4', 'What to do'), h('p', f.fix)));
+      }
+      const rateEl = h('span.pill', 'DDD');
+      const freeze = h('button.btn.sm', { type: 'button', onclick: () => { if (live.running) { live.stop(); freeze.textContent = 'Resume'; } else { live.start(); freeze.textContent = 'Freeze'; } } }, 'Freeze');
+      // ---- interrogation ----
+      const interBtn = h('button.btn.sm', { type: 'button', onclick: () => {
+        const c = dev.c, f = FAULTS[state.fault];
+        interEl.innerHTML = '';
+        interEl.append(h('div.scroll-x', h('table.tbl', h('thead', h('tr', h('th', ''), h('th', 'Atrial lead'), h('th', 'Ventricular lead'))),
+          h('tbody', h('tr', h('td', 'Capture threshold'), h('td.mono', c.aThr + ' V'), h('td.mono', c.vThr + ' V')),
+            h('tr', h('td', 'Programmed output'), h('td.mono', c.aOut + ' V'), h('td.mono', c.vOut + ' V')),
+            h('tr', h('td', 'Sensed amplitude'), h('td.mono', 'P ' + c.pAmp + ' mV'), h('td.mono', 'R ' + c.rAmp + ' mV')),
+            h('tr', h('td', 'Programmed sensitivity'), h('td.mono', c.aSens + ' mV'), h('td.mono', c.vSens + ' mV')),
+            h('tr', h('td', 'Lead impedance'), h('td.mono', f.imp[0] + ' Ω'), h('td.mono', f.imp[1] + ' Ω')),
+            h('tr', h('td', 'Battery'), h('td.mono', { colSpan: 2 }, f.batt))))),
+          h('p.muted', { style: { fontSize: '12px', marginTop: '6px' } }, 'Safety margins: output ≥ 2× the voltage threshold; sensitivity setting ≤ half the measured P/R amplitude. Normal impedance ≈ 300–1200 Ω.'));
+      } }, 'Interrogate the device');
+      // ---- troubleshooting quiz ----
+      const quizEl = h('div');
+      function quizBox() {
+        quizEl.innerHTML = '';
+        if (!state.quiz) { quizEl.append(h('p.muted', 'A fault is applied without telling you which. Read the strip and markers, interrogate the device, then commit to a diagnosis.'), h('div', { style: { marginTop: '8px' } }, h('button.btn.primary', { type: 'button', onclick: startQuiz }, 'Give me a mystery fault'))); return; }
+        const q = state.quiz;
+        quizEl.append(h('p', h('b', 'Patient: '), PATIENTS[q.patient].name + '. Programmed ' + q.pm.mode + (q.pm.lrl ? ' ' + q.pm.lrl : ' 60') + '/min.'), h('p.muted', { style: { margin: '4px 0 8px' } }, 'What is wrong?'));
+        const opts = h('div.opts');
+        for (const k of q.options) {
+          const b = h('button.opt', { type: 'button', onclick: () => {
+            if (q.done) return; q.done = true;
+            for (const x of opts.children) { x.disabled = true; if (x.dataset.k === q.fault) x.classList.add('right'); }
+            if (k !== q.fault) b.classList.add('wrong');
+            const f = FAULTS[q.fault];
+            quizEl.append(h('div.note' + (k === q.fault ? '.good' : '.bad'), { style: { marginTop: '8px' } }, h('b', (k === q.fault ? 'Correct — ' : 'Not quite — ') + f.name + '. '), f.dx + '. ' + f.why + ' ', h('b', 'Fix: '), f.fix),
+              h('div', { style: { marginTop: '8px' } }, h('button.btn', { type: 'button', onclick: startQuiz }, 'Next case')));
+          } }, FAULTS[k].name);
+          b.dataset.k = k; opts.append(b);
+        }
+        quizEl.append(opts);
+      }
+      function startQuiz() {
+        const q = Object.assign({}, QUIZ[Math.floor(Math.random() * QUIZ.length)]);
+        const others = Object.keys(FAULTS).filter((k) => k !== 'none' && k !== q.fault).sort(() => Math.random() - 0.5).slice(0, 3);
+        q.options = others.concat([q.fault]).sort(() => Math.random() - 0.5); q.done = false;
+        state.quiz = q; state.patient = q.patientOverride || q.patient; state.fault = q.fault;
+        Object.assign(state.pm, EP.Pacemaker.DEF, q.pm, q.force || {}); state.pm.magnet = false; magnet.input.checked = false;
+        modeSel.value = state.pm.mode; for (const k in setters) setters[k](state.pm[k]);
+        patSel.sel ? (patSel.sel.value = q.patient) : (patSel.value = q.patient); faultSel.value = 'none'; faultInfo.innerHTML = '';
+        rebuild(); quizBox();
+      }
+      const ref = h('div.two',
+        h('section.card', h('div.card-h', h('h3', 'Is it working? A five-question read')), h('div.card-b.prose', h('ol', { style: { margin: 0, paddingLeft: '1.2em' } },
+          h('li', h('b', 'Is there output when there should be? '), 'No interval between ventricular events should exceed the lower rate interval. A pause without a spike = over-sensing or an open circuit.'),
+          h('li', h('b', 'Does every stimulus capture? '), 'Atrial spike → P wave. Ventricular spike → wide QRS with a T wave, and a pulse. A spike followed by nothing while the tissue is excitable = failure to capture.'),
+          h('li', h('b', 'Does it sense? '), 'Intrinsic P and R waves should reset the timers (AS/VS markers). Spikes marching through native beats = under-sensing.'),
+          h('li', h('b', 'Is the AV relationship as programmed? '), 'AS–VP at the sensed AV delay, AP–VP at the paced AV delay, never faster than the upper tracking rate.'),
+          h('li', h('b', 'Does the paced QRS fit the lead position? '), 'RV apex → LBBB pattern with a superior axis. A new RBBB pattern asks where the lead is (see Devices).')))),
+        h('section.card', h('div.card-h', h('h3', 'Timing cycles')), h('div.card-b.prose',
+          h('p', h('b', 'Lower rate interval (LRI): '), 'longest time allowed between ventricular events. '), h('p', h('b', 'AV delay: '), 'the device\'s PR interval. Sensed AVD is shorter than paced because the P wave is detected after atrial activation has begun.'),
+          h('p', h('b', 'PVARP: '), 'after each ventricular event the atrial channel ignores signals for tracking, so retrograde P waves and far-field R waves cannot trigger a paced beat.'),
+          h('p', h('b', 'TARP = AVD + PVARP: '), 'atrial rates faster than 60 000 / TARP are tracked 2:1. Between the upper tracking rate and the 2:1 rate the device Wenckebachs.'),
+          h('p', h('b', 'VRP and blanking: '), 'windows in which the ventricular channel ignores its own stimulus, the evoked response and the T wave.'))),
+        h('section.card', h('div.card-h', h('h3', 'NBG code')), h('div.card-b.scroll-x', h('table.tbl', h('tbody', NBG.map(([a, b]) => h('tr', h('td', h('b', a)), h('td', b))))))),
+        h('section.card', h('div.card-h', h('h3', 'Modes')), h('div.card-b.scroll-x', h('table.tbl', h('tbody', MODES.map(([a, b]) => h('tr', h('td.mono', h('b', a)), h('td', b))))))));
+
+      root.append(h('div.sim',
+        h('div.sim-main',
+          h('section.card', h('div.card-h', h('h2', 'Live strip — lead II, arterial line, marker channel'), h('span.grow'), rateEl, freeze), liveBox,
+            h('div.card-b', h('p.muted', { style: { fontSize: '12px' } }, 'Markers: AS/VS sensed, AP/VP paced, AR atrial sense inside the refractory period, MS mode switch. Bars show when each timer is running.'))),
+          h('section.card', h('div.card-h', h('h3', 'What the strip shows'), h('span.grow'), interBtn), h('div.card-b', findEl, h('div', { style: { marginTop: '10px' } }, interEl))),
+          h('section.card', h('div.card-h', h('h3', 'Troubleshooting practice')), h('div.card-b', quizEl)),
+          ref),
+        h('div.sim-main',
+          h('section.card', h('div.card-h', h('h3', 'Patient')), h('div.card-b', patSel)),
+          h('section.card', h('div.card-h', h('h3', 'Programming')), h('div.card-b', ctl, magnet)),
+          h('section.card', h('div.card-h', h('h3', 'Introduce a fault')), h('div.card-b', faultSel, faultInfo)))));
+      rebuild(); quizBox();
+      return { unmount() { live.destroy(); if (strip.ro) strip.ro.disconnect(); } };
+    },
+  });
+})(globalThis.EP = globalThis.EP || {});
+
+
+/* ---- js/ui-temp.js ---- */
+/* EP Simulator — Temporary pacing: transvenous box (rate / output mA / sensitivity mV) and
+ * transcutaneous pacing (rate / current mA), with capture and sensing threshold drills. */
+(function (EP) {
+  'use strict';
+  const h = EP.h, UI = EP.UI, Mo = EP.Morph;
+  const CHB = () => ({ fast: { block: true, retro: { block: true } } });
+  const PATIENTS = {
+    chb: { name: 'Complete heart block, wide escape 30/min, BP 74/40', intrinsic: 30, cfg: () => ({ sinus: { cl: 760 }, avn: CHB(), foci: [{ id: 'esc', node: 'V', cl: 2000, site: 'fascPost', label: 'escape', startAt: 600, sd: 0.02 }] }) },
+    brady: { name: 'Sinus bradycardia 42/min after beta-blocker overdose', intrinsic: 42, cfg: () => ({ sinus: { cl: 1430, resp: 0.02 } }) },
+    asys: { name: 'Ventricular standstill — P waves only', intrinsic: 0, cfg: () => ({ sinus: { cl: 700 }, avn: CHB() }) },
+    af: { name: 'Slow atrial fibrillation 36/min (digoxin toxicity)', intrinsic: 36, cfg: () => ({ sinus: { on: false }, atria: { mode: 'fib' }, avn: { fast: { erp: 1500, conceal: 0.08 } } }) },
+  };
+
+  EP.Modules = EP.Modules || [];
+  EP.Modules.push({
+    id: 'temp', title: 'Temporary pacing',
+    mount(root) {
+      const st = { kind: 'tv', patient: 'chb', rate: 70, out: 0, sens: 2, async: false, on: false, thr: 0.9, rAmp: 7, minCap: null, lostAt: null, sawUnder: false, capRun: 0 };
+      let sim, dev, live, lastHandled = 0;
+      const canvas = h('canvas', { 'aria-label': 'Monitor: lead II and arterial pressure' });
+      const liveBox = h('div.live', canvas);
+      const strip = new EP.LiveStrip(canvas, { channels: [{ lead: 1 }, { key: 'pulse', label: 'Arterial pressure' }], windowMs: 8000, rowMm: 24 });
+      const vit = h('div.vitals'), steps = h('div.findings'), lcd = h('div.box-lcd'), boxCtl = h('div.ctl'), status = h('div.findings');
+      const paceLight = h('span.pill', 'PACE'), senseLight = h('span.pill', 'SENSE');
+
+      function newPatient() {
+        const tv = st.kind === 'tv';
+        st.thr = tv ? +(0.5 + Math.random() * 1.1).toFixed(1) : Math.round(48 + Math.random() * 44);
+        st.rAmp = +(4 + Math.random() * 7).toFixed(1);
+        st.minCap = null; st.lostAt = null; st.sawUnder = false; st.capRun = 0; st.on = false; st.out = tv ? 0 : 0; st.sens = 2; st.async = false; st.rate = tv ? 70 : 70;
+      }
+      function cfg() {
+        const tv = st.kind === 'tv';
+        return {
+          mode: !st.on ? 'OFF' : (st.async ? 'VOO' : 'VVI'), lrl: st.rate, vOut: st.out, vThr: st.thr, vSens: st.sens, rAmp: st.rAmp, tAmp: 0.9, vrp: 250,
+          kind: tv ? 'temp' : 'tcp', tcpArtifact: !tv, vSite: tv ? 'rvApex' : 'rvFreeWall', vSpec: tv ? null : Mo.fuse([{ spec: Mo.spec('rvFreeWall'), t: 0 }, { spec: Mo.spec('lvAntWall'), t: 6 }]),
+        };
+      }
+      function rebuild() {
+        sim = new EP.HeartSim(PATIENTS[st.patient].cfg());
+        dev = new EP.Pacemaker(sim, cfg());
+        lastHandled = 0;
+        if (live) live.setSim(sim); else live = new EP.Live({ sim, strips: [strip], pulse: true, onTick: tick }).start();
+        drawBox();
+      }
+      function apply() { dev.set(cfg()); drawLcd(); }
+      function drawLcd() {
+        const tv = st.kind === 'tv';
+        lcd.innerHTML = '';
+        lcd.append(h('div', 'RATE', h('b', st.on ? String(st.rate) : '--'), 'ppm'), h('div', 'OUTPUT', h('b', st.on ? (tv ? st.out.toFixed(1) : String(st.out)) : '--'), 'mA'),
+          tv ? h('div', 'SENSITIVITY', h('b', st.async ? 'ASYNC' : st.sens.toFixed(1)), st.async ? '' : 'mV') : h('div', 'MODE', h('b', st.async ? 'FIXED' : 'DEMAND'), ''));
+      }
+      function slider(label, key, min, max, step, fmt) {
+        const val = h('span.val', fmt(st[key]));
+        const inp = h('input', { type: 'range', min, max, step, value: st[key], 'aria-label': label, oninput: () => { st[key] = +inp.value; val.textContent = fmt(st[key]); apply(); } });
+        boxCtl.append(h('label', label), val, inp);
+      }
+      function drawBox() {
+        const tv = st.kind === 'tv';
+        boxCtl.innerHTML = '';
+        slider('Rate', 'rate', 30, 180, 5, (v) => v + ' ppm');
+        if (tv) { slider('Output', 'out', 0, 20, 0.1, (v) => v.toFixed(1) + ' mA'); slider('Sensitivity (higher mV = less sensitive)', 'sens', 0.4, 20, 0.2, (v) => v.toFixed(1) + ' mV'); }
+        else slider('Current', 'out', 0, 160, 2, (v) => v + ' mA');
+        drawLcd();
+      }
+      const onBtn = h('button.btn.primary', { type: 'button', onclick: () => { st.on = !st.on; onBtn.textContent = st.on ? 'Pacing ON — turn off' : 'Start pacing'; apply(); } }, 'Start pacing');
+      const asyncChk = UI.check('Asynchronous (fixed rate, no sensing)', false, (v) => { st.async = v; apply(); });
+      function flash(el) { el.classList.add('good'); setTimeout(() => el.classList.remove('good'), 160); }
+
+      function tick(t) {
+        // lights + bookkeeping from new events
+        for (const e of sim.out) {
+          if (e.t <= lastHandled || e.t > t) continue;
+          if (e.type === 'spike') {
+            flash(paceLight);
+            if (e.captured) { st.capRun++; if (st.minCap == null || st.out < st.minCap) st.minCap = st.out; }
+            else { const q = sim.out.filter((x) => x.type === 'QRS' && e.t - x.t > 0 && e.t - x.t < 330).length; if (!q) { st.capRun = 0; if (st.minCap != null && st.out < st.minCap) st.lostAt = st.out; } else st.sawUnder = true; }
+          }
+          if (e.type === 'mark' && e.text === 'VS') flash(senseLight);
+        }
+        lastHandled = t;
+        if (Math.floor(t / 600) === Math.floor((t - 20) / 600)) return;
+        // vitals from the last 6 s
+        const q = sim.out.filter((e) => e.type === 'QRS' && e.t > t - 6000 && e.t < t - 150);
+        const hr = q.length > 1 ? Math.round(60000 / ((q[q.length - 1].t - q[0].t) / (q.length - 1))) : (q.length ? 10 : 0);
+        const bp = hr === 0 ? [0, 0] : hr < 36 ? [72, 38] : hr < 50 ? [84, 46] : hr <= 110 ? [108, 62] : hr <= 150 ? [96, 60] : [78, 50];
+        vit.innerHTML = '';
+        vit.append(h('div', h('div.k', 'Pulse'), h('div.v' + (hr < 45 ? '.bad' : ''), String(hr))), h('div', h('div.k', 'Arterial BP'), h('div.v' + (bp[0] < 90 ? '.bad' : ''), bp[0] ? bp[0] + '/' + bp[1] : '—')),
+          h('div', h('div.k', 'Perfusion'), h('div.v' + (bp[0] < 90 ? '.bad' : ''), { style: { fontSize: '13px' } }, bp[0] === 0 ? 'pulseless' : bp[0] < 90 ? 'cool, confused' : 'improving')));
+        drawSteps(t, hr);
+      }
+      function row(done, title, text) { return h('div.finding', h('span.pill' + (done ? '.good' : ''), done ? 'done' : 'to do'), h('div', h('b', title), h('div.muted', text))); }
+      function drawSteps(t, hr) {
+        const tv = st.kind === 'tv', intr = PATIENTS[st.patient].intrinsic;
+        const sp = sim.out.filter((e) => e.type === 'spike' && e.t > t - 5000), cap = sp.filter((e) => e.captured).length;
+        const capturing = st.on && sp.length >= 3 && cap >= sp.length - 1;
+        steps.innerHTML = ''; status.innerHTML = '';
+        const thrFound = st.minCap != null && st.lostAt != null;
+        if (tv) {
+          steps.append(
+            row(st.on && st.rate >= intr + 10, 'Set the rate 10–20/min above the intrinsic rate', 'You cannot judge capture unless the device is pacing faster than the patient.'),
+            row(capturing || thrFound, 'Raise the output until every spike captures', 'Capture = a wide QRS with a discordant T wave immediately after each spike, and a pulse with it.'),
+            row(thrFound, 'Find the capture threshold', thrFound ? `Lowest output that captured: ${st.minCap.toFixed(1)} mA (capture was lost at ${st.lostAt.toFixed(1)} mA).` : 'Turn the output down slowly until spikes stop producing QRS complexes, then back up. The threshold is the lowest output with 1:1 capture — ideally < 1 mA for a well-placed wire.'),
+            row(thrFound && capturing && st.out >= 2 * st.minCap && st.out <= Math.max(4 * st.minCap, 3), 'Leave the output at 2–3 × threshold', 'A safety margin for threshold rise (oedema, drugs, hyperkalaemia, lead movement). Re-check the threshold every shift.'),
+            intr > 0 ? row(st.sawUnder || st.sens > st.rAmp, 'Find the sensing threshold', 'Drop the pacing rate below the intrinsic rate, then turn the sensitivity dial toward higher mV until the SENSE light stops and the box paces across native beats. That value is the R-wave amplitude it can see.') : null,
+            intr > 0 ? row((st.sawUnder || st.sens > st.rAmp || true) && !st.async && st.sens <= st.rAmp / 2 && st.sens >= 1, 'Set sensitivity to half the sensing threshold', `Typical setting ≈ 2 mV. Too high a number → under-sensing (pacing on T waves). Too low → over-sensing of T waves or muscle (inappropriate inhibition).`) : null);
+        } else {
+          steps.append(
+            row(st.on && st.rate >= 60, 'Pads on, rate 60–80/min', 'Anterior–posterior (left parasternal + left infrascapular) or anterior–lateral. Keep the monitor leads away from the pads.'),
+            row(capturing, 'Increase the current until electrical capture', 'Every stimulus is followed by a wide QRS AND a broad T wave. The stimulus artefact alone can look like a QRS — look for the T wave.'),
+            row(capturing && hr >= 55, 'Confirm mechanical capture', 'A pulse with every paced beat: arterial line or pulse-oximeter waveform, or a femoral pulse (the neck twitches with every stimulus and misleads you).'),
+            row(capturing && st.minCap != null && st.out >= st.minCap + 4 && st.out <= st.minCap + 22, 'Set the current about 10% (5–10 mA) above threshold', st.minCap != null ? `Lowest current that captured so far: ${st.minCap} mA.` : 'Typical thresholds are 40–80 mA; higher with obesity, COPD, effusions or poor pad contact.'),
+            row(false, 'Analgesia, sedation, and plan the next step', 'Transcutaneous pacing is painful and unreliable beyond minutes to hours: it is a bridge to a transvenous wire or to the reversible cause being treated.'));
+        }
+        if (st.on && sp.length >= 3) {
+          if (capturing) status.append(h('div.note.good', h('b', 'Capturing. '), tv ? 'Spike → wide QRS (LBBB pattern from the RV apex) → pulse.' : 'Artefact → wide QRS with T wave → arterial upstroke.'));
+          else if (cap === 0) status.append(h('div.note.bad', h('b', 'No capture. '), tv ? 'Spikes without QRS complexes. Increase the output; if > 5–10 mA is needed the wire has moved — reposition, check connections and battery.' : 'Stimulus artefacts without a T wave or a pulse. Increase the current; check pad contact and position.'));
+          else status.append(h('div.note', h('b', 'Intermittent capture. '), 'You are sitting at threshold. This is where an unsupervised patient loses pacing — raise the output.'));
+          const under = sim.out.some((e) => e.type === 'spike' && e.t > t - 5000 && !e.captured && sim.out.some((x) => x.type === 'QRS' && e.t - x.t > 0 && e.t - x.t < 330));
+          if (under && !st.async) status.append(h('div.note.bad', h('b', 'Under-sensing. '), 'Spikes are landing on the ST-T of native beats: the R wave is smaller than the sensitivity setting. Turn sensitivity to a LOWER mV value. A stimulus on the T wave can start VF.'));
+          if (st.async && intr > 0) status.append(h('div.note', h('b', 'Asynchronous. '), 'The box ignores the patient\'s own beats. Acceptable in standstill; with an underlying rhythm it risks R-on-T.'));
+        } else if (!st.on) status.append(h('div.muted', 'The device is off. The patient is on the monitor with their own rhythm.'));
+        if (st.on && tv && !st.async && st.sens < 1) status.append(h('div.note', h('b', 'Very sensitive setting. '), 'Below about 1 mV the box may count T waves, P waves or muscle noise as R waves and withhold pacing.'));
+      }
+
+      const kindSeg = UI.seg([['tv', 'Transvenous wire'], ['tc', 'Transcutaneous pads']], st.kind, (v) => { st.kind = v; newPatient(); onBtn.textContent = 'Start pacing'; asyncChk.input.checked = false; teach(); rebuild(); }, 'Pacing method');
+      const patSel = UI.select(null, Object.keys(PATIENTS).map((k) => [k, PATIENTS[k].name]), st.patient, (v) => { st.patient = v; newPatient(); onBtn.textContent = 'Start pacing'; asyncChk.input.checked = false; rebuild(); });
+      patSel.setAttribute('aria-label', 'Patient'); patSel.style.width = '100%';
+      const teachEl = h('div.card-b.prose');
+      function teach() {
+        teachEl.innerHTML = '';
+        if (st.kind === 'tv') teachEl.append(
+          h('h4', 'The three dials'), UI.list(['RATE — pulses per minute. Set above the intrinsic rate to take over; for overdrive suppression of torsades use 90–110.', 'OUTPUT (mA) — current delivered. The capture threshold is the smallest current that reliably depolarises the ventricle; aim < 1 mA at insertion, run at 2–3× threshold.', 'SENSITIVITY (mV) — the smallest signal the box will call an R wave. It is a fence height: a HIGHER number is a higher fence, so fewer signals get over (less sensitive). Fully clockwise is ASYNC: no sensing at all.']),
+          h('h4', 'Getting the wire there'), UI.list(['Right internal jugular or left subclavian give the straightest route to the RV apex. Balloon-tipped wires float with flow; advance with the balloon up, deflate once across the tricuspid valve.', 'ECG guidance from the tip: large P waves in the RA, large QRS in the RV, ST elevation (injury current) when the tip touches endocardium.', 'Correct position paces with an LBBB pattern and superior axis (negative II, III, aVF). An RBBB pattern suggests the coronary sinus, septal perforation or the left ventricle.']),
+          h('h4', 'When it stops working'), UI.list(['Spike, no QRS: threshold has risen or the wire has moved — increase output, turn the patient on the left side, reposition.', 'No spike: disconnected cable, flat battery, or over-sensing — switch to ASYNC as a test.', 'Spikes on T waves: under-sensing — lower the mV number.', 'Hiccups or abdominal twitching: diaphragmatic pacing; suspect perforation if new.']));
+        else teachEl.append(
+          h('h4', 'What counts as capture'), UI.list(['Electrical: each pacing artefact is followed by a wide QRS and — the part people miss — a tall, broad T wave.', 'Mechanical: a pulse with each one. Use the arterial line or the pulse-oximeter waveform; the carotid is unreliable because the neck muscles jerk with every stimulus.', 'The artefact has an after-potential that looks like a QRS. If the "QRS" has no T wave and there is no pulse, it is artefact.']),
+          h('h4', 'Settings'), UI.list(['Demand mode at 60–80/min for bradycardia; start at 0 mA and climb in 5–10 mA steps (in arrest, start at maximum and come down).', 'Typical threshold 40–80 mA; set 10% above it.', 'Fixed (asynchronous) mode only if artefact prevents sensing.']),
+          h('h4', 'Limits'), UI.list(['Painful: give analgesia and sedation as blood pressure allows.', 'Failure to capture: pad position, poor contact, large chest, pneumothorax, pericardial effusion, acidosis, hyperkalaemia.', 'It buys time. Atropine and chronotropes (epinephrine, dopamine, isoprenaline) run in parallel while a transvenous wire or definitive treatment is arranged.']));
+      }
+      root.append(h('div.sim',
+        h('div.sim-main',
+          h('section.card', h('div.card-h', h('h2', 'Bedside monitor'), h('span.grow'), paceLight, senseLight), liveBox, h('div.card-b', vit)),
+          h('section.card', h('div.card-h', h('h3', 'Procedure')), h('div.card-b', steps, h('div.findings', { style: { marginTop: '10px' } }, status))),
+          h('section.card', h('div.card-h', h('h3', 'Notes')), teachEl)),
+        h('div.sim-main',
+          h('section.card', h('div.card-b', h('div', { style: { marginBottom: '10px' } }, kindSeg), patSel, h('div', { style: { marginTop: '8px' } }, h('button.btn.sm', { type: 'button', onclick: () => { newPatient(); onBtn.textContent = 'Start pacing'; asyncChk.input.checked = false; rebuild(); } }, 'New patient (new thresholds)')))),
+          h('section.card', h('div.card-h', h('h3', 'Pacing box')), h('div.card-b', h('div.box', lcd, boxCtl, asyncChk, onBtn))))));
+      newPatient(); teach(); rebuild();
+      return { unmount() { live.destroy(); if (strip.ro) strip.ro.disconnect(); } };
     },
   });
 })(globalThis.EP = globalThis.EP || {});

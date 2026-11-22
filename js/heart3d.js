@@ -61,6 +61,7 @@
     base: { az: 2.6, el: 0.75, dist: 44, target: [0.6, 0.2, -1.2] },
     inferior: { az: 0.5, el: -1.1, dist: 46, target: [1.5, -1, 0] },
     chest: { az: 0, el: 0.02, dist: 120, target: [0, 3, -2] },
+    device: { az: 0.12, el: 0.06, dist: 84, target: [2.6, 5.2, 0] },
     chestLat: { az: 1.5708, el: 0.02, dist: 120, target: [0, 3, -2] },
   };
 
