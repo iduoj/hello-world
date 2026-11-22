@@ -1,0 +1,103 @@
+# EP Simulator — Project Plan & Working Notes
+
+> Living document. Read this first after any context loss. Update the
+> **Status** section at the end of each work block.
+
+## Goal (from the user's brief)
+A teaching-first 12-lead ECG / electrophysiology simulator:
+
+1. 12-lead ECG simulator with common arrhythmias: polymorphic VT / torsades,
+   monomorphic VT, AVNRT, AVRT, AF, flutter, blocks, etc.
+2. Rotatable 3D heart with an electrical (activation) map tied to each rhythm,
+   plus other mechanism tools (ladder diagrams, calipers, explanations).
+3. Devices: pacemakers (single/dual chamber, CRT, LBB-area pacing, leadless
+   Micra VR/AV, AVEIR VR/AR/DR) and ICDs (transvenous, S-ICD, EV-ICD):
+   lead positions in 3D, simulated chest X-ray in correct vs incorrect
+   positions and what gives it away.
+4. Localisation from the 12-lead: paced QRS by pacing site, PVC/VT origin,
+   accessory pathway.
+5. Drug overdose / electrolyte ECG effects.
+6. Patient scenarios: pharmacologic vs electrical management.
+7. Pacemaker troubleshooting: modes, timing cycles, what "working properly"
+   looks like, malfunctions.
+8. Temporary pacing: transcutaneous + transvenous (mA, capture, sensitivity).
+
+Assumed audience: clinician learner (resident / fellow / advanced nurse / PA).
+Delivery: static web app (no server), works in a browser, also published as a
+Claude artifact.
+
+## Core design decision
+One physical model drives everything, so the ECG, the 3D map and the
+localisation tools always agree:
+
+- **Anatomy** is procedural (signed-distance fields → surface-nets mesh). No
+  external assets.
+- **Ventricular activation**: voxel model of the myocardium with a fast
+  endocardial (Purkinje) layer; multi-source Dijkstra gives local activation
+  time (LAT) for any set of sources (His-Purkinje exits, PVC focus, pacing
+  lead tip, accessory pathway insertion).
+- **ECG**: the heart dipole is the sum of LAT gradients (uniform double
+  layer); T wave from the ventricular-gradient rule (T area = G − QRS area),
+  so wide/ectopic beats get discordant T waves automatically. Dipole → 12
+  leads through the Dower matrix.
+- **Atria**: surface-mesh geodesic activation → P-wave dipole.
+- **Rhythm**: discrete-event conduction simulator (SA node, atria, dual
+  AV-node pathways, His/ventricles, accessory pathway, ectopic foci, device)
+  with delays + refractory periods. Re-entry, Wenckebach, PMT etc. emerge
+  from it; drugs/shocks/pacing are parameter changes or injected events.
+
+## Coordinates
+World, centimetres: **+x = patient's left, +y = superior, +z = anterior**.
+Viewer faces the patient (patient's left on screen right), same as a PA film.
+Heart-local frame: A = LV long axis (base→apex), S = LV→RV (septal normal),
+N = A×S (points to the inferior wall). `G.L(s,n,a)` maps local → world.
+
+## Code layout (plain scripts, global `EP` namespace, no build needed)
+See docs/ARCHITECTURE.md for module APIs.
+
+    index.html            app shell, loads css + js in order
+    css/app.css
+    js/util.js            vec math, RNG, helpers
+    js/geometry.js        SDF anatomy, landmarks, surface nets mesher
+    js/model.js           voxel ventricles, atrial graph, Dijkstra, dipoles
+    js/morph.js           beat waveforms (P/QRS/T), modifiers, Dower leads
+    js/heartsim.js        discrete-event conduction simulator
+    js/device.js          pacemaker / ICD / temporary pacer logic
+    js/rhythms.js         rhythm library presets + teaching text
+    js/ecgview.js         canvas ECG paper, 12-lead, strips, ladder, calipers
+    js/heart3d.js         three.js scene, activation animation, labels
+    js/devices3d.js       leads, generators, torso, chest X-ray mode
+    js/ui-*.js            app modules (one per tab)
+    js/content-*.js       teaching content (scenarios, tox, device notes)
+    tools/build.mjs       bundles to dist/ single-file + artifact fragment
+    tools/shot.mjs        Playwright screenshot / smoke-test harness
+
+## Modules (tabs)
+1. Rhythm Lab — library, 12-lead, rhythm strip, ladder diagram, calipers,
+   synced 3D activation map, mechanism notes.
+2. Localisation Lab — click-the-heart PVC/VT origin, accessory pathway,
+   pacing-site QRS; rules + quiz.
+3. Devices — device explorer: 3D leads + simulated CXR (PA/lateral),
+   correct vs malpositioned, paced 12-lead.
+4. Pacemaker Simulator — modes, timing cycles, marker channel,
+   malfunctions, troubleshooting cases, magnet.
+5. Temporary Pacing — transcutaneous + transvenous boxes (rate, mA, mV).
+6. ICD — zones, discriminators, ATP/shock, inappropriate therapy.
+7. Tox & Electrolytes — severity sliders, patterns, antidotes.
+8. Scenarios — cases with live monitor; drugs vs electricity; debrief.
+9. Quiz — rhythm identification.
+
+## Testing
+- cdnjs is blocked in the dev sandbox; three.js r128 is fetched from npm into
+  the scratchpad and Playwright routes the CDN URL to it (tools/shot.mjs).
+- Pure-logic modules run under Node (they only touch `globalThis.EP`).
+
+## Status log
+- [ ] Block 1: geometry + activation model + ECG synthesis
+- [ ] Block 2: ECG renderer + rhythm engine + library
+- [ ] Block 3: 3D heart + sync
+- [ ] Block 4: app shell + Rhythm Lab
+- [ ] Block 5: devices (3D, CXR), pacemaker sim, temp pacing, ICD
+- [ ] Block 6: localisation lab
+- [ ] Block 7: tox, scenarios, quiz
+- [ ] Block 8: bundle, publish artifact, PR
