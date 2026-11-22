@@ -103,6 +103,17 @@ See docs/ARCHITECTURE.md for module APIs.
 - [x] Block 7: tox & electrolytes, cases, quiz
 - [x] Block 8: bundle, artifact published, draft PR #4
 
+### Round 2 (user feedback: fellow level is right; wants more self-testing to find gaps; expand STEMI)
+- [ ] Ischaemia engine: voxel territories → injury (ST) vector from transmural directions, scar mask for
+      Q waves, extra leads V4R/V7–V9, PR depression, custom ST shapes (`js/ischemia.js`)
+- [ ] STEMI / OMI tab (`js/ui-stemi.js`): occlusion by artery with evolution slider, coronary tree +
+      territory on the 3D heart, subtle OMI patterns (hyperacute T, de Winter, precordial swirl, South
+      African flag, Aslanger, Wellens, posterior), LBBB / paced + modified Sgarbossa calculator, mimics
+- [ ] Assessment tab (`js/ui-assess.js`, replaces the simple quiz): mixed-domain fellow-level questions
+      (generated ECG items + written MCQs), confidence rating, per-domain gap map, history in
+      localStorage and in the artifact `db` capability (collection `assessment`) so results can be read
+      back to tailor later content
+
 ### Ideas not done yet (candidates for the next round)
 - Rate response (R) and AV-search / minimised-ventricular-pacing algorithms in the pacemaker sim
 - Intracardiac electrogram channels (A/V EGM) beside the marker channel
