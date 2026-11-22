@@ -93,11 +93,17 @@ See docs/ARCHITECTURE.md for module APIs.
 - Pure-logic modules run under Node (they only touch `globalThis.EP`).
 
 ## Status log
-- [ ] Block 1: geometry + activation model + ECG synthesis
-- [ ] Block 2: ECG renderer + rhythm engine + library
-- [ ] Block 3: 3D heart + sync
-- [ ] Block 4: app shell + Rhythm Lab
-- [ ] Block 5: devices (3D, CXR), pacemaker sim, temp pacing, ICD
+- [x] Block 1: geometry + activation model + ECG synthesis (model-derived QRS validated visually)
+- [x] Block 2: ECG renderer + rhythm engine + library (40 rhythms)
+- [x] Block 3: 3D heart + sync
+- [x] Block 4: app shell + Rhythm Lab; first artifact published
+- [ ] Block 5: devices (3D leads, CXR), pacemaker sim, temp pacing, ICD
 - [ ] Block 6: localisation lab
 - [ ] Block 7: tox, scenarios, quiz
-- [ ] Block 8: bundle, publish artifact, PR
+- [ ] Block 8: final polish, PR
+
+### Notes for whoever resumes
+- Hemiblock axis shift is boosted by small additive lobes (`LOBES` in morph.js) — the uniform
+  Purkinje sheet alone under-shifts the axis. Everything else is pure model output.
+- Normal frontal axis ≈ +30°; normal QRS 78 ms (visible), PR ≈ 160 ms.
+- Sandbox blocks cdnjs: tests map the three.js URL to the npm copy (tools/shot.mjs).
