@@ -146,13 +146,14 @@
     const reg = (k) => { let b = null; for (const q of parts) { const f = q.spec[k] != null ? q.spec[k] : (q.spec.purkLV == null ? 1 : q.spec.purkLV); b = b == null ? f : Math.max(b, f); } return b; };
     if (parts.some((q) => q.spec.purkLVant != null || q.spec.purkLVpost != null)) { sp.purkLVant = reg('purkLVant'); sp.purkLVpost = reg('purkLVpost'); }
     if (vm) { sp.vm = vm; sp.vp = vp; }
+    const sc = parts.find((q) => q.spec.scar); if (sc) sp.scar = sc.spec.scar;
     return sp;
   };
 
   // ---- ventricular activation (cached) --------------------------------------------------------
   const vcache = new Map();
   function specKey(sp) {
-    let k = (sp.purkLV == null ? 1 : sp.purkLV) + '|' + (sp.purkRV == null ? 1 : sp.purkRV) + '|' + (sp.purkLVant == null ? '' : sp.purkLVant) + '|' + (sp.purkLVpost == null ? '' : sp.purkLVpost) + '|' + (sp.vm || 0).toFixed(4) + '|' + (sp.aniso || 0) + '|' + (sp.lobes ? sp.lobes.id : '');
+    let k = (sp.purkLV == null ? 1 : sp.purkLV) + '|' + (sp.purkRV == null ? 1 : sp.purkRV) + '|' + (sp.purkLVant == null ? '' : sp.purkLVant) + '|' + (sp.purkLVpost == null ? '' : sp.purkLVpost) + '|' + (sp.vm || 0).toFixed(4) + '|' + (sp.aniso || 0) + '|' + (sp.lobes ? sp.lobes.id : '') + '|' + (sp.scar ? sp.scar.id + ':' + sp.scar.k.toFixed(2) : '');
     for (const s of sp.seeds) k += '|' + (s.v != null ? 'v' + s.v : s.p[0].toFixed(2) + ',' + s.p[1].toFixed(2) + ',' + s.p[2].toFixed(2) + (s.kind || '')) + '@' + Math.round((s.t || 0) * 2) / 2;
     return k;
   }
@@ -162,7 +163,7 @@
     if (r) { vcache.delete(key); vcache.set(key, r); return r; }
     const seeds = sp.seeds.map((s) => ({ v: s.v != null ? s.v : M.nearest(s.p, s.kind || 'any'), t: s.t || 0 }));
     const T = M.activate(seeds, sp);
-    const d = M.dipole(T, sp.vm ? 3.2 * Math.min(3.2, M.VM / sp.vm) : 3.2);   // slowed conduction: smooth proportionally
+    const d = M.dipole(T, sp.vm ? 3.2 * Math.min(3.2, M.VM / sp.vm) : 3.2, sp.scar ? sp.scar.w : null, sp.scar ? sp.scar.k : 0);   // slowed conduction: smooth proportionally
     if (sp.lobes) {
       const sc = sp.vm ? M.VM / sp.vm : 1;
       for (const lb of sp.lobes.list) {
@@ -223,13 +224,16 @@
     const refInteg = 0.2 * 300 * 1.9;              // keeps T amplitude sane when JT gets very short
     const norm = 1 / Math.max(integ, refInteg * 0.45);
     const wide = EP.smoothstep(105, 150, qrs);
-    const stFrac = m.stFrac == null ? 0.03 + 0.3 * wide : m.stFrac;
+    const stPri = m.stFrac == null ? 0.03 : m.stFrac, stSec = m.stFrac == null ? 0.2 * wide : 0;
+    const SA = [-k * a.area[0] * ta, -k * a.area[1] * ta, -k * a.area[2] * ta];
     const st = m.st || [0, 0, 0];
-    const stFn = m.stShape === 'scoop' ? stScoop : stPlateau;
+    const stFn = typeof m.stShape === 'function' ? m.stShape : m.stShape === 'scoop' ? stScoop : stPlateau;
     for (let i = 0; i < J; i++) {
       const tau = i / jt, q = (jIdx + i) * 3;
-      const tv = tShape(tau, p, sl, sr) * norm, sv = stPlateau(tau) * stFrac * norm, s2 = stFn(tau);
-      w[q] += TA[0] * (tv + sv) + st[0] * s2; w[q + 1] += TA[1] * (tv + sv) + st[1] * s2; w[q + 2] += TA[2] * (tv + sv) + st[2] * s2;
+      // T wave; a small primary ST component; and, for wide beats, a secondary ST shift that is purely
+      // opposite to the QRS area — so ST/S stays proportionate lead by lead ("appropriate discordance").
+      const tv = tShape(tau, p, sl, sr) * norm, pl = stPlateau(tau) * norm, s2 = stFn(tau), sv = pl * stPri, ss = pl * stSec;
+      w[q] += TA[0] * (tv + sv) + SA[0] * ss + st[0] * s2; w[q + 1] += TA[1] * (tv + sv) + SA[1] * ss + st[1] * s2; w[q + 2] += TA[2] * (tv + sv) + SA[2] * ss + st[2] * s2;
     }
     // --- U wave ---
     if (m.u) {
@@ -293,9 +297,15 @@
   Mo.pwave = function (sp, o) {
     o = o || {};
     const a = Mo.atrial(sp), amp = o.amp == null ? 1 : o.amp;
-    const w = new Float32Array(a.vcg.length);
-    for (let i = 0; i < w.length; i++) w[i] = a.vcg[i] * amp;
-    return { n: a.n, pre: -a.t0, vcg: w, adds: null, dur: a.dur, act: a };
+    const ext = o.prDep ? 110 : 0, n = a.n + ext;
+    const w = new Float32Array(n * 3);
+    for (let i = 0; i < a.vcg.length; i++) w[i] = a.vcg[i] * amp;
+    if (o.prDep) {
+      // atrial injury (pericarditis): PR-segment depression along the P axis
+      const d = [0.5, -0.62, 0.32], i0 = Math.round(a.tmax - a.t0) - 10;
+      for (let i = Math.max(0, i0); i < n; i++) { const g = -o.prDep * EP.smoothstep(i0, i0 + 25, i) * (1 - EP.smoothstep(n - 22, n - 2, i)); w[i * 3] += d[0] * g; w[i * 3 + 1] += d[1] * g; w[i * 3 + 2] += d[2] * g; }
+    }
+    return { n, pre: -a.t0, vcg: w, adds: null, dur: a.dur, act: a };
   };
   Mo.aspec = function (site, speed) { return { seeds: [{ site, t: 0 }], speed }; };
 

@@ -813,7 +813,7 @@ table.tbl td { padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-
 
   /* Heart dipole time series from a LAT field. Returns { vcg: Float32Array(3n) in mV, n (ms samples),
    * t0 (ms of first sample relative to LAT zero), dur, area:[x,y,z] (mV·ms) }. */
-  M.dipole = function (T, sigma) {
+  M.dipole = function (T, sigma, scarW, scarK) {
     let tmax = 0, tmin = Infinity;
     for (let i = 0; i < nv; i++) { const t = T[i]; if (t < Infinity) { if (t > tmax) tmax = t; if (t < tmin) tmin = t; } }
     const pad = 12;
@@ -841,7 +841,7 @@ table.tbl td { padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-
       const gl = Math.sqrt(gx * gx + gy * gy + gz * gz);
       if (gl > gmax) { const k = gmax / gl; gx *= k; gy *= k; gz *= k; }
       const f = t - t0, b = Math.floor(f), w = f - b;
-      const wt = (wall[i] === 3 ? M.OTW : wall[i] === 2 ? M.RVW : 1) * (M.BASE_FADE ? EP.smoothstep(-0.35, M.BASE_FADE, va[i]) : 1) * M.KV * dV;
+      const wt = (wall[i] === 3 ? M.OTW : wall[i] === 2 ? M.RVW : 1) * (M.BASE_FADE ? EP.smoothstep(-0.35, M.BASE_FADE, va[i]) : 1) * M.KV * dV * (scarW ? 1 - scarK * scarW[i] : 1);
       const k0 = wt * (1 - w), k1 = wt * w;
       D[b * 3] += gx * k0; D[b * 3 + 1] += gy * k0; D[b * 3 + 2] += gz * k0;
       if (b + 1 < n) { D[b * 3 + 3] += gx * k1; D[b * 3 + 4] += gy * k1; D[b * 3 + 5] += gz * k1; }
@@ -850,6 +850,35 @@ table.tbl td { padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-
     const area = [0, 0, 0];
     for (let i = 0; i < n; i++) { area[0] += D[i * 3]; area[1] += D[i * 3 + 1]; area[2] += D[i * 3 + 2]; }
     return { vcg: D, n, t0, dur: tmax - tmin, tmin, tmax, area };
+  };
+
+  /* Voxel weights (0..1) for a myocardial territory described by spheres in heart-local coordinates.
+   * spheres: [[s, n, a, radius, 'rv' | undefined]] — 'rv' spheres select right-ventricular wall only. */
+  M.territory = function (spheres) {
+    const w = new Float32Array(nv);
+    for (let i = 0; i < nv; i++) {
+      let m = 0;
+      for (const sp of spheres) {
+        const rv = wall[i] >= 2;
+        if ((sp[4] === 'rv') !== rv) continue;
+        const d = Math.sqrt((vs[i] - sp[0]) ** 2 + (vn[i] - sp[1]) ** 2 + (va[i] - sp[2]) ** 2);
+        const k = 1 - EP.smoothstep(sp[3] * 0.72, sp[3], d);
+        if (k > m) m = k;
+      }
+      w[i] = m;
+    }
+    return w;
+  };
+  /* Injury-current vector of a territory: sum of transmural (endo → epi) directions. For the septum this
+   * points from the LV side to the RV side. Pass w = null for the whole left ventricle. */
+  M.injury = function (w) {
+    const o = [0, 0, 0], dV = H * H * H;
+    for (let i = 0; i < nv; i++) {
+      const k = (w ? w[i] : (wall[i] < 2 ? 1 : 0)) * (wall[i] >= 2 ? 0.45 : 1);   // thin RV wall counts less
+      if (!k) continue;
+      o[0] += tx[i] * k * dV; o[1] += ty[i] * k * dV; o[2] += tz[i] * k * dV;
+    }
+    return o;
   };
 
   /* Map each vertex of a mesh to its nearest myocardial voxel (-1 if the vertex is not ventricular). */
@@ -968,6 +997,9 @@ table.tbl td { padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-
     [-0.515, -0.157, 0.917], [0.044, -0.164, 1.387], [0.882, -0.098, 1.277],
     [1.213, -0.127, 0.601], [1.125, -0.127, 0.086], [0.831, -0.076, -0.230],
   ];
+  // additional leads: right-sided and posterior (indices 12–15)
+  L.names.push('V4R', 'V7', 'V8', 'V9');
+  L.vec.push([-0.62, -0.1, 0.56], [0.6, -0.05, -0.5], [0.34, -0.05, -0.72], [0.08, -0.05, -0.8]);
   L.project = function (x, y, z, lead) { const v = L.vec[lead]; return v[0] * x + v[1] * y + v[2] * z; };
 })(globalThis.EP = globalThis.EP || {});
 
@@ -1121,13 +1153,14 @@ table.tbl td { padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-
     const reg = (k) => { let b = null; for (const q of parts) { const f = q.spec[k] != null ? q.spec[k] : (q.spec.purkLV == null ? 1 : q.spec.purkLV); b = b == null ? f : Math.max(b, f); } return b; };
     if (parts.some((q) => q.spec.purkLVant != null || q.spec.purkLVpost != null)) { sp.purkLVant = reg('purkLVant'); sp.purkLVpost = reg('purkLVpost'); }
     if (vm) { sp.vm = vm; sp.vp = vp; }
+    const sc = parts.find((q) => q.spec.scar); if (sc) sp.scar = sc.spec.scar;
     return sp;
   };
 
   // ---- ventricular activation (cached) --------------------------------------------------------
   const vcache = new Map();
   function specKey(sp) {
-    let k = (sp.purkLV == null ? 1 : sp.purkLV) + '|' + (sp.purkRV == null ? 1 : sp.purkRV) + '|' + (sp.purkLVant == null ? '' : sp.purkLVant) + '|' + (sp.purkLVpost == null ? '' : sp.purkLVpost) + '|' + (sp.vm || 0).toFixed(4) + '|' + (sp.aniso || 0) + '|' + (sp.lobes ? sp.lobes.id : '');
+    let k = (sp.purkLV == null ? 1 : sp.purkLV) + '|' + (sp.purkRV == null ? 1 : sp.purkRV) + '|' + (sp.purkLVant == null ? '' : sp.purkLVant) + '|' + (sp.purkLVpost == null ? '' : sp.purkLVpost) + '|' + (sp.vm || 0).toFixed(4) + '|' + (sp.aniso || 0) + '|' + (sp.lobes ? sp.lobes.id : '') + '|' + (sp.scar ? sp.scar.id + ':' + sp.scar.k.toFixed(2) : '');
     for (const s of sp.seeds) k += '|' + (s.v != null ? 'v' + s.v : s.p[0].toFixed(2) + ',' + s.p[1].toFixed(2) + ',' + s.p[2].toFixed(2) + (s.kind || '')) + '@' + Math.round((s.t || 0) * 2) / 2;
     return k;
   }
@@ -1137,7 +1170,7 @@ table.tbl td { padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-
     if (r) { vcache.delete(key); vcache.set(key, r); return r; }
     const seeds = sp.seeds.map((s) => ({ v: s.v != null ? s.v : M.nearest(s.p, s.kind || 'any'), t: s.t || 0 }));
     const T = M.activate(seeds, sp);
-    const d = M.dipole(T, sp.vm ? 3.2 * Math.min(3.2, M.VM / sp.vm) : 3.2);   // slowed conduction: smooth proportionally
+    const d = M.dipole(T, sp.vm ? 3.2 * Math.min(3.2, M.VM / sp.vm) : 3.2, sp.scar ? sp.scar.w : null, sp.scar ? sp.scar.k : 0);   // slowed conduction: smooth proportionally
     if (sp.lobes) {
       const sc = sp.vm ? M.VM / sp.vm : 1;
       for (const lb of sp.lobes.list) {
@@ -1198,13 +1231,16 @@ table.tbl td { padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-
     const refInteg = 0.2 * 300 * 1.9;              // keeps T amplitude sane when JT gets very short
     const norm = 1 / Math.max(integ, refInteg * 0.45);
     const wide = EP.smoothstep(105, 150, qrs);
-    const stFrac = m.stFrac == null ? 0.03 + 0.3 * wide : m.stFrac;
+    const stPri = m.stFrac == null ? 0.03 : m.stFrac, stSec = m.stFrac == null ? 0.2 * wide : 0;
+    const SA = [-k * a.area[0] * ta, -k * a.area[1] * ta, -k * a.area[2] * ta];
     const st = m.st || [0, 0, 0];
-    const stFn = m.stShape === 'scoop' ? stScoop : stPlateau;
+    const stFn = typeof m.stShape === 'function' ? m.stShape : m.stShape === 'scoop' ? stScoop : stPlateau;
     for (let i = 0; i < J; i++) {
       const tau = i / jt, q = (jIdx + i) * 3;
-      const tv = tShape(tau, p, sl, sr) * norm, sv = stPlateau(tau) * stFrac * norm, s2 = stFn(tau);
-      w[q] += TA[0] * (tv + sv) + st[0] * s2; w[q + 1] += TA[1] * (tv + sv) + st[1] * s2; w[q + 2] += TA[2] * (tv + sv) + st[2] * s2;
+      // T wave; a small primary ST component; and, for wide beats, a secondary ST shift that is purely
+      // opposite to the QRS area — so ST/S stays proportionate lead by lead ("appropriate discordance").
+      const tv = tShape(tau, p, sl, sr) * norm, pl = stPlateau(tau) * norm, s2 = stFn(tau), sv = pl * stPri, ss = pl * stSec;
+      w[q] += TA[0] * (tv + sv) + SA[0] * ss + st[0] * s2; w[q + 1] += TA[1] * (tv + sv) + SA[1] * ss + st[1] * s2; w[q + 2] += TA[2] * (tv + sv) + SA[2] * ss + st[2] * s2;
     }
     // --- U wave ---
     if (m.u) {
@@ -1268,9 +1304,15 @@ table.tbl td { padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-
   Mo.pwave = function (sp, o) {
     o = o || {};
     const a = Mo.atrial(sp), amp = o.amp == null ? 1 : o.amp;
-    const w = new Float32Array(a.vcg.length);
-    for (let i = 0; i < w.length; i++) w[i] = a.vcg[i] * amp;
-    return { n: a.n, pre: -a.t0, vcg: w, adds: null, dur: a.dur, act: a };
+    const ext = o.prDep ? 110 : 0, n = a.n + ext;
+    const w = new Float32Array(n * 3);
+    for (let i = 0; i < a.vcg.length; i++) w[i] = a.vcg[i] * amp;
+    if (o.prDep) {
+      // atrial injury (pericarditis): PR-segment depression along the P axis
+      const d = [0.5, -0.62, 0.32], i0 = Math.round(a.tmax - a.t0) - 10;
+      for (let i = Math.max(0, i0); i < n; i++) { const g = -o.prDep * EP.smoothstep(i0, i0 + 25, i) * (1 - EP.smoothstep(n - 22, n - 2, i)); w[i * 3] += d[0] * g; w[i * 3 + 1] += d[1] * g; w[i * 3 + 2] += d[2] * g; }
+    }
+    return { n, pre: -a.t0, vcg: w, adds: null, dur: a.dur, act: a };
   };
   Mo.aspec = function (site, speed) { return { seeds: [{ site, t: 0 }], speed }; };
 
@@ -1491,7 +1533,7 @@ table.tbl td { padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-
       if (t - A.last < c.atria.erp) { this.emit({ t, type: 'cond', path: 'atrium', dir: o.kind === 'retro' ? 'r' : 'f', t0: t, t1: t, ok: false, why: 'refractory' }); return false; }
       A.last = t; this.acount++;
       const asp = Mo.aspec(o.site, c.atria.speed);
-      const wave = Mo.pwave(asp, { amp: c.atria.pAmp });
+      const wave = Mo.pwave(asp, { amp: c.atria.pAmp, prDep: c.atria.prDep });
       const act = wave.act;
       this.emit({ t, type: 'P', wave, site: o.site, kind: o.kind || 'sinus', act });
       this._atrialOut(t, (s) => this._latA(act, s), o.via);
@@ -1561,6 +1603,7 @@ table.tbl td { padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-
       if (V.mode !== 'normal') return false;
       let spec = c.spec;
       if (cfg.vent.slow && cfg.vent.slow !== 1 && !spec.vm) spec = Object.assign({}, spec, { vm: M.VM / cfg.vent.slow, vp: M.VP / cfg.vent.slow });
+      if (cfg.vent.scar && !spec.scar) spec = Object.assign({}, spec, { scar: cfg.vent.scar });
       const pend = V.pending;
       if (pend && t <= pend.t0 + FW) {
         const rel = t - pend.t0, a = Mo.vent(spec);
@@ -1802,7 +1845,7 @@ table.tbl td { padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-
     opts = opts || {};
     const fs = opts.fs || S.FS, dt = 1000 / fs, n = Math.max(1, Math.round((t1 - t0) / dt));
     const xyz = new Float32Array(3 * n);
-    const add = new Array(12).fill(null);
+    const add = new Array(EP.Leads.vec.length).fill(null);
     const events = [], spikes = [];
     for (const ev of sim.out) {
       if (ev.t > t1 + 50) break;
@@ -1852,7 +1895,7 @@ table.tbl td { padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-
     }
     const leads = [], Lv = EP.Leads.vec;
     const nz = opts.noise == null ? 0.006 : opts.noise, r = EP.rng(977);
-    for (let l = 0; l < 12; l++) {
+    for (let l = 0; l < Lv.length; l++) {
       const a = new Float32Array(n), v = Lv[l], ad = add[l];
       for (let i = 0; i < n; i++) a[i] = v[0] * xyz[i * 3] + v[1] * xyz[i * 3 + 1] + v[2] * xyz[i * 3 + 2] + (ad ? ad[i] : 0) + (nz ? nz * (r() - 0.5) * 2 : 0);
       leads.push(a);
@@ -2201,6 +2244,176 @@ table.tbl td { padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-
       if (best && ref.t - best.t < 700 && !ref.junctional && (ref.label === 'conducted' || ref.label === 'pre-excited')) m.pr = Math.round(ref.t + ref.wave.qrsOn - best.t);
     }
     return m;
+  };
+})(globalThis.EP = globalThis.EP || {});
+
+
+/* ---- js/ischemia.js ---- */
+/* EP Simulator — myocardial ischaemia and infarction.
+ *
+ * A coronary territory is a set of myocardial voxels. From it the model derives:
+ *   injury current  → ST vector = sum of transmural (endo → epi) directions over the territory
+ *                     (for the septum that points from the LV side to the RV side — the "precordial swirl")
+ *   infarction      → those voxels stop contributing to the QRS dipole (Q waves, lost R waves)
+ *   repolarisation  → T-wave vector along (hyperacute) or against (evolved / reperfused) the injury vector
+ * so ST elevation, reciprocal change, Q waves and T-wave evolution all follow from where the artery is blocked.
+ */
+(function (EP) {
+  'use strict';
+  const G = EP.G, M = EP.Model, Mo = EP.Morph, V = EP.V, Lds = EP.Leads;
+  const I = (EP.Isch = {});
+  const S = {   // wall segments as spheres in heart-local coordinates [s, n, a, radius]
+    septBase: [2.5, -0.8, 1.6, 2.2], septMid: [2.4, -0.7, 3.6, 2.2], septApical: [1.8, -0.5, 5.6, 2.0],
+    antBase: [0.9, -2.5, 1.5, 2.2], antMid: [0.8, -2.4, 3.6, 2.2], antApical: [0.5, -1.8, 5.6, 2.0],
+    alBase: [-1.3, -2.3, 1.6, 2.1], alMid: [-1.5, -2.1, 3.5, 2.0], apex: [0.2, 0.0, 7.6, 2.2],
+    latBase: [-2.6, 0.0, 1.5, 2.2], latMid: [-2.6, 0.2, 3.6, 2.2], latApical: [-1.9, 0.2, 5.6, 1.9],
+    ilBase: [-1.6, 2.1, 1.3, 2.1], ilMid: [-1.7, 2.0, 3.3, 2.0], postBase: [-0.4, 2.7, 1.4, 1.9],
+    infBase: [0.0, 2.65, 1.5, 2.2], infMid: [0.0, 2.55, 3.6, 2.2], infApical: [0.3, 1.9, 5.6, 1.9],
+    infSeptBase: [2.2, 1.5, 2.0, 1.5], infSeptMid: [2.1, 1.4, 4.0, 1.5],
+    rv1: [5.6, 0.6, 2.2, 2.6, 'rv'], rv2: [5.0, 2.4, 3.0, 2.4, 'rv'], rv3: [5.4, -1.2, 3.6, 2.4, 'rv'],
+  };
+  const T = (keys) => keys.split(' ').map((k) => S[k]);
+  I.TERR = {
+    ladProx: { segs: T('septBase septMid septApical antBase antMid antApical alBase alMid apex') },
+    ladMid: { segs: T('septApical antMid antApical alMid apex') },
+    ladWrap: { segs: T('septApical antMid antApical apex infApical') },
+    septal: { segs: T('septBase septMid antBase') },
+    d1: { segs: T('alBase alMid') },
+    lcx: { segs: T('latBase latMid latApical ilBase') },
+    post: { segs: T('ilBase ilMid postBase') },
+    rcaProx: { segs: T('infBase infMid infApical infSeptBase infSeptMid postBase rv1 rv2 rv3') },
+    rcaDist: { segs: T('infBase infMid infApical infSeptBase infSeptMid') },
+    lcxInf: { segs: T('infBase infMid ilBase ilMid latMid postBase') },
+    infSmall: { segs: T('infMid infSeptMid') },
+    global: { segs: [], sub: 1 },
+  };
+  const cache = {};
+  I.KST = 0.018;   // mV per unit of injury vector
+  /* → { w (voxel weights), vec (ST vector, mV, transmural injury), n } */
+  I.terr = function (name) {
+    if (cache[name]) return cache[name];
+    Mo.init();
+    const def = I.TERR[name], w = M.territory(def.segs), v = M.injury(def.segs.length ? w : new Float32Array(M.nv));
+    const t = { name, w, id: name, vec: [v[0] * I.KST, v[1] * I.KST, v[2] * I.KST] };
+    return (cache[name] = t);
+  };
+  let _sub = null;
+  /* Diffuse subendocardial ischaemia: the vector points from the epicardium toward the cavity (ST depression
+   * in most leads, elevation in aVR). */
+  I.subVec = function () { if (!_sub) { Mo.init(); const v = M.injury(null); const l = Math.hypot(v[0], v[1], v[2]) || 1; _sub = [-v[0] / l * 0.36, -v[1] / l * 0.36, -v[2] / l * 0.36]; } return _sub; };
+
+  const pw = (pts, x) => { for (let i = 0; i < pts.length - 1; i++) if (x <= pts[i + 1][0]) { const a = pts[i], b = pts[i + 1]; return a[1] + (b[1] - a[1]) * EP.clamp((x - a[0]) / (b[0] - a[0]), 0, 1); } return pts[pts.length - 1][1]; };
+  const ST_T = [[0, 0.06], [0.1, 0.28], [0.28, 1], [0.45, 1], [0.7, 0.3], [1, 0.04]];
+  const T_T = [[0, 0.9], [0.1, 1.5], [0.3, 0.75], [0.48, 0], [0.7, -0.85], [1, -0.3]];
+  const Q_T = [[0, 0], [0.28, 0], [0.62, 0.9], [1, 0.92]];
+  I.stageName = (t) => (t < 0.14 ? 'minutes — hyperacute T waves' : t < 0.5 ? 'hours — acute injury (ST elevation)' : t < 0.78 ? 'day 1–2 — Q waves, T inversion' : 'weeks — established infarct');
+  /* Build the `vent` settings (mods + scar) for a territory at an evolution stage (0..1).
+   * o: { terr, stage, amp (ST scale), sub (0..1 extra subendocardial ischaemia), st, t, q (overrides) } */
+  I.vent = function (o) {
+    const tr = o.terr ? I.terr(o.terr) : null, stage = o.stage == null ? 0.36 : o.stage, amp = o.amp == null ? 1 : o.amp;
+    const kS = o.st != null ? o.st : pw(ST_T, stage), kT = o.t != null ? o.t : pw(T_T, stage), kQ = o.q != null ? o.q : pw(Q_T, stage);
+    const vec = tr ? tr.vec.slice() : [0, 0, 0];
+    const st = [vec[0] * kS * amp, vec[1] * kS * amp, vec[2] * kS * amp];
+    if (o.sub) { const sv = I.subVec(); st[0] += sv[0] * o.sub; st[1] += sv[1] * o.sub; st[2] += sv[2] * o.sub; }
+    const mods = { st, tAdd: [vec[0] * kT * amp * 135, vec[1] * kT * amp * 135, vec[2] * kT * amp * 135] };
+    if (stage < 0.2 && o.t == null) mods.tShape = { p: 0.68, sl: 0.24, sr: 0.15 };
+    const out = { mods };
+    if (tr && kQ > 0.02) out.scar = { w: tr.w, k: kQ, id: tr.id };
+    return out;
+  };
+
+  // ---- coronary tree (drawn on the epicardial surface) -------------------------------------------------
+  function proj(p) {
+    // push a point onto the epicardial surface (a little outside it)
+    let q = p.slice();
+    for (let it = 0; it < 5; it++) {
+      const e = 0.06, d = G.sdMuscle(q[0], q[1], q[2]);
+      let g = [G.sdMuscle(q[0] + e, q[1], q[2]) - G.sdMuscle(q[0] - e, q[1], q[2]), G.sdMuscle(q[0], q[1] + e, q[2]) - G.sdMuscle(q[0], q[1] - e, q[2]), G.sdMuscle(q[0], q[1], q[2] + e) - G.sdMuscle(q[0], q[1], q[2] - e)];
+      g = V.norm(g); q = V.addS(q, g, -(d - 0.14));
+    }
+    return q;
+  }
+  const qf = (a) => (a < 0.9 ? Math.sqrt(Math.max(0.05, 1 - ((0.9 - a) / 2.2) ** 2)) : Math.sqrt(Math.max(0.03, 1 - ((a - 0.9) / 7.6) ** 2)));
+  const lvPt = (deg, a, r) => { const q = qf(a) * (r || 3.2), th = (deg * Math.PI) / 180; return G.L(q * Math.cos(th), q * Math.sin(th), a); };
+  const mr = (deg) => V.addS(G.ringPoint(G.ANNULI.mitral, (deg * Math.PI) / 180, 1.9), G.A, -0.3);
+  const tr = (deg) => V.addS(G.ringPoint(G.ANNULI.tricuspid, (deg * Math.PI) / 180, 1.45), G.A, -0.2);
+  let _cor = null;
+  /* → { id: { name, pts (world), r, septal } } */
+  I.coronaries = function () {
+    if (_cor) return _cor;
+    const P = (arr) => arr.map(proj), c = {};
+    const lad = []; for (let a = 0.5; a <= 8.2; a += 0.55) lad.push(lvPt(-60, a)); lad.push(lvPt(20, 8.0), lvPt(60, 7.0));
+    c.lm = { name: 'Left main', r: 0.2, pts: P([G.L(1.5, -2.1, -0.7), G.L(1.4, -2.6, -0.2), lvPt(-60, 0.5)]) };
+    c.lad = { name: 'LAD', r: 0.17, pts: P(lad) };
+    c.s1 = { name: 'First septal', r: 0.1, septal: true, pts: [proj(lvPt(-60, 1.5)), G.L(2.3, -1.6, 1.9), G.L(2.6, -0.6, 2.5)] };
+    c.s2 = { name: 'Septal', r: 0.09, septal: true, pts: [proj(lvPt(-60, 3.2)), G.L(2.2, -1.5, 3.6), G.L(2.4, -0.6, 4.2)] };
+    c.d1 = { name: 'First diagonal', r: 0.12, pts: P([lvPt(-60, 1.9), lvPt(-88, 2.7), lvPt(-112, 3.7), lvPt(-126, 4.9)]) };
+    c.d2 = { name: 'Diagonal', r: 0.1, pts: P([lvPt(-60, 3.8), lvPt(-84, 4.6), lvPt(-102, 5.6)]) };
+    c.lcx = { name: 'Circumflex', r: 0.16, pts: P([lvPt(-60, 0.5), mr(275), mr(240), mr(205), mr(170), mr(135), mr(105)]) };
+    c.om = { name: 'Obtuse marginal', r: 0.12, pts: P([mr(200), lvPt(182, 1.6), lvPt(178, 3.2), lvPt(174, 4.8)]) };
+    c.rca = { name: 'RCA', r: 0.17, pts: P([G.L(3.0, -2.3, -0.5), tr(300), tr(335), tr(10), tr(45), tr(80), tr(115), tr(150)]) };
+    c.rvm = { name: 'RV marginal', r: 0.1, pts: P([tr(20), G.L(6.4, 0.9, 1.8), G.L(6.2, 1.1, 3.4), G.L(5.5, 1.3, 5.0)]) };
+    c.pda = { name: 'PDA', r: 0.12, pts: P([tr(150), lvPt(60, 0.9), lvPt(60, 2.6), lvPt(60, 4.4), lvPt(60, 6.0)]) };
+    c.pl = { name: 'Posterolateral', r: 0.11, pts: P([tr(150), mr(70), lvPt(112, 1.4), lvPt(118, 3.0)]) };
+    return (_cor = c);
+  };
+  /* Which vessels lose flow for an occlusion at [artery, fraction]. */
+  const DOWN = { lm: ['lad', 's1', 's2', 'd1', 'd2', 'lcx', 'om'], lad: ['s1', 's2', 'd1', 'd2'], lcx: ['om'], rca: ['rvm', 'pda', 'pl'] };
+  const BRANCH_AT = { s1: 0.1, d1: 0.14, s2: 0.33, d2: 0.38, om: 0.45, rvm: 0.42, pda: 1, pl: 1 };
+  /* Draw the coronary tree on a Heart3D. occl: [artery id, fraction 0..1] or null. Returns { remove() }. */
+  I.addCoronaries = function (heart, occl) {
+    const grp = heart.group('coronaries');
+    while (grp.children.length) grp.remove(grp.children[0]);
+    const cor = I.coronaries(), red = 0xd23c3c, dead = 0x4a4f63;
+    const labels = [];
+    for (const id in cor) {
+      const a = cor[id], curve = new THREE.CatmullRomCurve3(a.pts.map((p) => new THREE.Vector3(p[0], p[1], p[2])), false, 'centripetal');
+      let cut = null;
+      if (occl) { if (occl[0] === id) cut = occl[1]; else if ((DOWN[occl[0]] || []).includes(id) && (occl[0] === 'lm' || (BRANCH_AT[id] == null ? 0 : BRANCH_AT[id]) >= occl[1])) cut = 0; }
+      const seg = (u0, u1, color) => { if (u1 - u0 < 0.01) return; const pts = []; for (let i = 0; i <= 30; i++) pts.push(curve.getPointAt(u0 + (u1 - u0) * (i / 30))); const m = new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 40, a.r, 7, false), new THREE.MeshStandardMaterial({ color, roughness: 0.45 })); grp.add(m); };
+      if (cut == null) seg(0, 1, red); else { seg(0, cut, red); seg(cut, 1, dead); }
+      if (occl && occl[0] === id) {
+        const m = new THREE.Mesh(new THREE.SphereGeometry(a.r * 2.3, 14, 10), new THREE.MeshBasicMaterial({ color: 0x111418 })); m.position.copy(curve.getPointAt(EP.clamp(occl[1], 0.01, 0.99))); grp.add(m);
+        const p = m.position; labels.push(heart.addLabel('Occlusion', [p.x, p.y + 0.8, p.z], 'note'));
+      }
+    }
+    for (const [id, u] of [['lad', 0.55], ['lcx', 0.6], ['rca', 0.45]]) { const a = cor[id]; const p = a.pts[Math.floor(a.pts.length * u)]; labels.push(heart.addLabel(a.name, p, 'ves')); }
+    heart.invalidate();
+    return { remove() { while (grp.children.length) grp.remove(grp.children[0]); for (const l of labels) l.remove(); heart.invalidate(); } };
+  };
+
+  /* ST level, R and S amplitude for every lead of one beat. → [{ st, r, s, pos (dominant positive) }] in mV */
+  I.measure = function (rec, ev) {
+    const out = [], w = ev.wave, a = w.act;
+    const tJ = ev.t + a.off + 22, t0 = ev.t + a.on - 2, t1 = ev.t + a.off + 2;
+    const idx = (t) => EP.clamp(Math.round((t - rec.t0) / rec.dt), 0, rec.n - 1);
+    for (let l = 0; l < rec.leads.length; l++) {
+      const d = rec.leads[l];
+      let mx = 0, mn = 0;
+      for (let i = idx(t0); i <= idx(t1); i++) { if (d[i] > mx) mx = d[i]; if (d[i] < mn) mn = d[i]; }
+      let st = 0, c = 0; for (let i = idx(tJ) - 2; i <= idx(tJ) + 2; i++) { st += d[i]; c++; }
+      out.push({ st: st / c, r: mx, s: -mn, pos: mx >= -mn });
+    }
+    return out;
+  };
+  /* Original and Smith-modified Sgarbossa criteria for LBBB / ventricular paced rhythm. m from measure(). */
+  I.sgarbossa = function (m) {
+    const res = { concSTE: [], concSTD: [], disc5: [], ratio: [], rows: [] };
+    for (let l = 0; l < 12; l++) {
+      const x = m[l], mm = x.st * 10, name = Lds.names[l];
+      const dom = x.pos ? x.r : x.s, ratio = dom > 0.05 ? x.st / (x.pos ? x.r : -x.s) : 0;   // negative when discordant
+      const conc = (x.pos && mm >= 1) || (!x.pos && mm <= -1);
+      if (x.pos && mm >= 1) res.concSTE.push(name);
+      if (!x.pos && mm <= -1 && l >= 6 && l <= 8) res.concSTD.push(name);
+      if (!x.pos && mm >= 5) res.disc5.push(name);
+      const r2 = !x.pos ? x.st / x.s : -x.st / x.r;     // discordant ST relative to the preceding S (or R)
+      if (!x.pos && mm >= 1 && r2 >= 0.25) res.ratio.push(name);
+      res.rows.push({ name, pos: x.pos, st: mm, dom: dom * 10, ratio: dom > 0.05 ? x.st / (x.pos ? x.r : -x.s) : 0, conc });
+      void ratio;
+    }
+    res.original = (res.concSTE.length ? 5 : 0) + (res.concSTD.length ? 3 : 0) + (res.disc5.length ? 2 : 0);
+    res.modified = res.concSTE.length > 0 || res.concSTD.length > 0 || res.ratio.length > 0;
+    return res;
   };
 })(globalThis.EP = globalThis.EP || {});
 
@@ -2941,7 +3154,7 @@ table.tbl td { padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-
   EP.ISO_RAMP = ISO;
 
   const BASE_V = [0.6, 0.25, 0.23], BASE_A = [0.68, 0.38, 0.36], BASE_ENDO = [0.42, 0.16, 0.16];
-  const APD_V = 300, APD_A = 190;
+  const APD_V = 300, APD_A = 190, TINT = [0.2, 0.24, 0.5];
 
   const VIEWS = {
     front: { az: 0, el: 0.08, dist: 48, target: [1.2, 0.2, -0.6] },
@@ -3200,6 +3413,15 @@ table.tbl td { padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-
       this.setTime(this.t);
     }
     setMode(m) { this.o.mode = m; this.setTime(this.t); }
+    /* Shade an ischaemic territory. w: per-voxel weights (0..1) or null to clear. */
+    setTint(w) {
+      if (!w) { this.tintV = null; this.tintC = null; this.setTime(this.t); return; }
+      const vox = A.voxOfVert, n = this.nv;
+      this.tintV = new Float32Array(n);
+      for (let i = 0; i < n; i++) this.tintV[i] = vox[i] >= 0 ? w[vox[i]] : 0;
+      this.tintC = this.cav.map((c) => { const a = new Float32Array(c.n); for (let i = 0; i < c.n; i++) a[i] = c.vox[i] >= 0 ? w[c.vox[i]] : 0; return a; });
+      this.setTime(this.t);
+    }
     setOpts(o) {
       Object.assign(this.o, o);
       const op = this.o.opacity;
@@ -3277,6 +3499,7 @@ table.tbl td { padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-
           const f = ph[i] / (atr ? apdA : apdV);
           if (f >= 1) { tmp[0] = base[0]; tmp[1] = base[1]; tmp[2] = base[2]; } else rampAt(RAMP, f, base, tmp);
         }
+        if (this.tintV && this.tintV[i] > 0) { const k = this.tintV[i] * 0.82; tmp[0] += (TINT[0] - tmp[0]) * k; tmp[1] += (TINT[1] - tmp[1]) * k; tmp[2] += (TINT[2] - tmp[2]) * k; }
         col[i * 3] = tmp[0]; col[i * 3 + 1] = tmp[1]; col[i * 3 + 2] = tmp[2];
       }
       this.muscle.geometry.attributes.color.needsUpdate = true;
@@ -3285,6 +3508,7 @@ table.tbl td { padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-
         for (let i = 0; i < cv.n; i++) {
           if (mode === 'iso' && isoV && cv.vox[i] >= 0) rampAt(ISO, EP.clamp((this._vlat(isoV.act).c[c][i] - isoV.act.tmin) / Math.max(40, isoV.act.tmax - isoV.act.tmin), 0, 1), BASE_ENDO, tmp);
           else { const f = cp[i] / apdV; if (f >= 1) { tmp[0] = BASE_ENDO[0]; tmp[1] = BASE_ENDO[1]; tmp[2] = BASE_ENDO[2]; } else rampAt(RAMP, f, BASE_ENDO, tmp); }
+          if (this.tintC && this.tintC[c][i] > 0) { const k = this.tintC[c][i] * 0.82; tmp[0] += (TINT[0] - tmp[0]) * k; tmp[1] += (TINT[1] - tmp[1]) * k; tmp[2] += (TINT[2] - tmp[2]) * k; }
           cv.col[i * 3] = tmp[0]; cv.col[i * 3 + 1] = tmp[1]; cv.col[i * 3 + 2] = tmp[2];
         }
         cv.mesh.geometry.attributes.color.needsUpdate = true;
@@ -3946,6 +4170,7 @@ table.tbl td { padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-
   const PACE = [['rvApex', 'RV apex', () => Mo.spec('rvApex')], ['rvMidSeptum', 'RV mid-septum', () => Mo.spec('rvMidSeptum')], ['rvotSeptal', 'RV outflow tract', () => Mo.spec('rvotSeptal')],
     ['his', 'His bundle (selective)', () => ({ seeds: Mo.hps({ t: 42 }), purkLV: 1, purkRV: 1 })], ['lbbArea', 'Left bundle branch area', () => Mo.spec('lbbArea')],
     ['lvLatEpi', 'LV lateral vein (LV only)', () => Mo.spec('lvLatEpi')], ['biv', 'Biventricular', () => Mo.fuse([{ spec: Mo.spec('rvApex'), t: 0 }, { spec: Mo.spec('lvLatEpi'), t: 0 }])], ['lvInfApical', 'LV endocardium (lead across a PFO)', () => Mo.spec('lvInfApical')], ['midCardiacVein', 'Middle cardiac vein', () => Mo.spec('midCardiacVein')]];
+  EP.LocData = { PRESETS, PACE };
   const PACE_NOTE = {
     rvApex: 'LBBB pattern, superior axis (negative II/III/aVF), positive I and aVL. The widest of the right-sided sites.',
     rvMidSeptum: 'LBBB pattern but narrower; axis normal to leftward. Lead I positive.',
@@ -4387,6 +4612,7 @@ table.tbl td { padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-
     { patient: 'chb', pm: { mode: 'VVI', lrl: 70 }, fault: 'fracture' }, { patient: 'chb', pm: { mode: 'DDD' }, fault: 'aUnder' },
     { patient: 'chb', pm: { mode: 'DDD' }, fault: 'ffr' }, { patient: 'chb', pm: { mode: 'DDD' }, fault: 'battery' }, { patient: 'chb', pm: { mode: 'VVI', lrl: 70 }, fault: 'exit' },
   ];
+  EP.PacerData = { FAULTS, PATIENTS, QUIZ };
   PATIENTS.asys2 = { name: 'Complete heart block, sinus bradycardia 45/min, no escape', hidden: true, cfg: () => ({ sinus: { cl: 1330 }, avn: CHB() }) };
 
   /* Read the last few seconds of the strip the way a clinician would. → [[level, title, text]] */
@@ -4973,6 +5199,238 @@ table.tbl td { padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-
 })(globalThis.EP = globalThis.EP || {});
 
 
+/* ---- js/ui-stemi.js ---- */
+/* EP Simulator — STEMI / occlusion MI: culprit artery ↔ territory ↔ 12-lead, subtle occlusion patterns,
+ * LBBB and paced rhythms with the (modified) Sgarbossa criteria, and mimics. */
+(function (EP) {
+  'use strict';
+  const h = EP.h, UI = EP.UI, I = EP.Isch, G = EP.G, Mo = EP.Morph, R = EP.Rhythms, Lds = EP.Leads;
+  const CHB = () => ({ fast: { block: true, retro: { block: true } } });
+  const plat = (x) => EP.smoothstep(0, 0.045, x) * (1 - EP.smoothstep(0.22, 0.68, x));
+  const upslope = (x) => EP.smoothstep(0, 0.03, x) * (1 - EP.smoothstep(0.03, 0.42, x));
+  const term = (amp) => (ms, jt) => { if (ms < 0) return 0; const u = (ms / jt - 0.87) / 0.075; return -amp * Math.exp(-u * u); };
+  const scale = (v, k) => [v[0] * k, v[1] * k, v[2] * k];
+
+  const S = (EP.Stemi = {});
+  S.groups = [{ id: 'art', name: 'Occlusion by artery' }, { id: 'omi', name: 'Subtle occlusion patterns' }, { id: 'wide', name: 'Abnormal QRS — Sgarbossa' }, { id: 'mimic', name: 'Mimics' }];
+  S.list = [
+    // ------------------------------------------------------------------ by artery
+    { id: 'ladProx', group: 'art', name: 'Proximal LAD', sub: 'before the first septal and diagonal', evol: true, occl: ['lad', 0.03], terr: 'ladProx', view: 'front',
+      cfg: (t) => ({ sinus: { cl: 720 }, vent: I.vent({ terr: 'ladProx', stage: t }) }),
+      teach: { mech: 'Everything the LAD supplies is ischaemic: the anterior two-thirds of the septum (septal perforators), the anterior and anterolateral wall (diagonals) and the apex. The injury vector points anteriorly and slightly up and right, because basal septum and high anterior wall are included.',
+        ecg: ['ST elevation V1–V4 (often to V6), I and aVL.', 'Markers of a PROXIMAL lesion: ST elevation in aVR and V1 > 2.5 mm, ST elevation in aVL, reciprocal ST depression in II, III, aVF, new RBBB or left anterior fascicular block.', 'Evolution: hyperacute T waves within minutes → convex ST elevation → loss of R waves and Q waves V1–V4 → T inversion.'],
+        pearls: ['About 40% of the left ventricle is at risk: cardiogenic shock and VF are the early dangers.', 'New RBBB (± LAFB) in anterior MI means the first septal perforator territory is infarcting: infranodal conduction disease with a high risk of sudden complete heart block.', 'Drag the timeline to watch the same occlusion evolve.'] } },
+    { id: 'ladMid', group: 'art', name: 'Mid LAD', sub: 'after the first septal and diagonal', evol: true, occl: ['lad', 0.3], terr: 'ladMid', view: 'front',
+      cfg: (t) => ({ sinus: { cl: 760 }, vent: I.vent({ terr: 'ladMid', stage: t }) }),
+      teach: { mech: 'The basal septum and high lateral wall are spared, so the injury vector points straight anteriorly and toward the apex.',
+        ecg: ['ST elevation V2–V5, maximal in V2–V4.', 'No ST elevation in aVR or aVL; inferior leads isoelectric (no reciprocal depression) or slightly elevated.', 'V1 is spared or minimally elevated.'],
+        pearls: ['Absence of reciprocal inferior ST depression does not argue against anterior MI — it argues against a proximal lesion.', 'Subtle LAD occlusion vs early repolarisation: occlusion has loss of R-wave height, a longer QTc, terminal QRS distortion (loss of the S wave or J wave in V2–V3) and convexity.'] } },
+    { id: 'ladWrap', group: 'art', name: 'Wraparound LAD', sub: 'anterior and inferior ST elevation', evol: true, occl: ['lad', 0.32], terr: 'ladWrap', view: 'inferior',
+      cfg: (t) => ({ sinus: { cl: 760 }, vent: I.vent({ terr: 'ladWrap', stage: t }) }),
+      teach: { mech: 'A long LAD that curls round the apex to supply the inferoapical wall. Occlusion beyond the first diagonal makes anterior AND inferior walls ischaemic at once; the vector points to the apex.',
+        ecg: ['ST elevation in V2–V5 and in II, III, aVF simultaneously.', 'ST elevation II ≥ III (the apex faces lead II) — unlike RCA occlusion, where III > II.', 'No reciprocal depression in aVL.'],
+        pearls: ['Simultaneous anterior and inferior ST elevation is far more often one wraparound LAD than two occluded arteries. Pericarditis and takotsubo are the other causes of diffuse elevation.'] } },
+    { id: 'd1', group: 'art', name: 'First diagonal — high lateral', sub: '"South African flag" sign', evol: true, occl: ['d1', 0.06], terr: 'd1', view: 'left',
+      cfg: (t) => { const v = I.vent({ terr: 'd1', stage: t, amp: 1.25 }), k = Math.max(0, v.mods.st[0]) / 0.05; v.mods.leadAdd = [{ lead: 7, fn: (ms, jt) => (ms < 0 ? 0 : 0.03 * Math.min(4, k) * plat(ms / jt)) }]; return { sinus: { cl: 800 }, vent: v }; },
+      teach: { mech: 'A small territory high on the anterolateral wall, under leads I and aVL. The injury vector points up and to the left — almost directly away from lead III.',
+        ecg: ['ST elevation in I, aVL and V2; ST depression in III (and aVF).', 'On a standard 4 × 3 printout those four leads (I, aVL, V2, III) form the pattern of the South African flag.', 'ST elevation is often < 1 mm: the reciprocal depression in III may be the most obvious abnormality.'],
+        pearls: ['This is the occlusion most often called "non-diagnostic". aVL and III are reciprocal: any ST depression in III should send your eye to aVL.', 'High lateral leads (V4–V6 one or two interspaces up) can confirm.'] } },
+    { id: 'lcx', group: 'art', name: 'Circumflex / obtuse marginal', sub: 'lateral ± posterior', evol: true, occl: ['lcx', 0.3], terr: 'lcx', view: 'left',
+      cfg: (t) => ({ sinus: { cl: 800 }, vent: I.vent({ terr: 'lcx', stage: t }) }),
+      teach: { mech: 'The lateral and posterolateral wall. It faces away from most of the standard leads, so circumflex occlusion is the one most often missed: up to half produce no diagnostic ST elevation on a standard 12-lead.',
+        ecg: ['ST elevation in I, aVL, V5–V6 (lateral), usually small.', 'ST depression V1–V3 with upright T waves: the mirror image of posterior ST elevation.', 'Posterior leads V7–V9 show the elevation directly — tick the box above.'],
+        pearls: ['Ongoing ischaemic pain with a "normal" or only ST-depressed ECG: record V7–V9 and repeat the ECG. Refractory pain needs the cath lab whatever the ECG shows.', 'Voltage in posterior leads is low: 0.5 mm of ST elevation is significant in V7–V9.'] } },
+    { id: 'post', group: 'art', name: 'Isolated posterior MI', sub: 'ST depression V1–V4 is the STEMI', evol: true, occl: ['lcx', 0.72], terr: 'post', view: 'back', extra: true,
+      cfg: (t) => ({ sinus: { cl: 820 }, vent: I.vent({ terr: 'post', stage: t, amp: 1.5 }) }),
+      teach: { mech: 'The posterior (inferobasal) wall has no lead facing it on a standard ECG. V1–V3 see its injury current from the opposite side, so everything is inverted: ST elevation appears as depression, a posterior Q wave as a tall R, and the terminal T inversion as an upright T.',
+        ecg: ['Horizontal ST depression maximal in V1–V4 (not V5–V6), with upright T waves.', 'Later: R/S ratio > 1 in V2 with a broad R (the "Q-wave equivalent").', 'V7–V9: ST elevation ≥ 0.5 mm in any one lead confirms it.'],
+        pearls: ['ST depression maximal in V1–V4 = posterior occlusion until proven otherwise. ST depression maximal in V5–V6 and II with ST elevation in aVR = diffuse subendocardial ischaemia. The distinction decides who goes to the cath lab now.', 'Turn the trace upside down and look from behind: V2 becomes a classic STEMI.'] } },
+    { id: 'rcaProx', group: 'art', name: 'Proximal RCA', sub: 'inferior MI with right ventricular infarction', evol: true, occl: ['rca', 0.12], terr: 'rcaProx', view: 'inferior', extra: true,
+      cfg: (t) => ({ sinus: { cl: 1120 }, avn: { fast: { min: 150 } }, vent: I.vent({ terr: 'rcaProx', stage: t }) }),
+      teach: { mech: 'Inferior wall, inferior septum and — because the occlusion is proximal to the RV marginal branches — the right ventricular free wall. The vector points down and to the RIGHT. The RCA also supplies the sinus node (60%) and AV node (90%).',
+        ecg: ['ST elevation III > II, with reciprocal ST depression in aVL and I: the vector points toward lead III.', 'Right ventricular involvement: ST elevation in V1 (with ST depression in V2 — a discordance that is almost specific), and ST elevation ≥ 1 mm in V4R.', 'Sinus bradycardia, first-degree block, Wenckebach or complete block with a narrow junctional escape.'],
+        pearls: ['Record right-sided leads in every inferior MI — V4R elevation fades within hours.', 'RV infarction is preload-dependent: hypotension with clear lungs and raised JVP. Avoid nitrates, diuretics and morphine; give fluid; maintain AV synchrony.', 'AV block here is nodal (vagal, then ischaemic): usually narrow-complex, atropine-responsive and transient. It rarely needs a permanent pacemaker.'] } },
+    { id: 'rcaDist', group: 'art', name: 'Distal RCA', sub: 'inferior MI without RV involvement', evol: true, occl: ['rca', 0.62], terr: 'rcaDist', view: 'inferior',
+      cfg: (t) => ({ sinus: { cl: 950 }, vent: I.vent({ terr: 'rcaDist', stage: t }) }),
+      teach: { mech: 'Occlusion beyond the RV branches: inferior wall and inferior septum only.',
+        ecg: ['ST elevation III > II, reciprocal depression in aVL (the most sensitive single sign of inferior MI) and I.', 'V1 isoelectric; V4R < 1 mm.', 'Q waves in III and aVF later (a Q in III alone is a normal variant).'],
+        pearls: ['ST depression in aVL can precede the inferior ST elevation: a new down-sloping ST and inverted T in aVL deserves a repeat ECG in 10 minutes.'] } },
+    { id: 'lcxInf', group: 'art', name: 'Dominant circumflex', sub: 'inferolateral-posterior MI', evol: true, occl: ['lcx', 0.22], terr: 'lcxInf', view: 'left', extra: true,
+      cfg: (t) => ({ sinus: { cl: 860 }, vent: I.vent({ terr: 'lcxInf', stage: t }) }),
+      teach: { mech: 'When the circumflex supplies the posterior descending artery, its occlusion infarcts the inferior, posterior and lateral walls. The vector points down, back and to the LEFT.',
+        ecg: ['ST elevation II ≥ III (vector toward the left).', 'No reciprocal depression in aVL/I — they may even be elevated; ST elevation in V5–V6.', 'ST depression V1–V3 from the posterior component.'],
+        pearls: ['Inferior MI: III > II with ST depression in I → RCA. II ≥ III with isoelectric or elevated I/aVL and V5–V6 → circumflex.', 'No right ventricular infarction and less bradycardia than with the RCA.'] } },
+    { id: 'lm', group: 'art', name: 'Left main / multivessel ischaemia', sub: 'diffuse ST depression with ST elevation in aVR', occl: ['lm', 0.4], terr: null, view: 'front',
+      cfg: () => ({ sinus: { cl: 590, resp: 0 }, vent: I.vent({ sub: 1 }) }),
+      teach: { mech: 'Global subendocardial ischaemia: the inner layer of the whole left ventricle is ischaemic while the outer layer is not. The injury vector points from epicardium to cavity everywhere; summed, it points toward the base and the right shoulder — toward aVR and away from nearly everything else.',
+        ecg: ['ST depression in ≥ 6 leads, maximal in V4–V6 and II.', 'ST elevation in aVR ≥ 1 mm (≥ V1).', 'It is a pattern of supply-demand mismatch, not of one occluded artery.'],
+        pearls: ['Causes: left main or proximal LAD subocclusion, triple-vessel disease — but also tachyarrhythmia, severe anaemia, hypoxia, aortic stenosis, post-arrest and massive PE. Treat the cause first; persistent pattern with ongoing pain → urgent angiography.', 'True total left main occlusion usually presents as anterolateral STEMI with shock or arrest, not with this pattern.'] } },
+    // ------------------------------------------------------------------ subtle OMI
+    { id: 'hyper', group: 'omi', name: 'Hyperacute T waves', sub: 'the first minutes of LAD occlusion', occl: ['lad', 0.3], terr: 'ladMid', view: 'front',
+      cfg: () => ({ sinus: { cl: 780 }, vent: I.vent({ terr: 'ladMid', stage: 0.06 }) }),
+      teach: { mech: 'Before the ST segment rises, extracellular potassium leaks from ischaemic cells and shortens their action potential: the T wave over the territory becomes broad, bulky and symmetrical.',
+        ecg: ['T waves that are large RELATIVE to the QRS that precedes them — wide-based, symmetrical, with a straightened ST take-off. Size is judged against the R wave, not in absolute millimetres.', 'Minimal or no ST elevation yet; reciprocal changes may already be present.', 'Hyperkalaemia gives narrow, pointed, tented T waves in all leads; hyperacute T waves are fat and regional.'],
+        pearls: ['This is the earliest sign of occlusion and it is transient: repeat the ECG every 10–15 minutes. The next tracing declares itself.', 'A T wave taller than the R wave in V2–V4 in someone with chest pain is abnormal until proven otherwise.'] } },
+    { id: 'dewinter', group: 'omi', name: 'de Winter pattern', sub: 'LAD occlusion without ST elevation', occl: ['lad', 0.08], terr: 'ladProx', view: 'front',
+      cfg: () => { const v = I.terr('ladMid').vec; return { sinus: { cl: 760 }, vent: { mods: { st: scale(v, -0.5), stShape: upslope, tAdd: scale(v, 135 * 1.7), tShape: { p: 0.66, sl: 0.17, sr: 0.14 }, leadAdd: [{ lead: 3, fn: (ms, jt) => (ms < 0 ? 0 : 0.09 * plat(ms / jt)) }] } } }; },
+      teach: { mech: 'A static pattern (it does not evolve into ST elevation) seen in about 2% of acute LAD occlusions. The usual explanation is subendocardial ischaemia with preserved subepicardial flow from collaterals or a wraparound vessel.',
+        ecg: ['1–3 mm of UPSLOPING ST depression at the J point in V1–V6…', '…continuing into tall, symmetrical, prominent T waves.', '0.5–1 mm ST elevation in aVR; no precordial ST elevation.'],
+        pearls: ['A STEMI equivalent: activate the cath lab. It is not "ischaemia with peaked T waves".', 'Upsloping ST depression is benign on an exercise test and dangerous at rest with chest pain.'] } },
+    { id: 'swirl', group: 'omi', name: 'Precordial swirl', sub: 'septal STEMI — LAD proximal to the first septal', occl: ['lad', 0.02], terr: 'septal', view: 'front',
+      cfg: () => ({ sinus: { cl: 740 }, vent: I.vent({ terr: 'septal', stage: 0.36, amp: 1.1 }) }),
+      teach: { mech: 'When the basal septum is the dominant ischaemic territory the injury vector points from the left side of the septum to the right — toward V1 and aVR and directly away from V5–V6. Looked at across the precordium, the ST segments "swirl" from elevation on the right to depression on the left. Make the wall translucent in the 3D view to see the septal territory.',
+        ecg: ['ST elevation in V1 and aVR (often V2), with hyperacute T waves in V1–V2.', 'RECIPROCAL ST depression in V5 and V6 — the feature that defines the pattern.', 'The ST elevation in V1–V2 may be only 1–2 mm and is easily dismissed as LVH or "anterior early repolarisation".'],
+        pearls: ['Described by Smith and Meyers as a sign of LAD occlusion proximal to the first septal perforator. It is frequently misread as left main / diffuse ischaemia because of the aVR elevation: the difference is that here V1–V2 are elevated and the depression is confined to the lateral leads.', 'Mimics that give ST elevation in V1 with lateral depression: LVH with strain and LBBB — in both the QRS is abnormal and the ST change is proportionate to it.'] } },
+    { id: 'aslanger', group: 'omi', name: 'Aslanger pattern', sub: 'inferior occlusion hidden by multivessel disease', occl: ['rca', 0.75], terr: 'infSmall', view: 'inferior',
+      cfg: () => ({ sinus: { cl: 700 }, vent: I.vent({ terr: 'infSmall', stage: 0.36, sub: 0.55 }) }),
+      teach: { mech: 'Two vectors at once: a small inferior injury current (pointing down and right, toward lead III) and diffuse subendocardial ischaemia from disease in the other vessels (pointing toward aVR). They cancel in II and aVF, leaving ST elevation in lead III alone.',
+        ecg: ['ST elevation in III but not in the other inferior leads.', 'ST depression in V4–V6 (not V2) with a positive or terminally positive T wave.', 'ST segment in V1 higher than in V2.'],
+        pearls: ['Does not meet STEMI criteria (needs two contiguous leads) yet marks an acute inferior occlusion with multivessel disease — and a larger infarct and higher mortality than other NSTEMI.', 'Isolated ST elevation in III is not automatically benign: look at aVL (reciprocal), V1 vs V2, and the lateral leads.'] } },
+    { id: 'wellensA', group: 'omi', name: 'Wellens pattern A', sub: 'biphasic T waves V2–V3', occl: null, terr: 'ladMid', view: 'front',
+      cfg: () => { const v = I.vent({ terr: 'ladMid', st: 0, t: -0.18, q: 0 }); v.mods.leadAdd = [{ lead: 7, fn: term(0.34) }, { lead: 8, fn: term(0.4) }, { lead: 9, fn: term(0.22) }]; return { sinus: { cl: 900 }, vent: v }; },
+      teach: { mech: 'A REPERFUSION pattern: the LAD occluded, caused pain, and has spontaneously reopened. The terminal T inversion is the same change seen after successful PCI. The artery still has a critical unstable lesion.',
+        ecg: ['Pain-free ECG: biphasic T waves in V2–V3 — up first, then sharply down (type A, ≈ 25%).', 'Isoelectric or minimally elevated ST (< 1 mm), preserved precordial R waves, no Q waves.', 'Normal or slightly raised troponin.'],
+        pearls: ['Wellens syndrome is a history (recent angina, now pain-free) plus the ECG. The same T waves in someone with ongoing pain mean something else.', 'If pain returns the T waves "pseudo-normalise" to upright — that is re-occlusion, not improvement.', 'Do not stress-test. Early angiography.'] } },
+    { id: 'wellensB', group: 'omi', name: 'Wellens pattern B', sub: 'deep symmetrical T inversion', occl: null, terr: 'ladMid', view: 'front',
+      cfg: () => { const v = I.vent({ terr: 'ladMid', st: 0.02, t: -1.3, q: 0 }); v.mods.tShape = { p: 0.7, sl: 0.15, sr: 0.13 }; v.mods.qtc = 450; return { sinus: { cl: 920 }, vent: v }; },
+      teach: { mech: 'The later stage of the same reperfusion process: pattern A evolves into B over hours to days.',
+        ecg: ['Deep (> 2 mm), symmetrical T-wave inversion in V2–V4, often extending to V1–V6 (type B, ≈ 75%).', 'QT prolonged; R waves preserved.', 'Differential of deep precordial T inversion: PE (with inversion in III and V1, tachycardia), raised intracranial pressure, takotsubo, hypertrophic cardiomyopathy (apical), post-pacing/post-tachycardia memory T waves.'],
+        pearls: ['Cardiac memory after RV pacing or LBBB: T inversion in the precordium but upright T in I and aVL, and the precordial T inversion is deeper than in lead III — the opposite of LAD ischaemia.'] } },
+    // ------------------------------------------------------------------ abnormal QRS
+    { id: 'lbbb0', group: 'wide', name: 'LBBB without occlusion', sub: 'appropriate discordance', wide: true, occl: null, terr: null, view: 'front',
+      cfg: () => ({ sinus: { cl: 820 }, hps: { pattern: 'lbbb' } }),
+      teach: { mech: 'Abnormal depolarisation produces abnormal repolarisation. In LBBB the ST segment and T wave point opposite to the main QRS deflection in every lead — and the size of the ST shift is proportional to the size of the QRS.',
+        ecg: ['Leads with a deep S (V1–V3): ST elevation and upright T. Leads with a tall R (I, aVL, V5–V6): ST depression and inverted T.', 'The ST elevation in V1–V3 is typically 10–20% of the S-wave depth; 5 mm of elevation can be normal behind a 40 mm S wave.', 'Nothing here meets any Sgarbossa criterion — check the calculator.'],
+        pearls: ['"New LBBB" on its own is no longer a STEMI equivalent: most such patients do not have an occlusion. Look for the specific signs instead.'] } },
+    { id: 'lbbbLad', group: 'wide', name: 'LBBB + LAD occlusion', sub: 'excessive discordance', wide: true, occl: ['lad', 0.05], terr: 'ladProx', view: 'front',
+      cfg: () => ({ sinus: { cl: 760 }, hps: { pattern: 'lbbb' }, vent: I.vent({ terr: 'ladProx', stage: 0.36, amp: 0.7 }) }),
+      teach: { mech: 'The injury current adds to the baseline secondary ST shift. In V1–V3 both point the same way (up), so the ST elevation stays discordant — but becomes too large for the S wave it follows.',
+        ecg: ['Original Sgarbossa: concordant ST elevation ≥ 1 mm (5 points), concordant ST depression ≥ 1 mm in V1–V3 (3), discordant ST elevation ≥ 5 mm (2). Score ≥ 3 is specific (≈ 98%) but insensitive (≈ 20–36%).', 'Smith-modified: replace the absolute 5 mm rule with a RATIO — ST elevation ÷ S-wave depth ≥ 0.25 (ST/S ≤ −0.25) in any lead with ≥ 1 mm of elevation. Any one of the three criteria is positive. Sensitivity ≈ 80–91%, specificity ≈ 90%.', 'Measure ST at the J point relative to the PR segment, and the S (or R) from the PR segment to its nadir (or peak).'],
+        pearls: ['The same rules apply to right ventricular paced rhythms.', 'Unstable patient with LBBB and ischaemic symptoms: angiography regardless of the score.'] } },
+    { id: 'lbbbInf', group: 'wide', name: 'LBBB + inferoposterior occlusion', sub: 'concordant ST depression V1–V3', wide: true, occl: ['lcx', 0.22], terr: 'lcxInf', view: 'left',
+      cfg: () => ({ sinus: { cl: 800 }, hps: { pattern: 'lbbb' }, vent: I.vent({ terr: 'lcxInf', stage: 0.36, amp: 0.95 }) }),
+      teach: { mech: 'A posterior injury vector pulls the ST segment in V1–V3 downward — the same direction as their QS complexes. Concordance in LBBB is always abnormal.',
+        ecg: ['ST DEPRESSION in V1–V3, where LBBB should produce ST elevation: concordant depression ≥ 1 mm (3 points — positive on its own).', 'Inferior leads: ST elevation out of proportion to their small QRS complexes (ratio criterion).', 'Lateral leads may lose their expected ST depression ("pseudo-normalisation").'],
+        pearls: ['In LBBB the question is never "is there ST elevation?" but "is the ST segment where the QRS says it should be?"'] } },
+    { id: 'paceLad', group: 'wide', name: 'Paced rhythm + LAD occlusion', sub: 'Sgarbossa applies', wide: true, occl: ['lad', 0.05], terr: 'ladProx', view: 'front',
+      cfg: () => ({ sinus: { cl: 820 }, avn: CHB(), vent: I.vent({ terr: 'ladProx', stage: 0.36, amp: 0.7 }) }), pm: { mode: 'DDD', lrl: 60, vSite: 'rvApex' },
+      teach: { mech: 'RV apical pacing activates the ventricles much as LBBB does (right before left), so it has the same discordant repolarisation — and the same rules for finding an infarct behind it.',
+        ecg: ['Paced QRS: LBBB pattern with a superior axis, so the inferior leads are also negative with discordant ST elevation at baseline.', 'Here V1–V4 show ST elevation exceeding 25% of the S wave.', 'Concordant ST elevation is rarer in paced rhythms because few leads have a positive QRS (I, aVL, sometimes V5–V6).'],
+        pearls: ['If the patient is not pacing-dependent, temporarily lowering the rate to reveal the intrinsic QRS helps — but T-wave inversion afterwards may be cardiac memory, not ischaemia.', 'Biventricular and left-bundle-area pacing change the baseline pattern; compare with a previous paced ECG.'] } },
+    { id: 'rbbbLad', group: 'wide', name: 'New RBBB + LAFB with anterior MI', sub: 'a high-risk combination', occl: ['lad', 0.02], terr: 'ladProx', view: 'front',
+      cfg: () => ({ sinus: { cl: 700 }, hps: { pattern: 'rbbb+lafb' }, vent: I.vent({ terr: 'ladProx', stage: 0.4, amp: 0.9 }) }),
+      teach: { mech: 'The right bundle and the left anterior fascicle run in the anterior septum and are supplied by the first septal perforator. Their loss means a very proximal LAD (or left main) occlusion with a large septal infarct.',
+        ecg: ['RBBB (wide terminal R in V1, wide S in I and V6) with left axis deviation.', 'RBBB does not hide infarction: the first 80 ms and the ST segment are still readable. The expected T inversion in V1–V3 is replaced by ST elevation. Q waves replace the initial r in V1–V3 (qR).', 'Do not apply Sgarbossa to RBBB — read the ST segment normally, measuring from the J point (the end of the R′).'],
+        pearls: ['Mortality is several times that of anterior MI without block; progression to complete infranodal heart block can be abrupt. Pacing pads on; many centres place a temporary wire.', 'Persisting bifascicular block with transient complete block after MI is an indication for permanent pacing.'] } },
+    // ------------------------------------------------------------------ mimics
+    { id: 'peri', group: 'mimic', name: 'Acute pericarditis', sub: 'diffuse ST elevation with PR depression', occl: null, terr: null, view: 'front',
+      cfg: () => ({ sinus: { cl: 640 }, atria: { prDep: 0.075 }, vent: { mods: { st: scale(G.A, 0.17), tAmp: 1.0 } } }),
+      teach: { mech: 'Inflammation of the whole epicardial surface: a superficial injury current over both ventricles, whose sum points to the apex (down, left and forward) — and over the atria, which shifts the PR segment the opposite way.',
+        ecg: ['Widespread concave-up ST elevation: I, II, aVF, V2–V6. ST elevation II > III.', 'PR depression in the same leads; PR ELEVATION with ST depression in aVR (and V1).', 'No reciprocal ST depression other than aVR/V1; no Q waves; T waves invert only after the ST segments normalise.', 'ST/T ratio in V6 > 0.25 favours pericarditis over early repolarisation.'],
+        pearls: ['Any reciprocal depression (especially in aVL), ST elevation III > II, convex or horizontal ST, or new Q waves → treat as MI.', 'Spodick\'s sign: a down-sloping TP segment.'] } },
+    { id: 'er', group: 'mimic', name: 'Early repolarisation', sub: 'benign precordial ST elevation', occl: null, terr: null, view: 'front',
+      cfg: () => ({ sinus: { cl: 1020 }, vent: { mods: { st: [0.075, -0.035, 0.12], jWave: 0.13, tAmp: 1.4 } } }),
+      teach: { mech: 'A normal variant of early repolarisation in the anterolateral epicardium, most marked at slow heart rates in young, athletic people.',
+        ecg: ['Concave ST elevation V2–V5 with a notch or slur at the J point, and tall but ASYMMETRIC T waves (slow up, fast down).', 'Tall R waves, normal R-wave progression, short QTc, no reciprocal depression.', 'Stable from one ECG to the next.'],
+        pearls: ['Subtle LAD occlusion is distinguished by: low R-wave amplitude in V4, longer QTc, ST elevation 60 ms after the J point in V3, and low QRS amplitude in V2 (the Smith four-variable formula). Terminal QRS distortion — no S wave and no J wave in V2 or V3 — does not occur in early repolarisation.', 'When in doubt, serial ECGs and echo: early repolarisation does not change over 20 minutes.'] } },
+    { id: 'aneurysm', group: 'mimic', name: 'Left ventricular aneurysm', sub: 'old anterior MI with persistent ST elevation', occl: null, terr: 'ladProx', view: 'front',
+      cfg: () => ({ sinus: { cl: 860 }, vent: I.vent({ terr: 'ladProx', st: 0.26, t: -0.1, q: 0.93 }) }),
+      teach: { mech: 'A thinned, scarred, dyskinetic anterior wall weeks or more after an un-reperfused LAD infarct. The scar no longer depolarises (deep QS waves) and the ST segment never returns to baseline.',
+        ecg: ['QS or Qr waves in V1–V4 with coved ST elevation of 1–3 mm.', 'Small, flat or shallowly inverted T waves.', 'T-wave to QRS amplitude ratio < 0.36 in ALL of V1–V4 suggests aneurysm; a ratio ≥ 0.36 in any one of them suggests acute MI (the T wave is still tall in acute occlusion).'],
+        pearls: ['The rule only applies when symptoms are recent (< 6 h): subacute MI also has small T waves.', 'The scar border is a substrate for monomorphic VT — the scar-related VT in the Rhythms tab.'] } },
+  ];
+  S.byId = {}; for (const x of S.list) S.byId[x.id] = x;
+
+  /* Simulate a pattern → recording with all 16 leads. */
+  S.record = function (pt, stage) {
+    const sim = new EP.HeartSim(pt.cfg(stage));
+    if (pt.pm) new EP.Pacemaker(sim, pt.pm);
+    sim.runUntil(12500);
+    const rec = EP.Synth.build(sim, 2200, 12200); rec.sim = sim;
+    return rec;
+  };
+
+  EP.Modules = EP.Modules || [];
+  EP.Modules.push({
+    id: 'stemi', title: 'STEMI / OMI',
+    mount(root) {
+      let cur = null, stage = 0.36, extra = false, timer = 0, corH = null;
+      const player = new EP.Player({ layout: '12', ladder: false });
+      const rail = h('nav.card.rail', { 'aria-label': 'Patterns' }), listEl = h('div', { style: { paddingBottom: '8px' } }); rail.append(listEl);
+      const sel = UI.select(null, S.groups.map((g) => ({ group: g.name, items: S.list.filter((x) => x.group === g.id).map((x) => [x.id, x.name]) })), 'ladProx', (v) => show(v));
+      sel.classList.add('rail-sel'); sel.setAttribute('aria-label', 'Pattern');
+      const ctl = h('div.card-b'), stEl = h('div'), sgEl = h('div'), head = h('div.card-h'), teach = h('div.card-b');
+      function fill() { listEl.innerHTML = ''; for (const g of S.groups) { listEl.append(h('div.rail-g', g.name)); for (const x of S.list.filter((y) => y.group === g.id)) listEl.append(h('button.rail-i', { type: 'button', 'aria-current': String(cur === x), onclick: () => show(x.id) }, x.name, h('small', x.sub))); } }
+      function render(keep) {
+        const rec = S.record(cur, stage);
+        player.o.strips = extra ? [12, 13, 14, 15] : [1]; player._applyLayout();
+        player.load(rec, { title: cur.name + (cur.evol ? ' — ' + I.stageName(stage) : ''), t: keep ? player.t : null });
+        const q = rec.events.filter((e) => e.type === 'QRS' && e.t > rec.t0 + 1500)[1];
+        if (!q) return;
+        const m = I.measure(rec, q);
+        stEl.innerHTML = '';
+        const chip = (l) => { const mm = m[l].st * 10, big = Math.abs(mm) >= (l >= 13 ? 0.5 : 1); return h('div', { style: { background: big ? (mm > 0 ? 'color-mix(in srgb, var(--bad) 16%, var(--surface))' : 'color-mix(in srgb, var(--ecg-caliper) 16%, var(--surface))') : 'var(--surface)' } }, h('div.k', Lds.names[l]), h('div.v', { style: { fontSize: '13px' } }, (mm > 0 ? '+' : '') + mm.toFixed(1))); };
+        stEl.append(h('div.eyebrow', { style: { margin: '0 0 4px' } }, 'ST level at the J point (mm) — red elevation, blue depression'), h('div.kv', { style: { gridTemplateColumns: 'repeat(auto-fit, minmax(56px, 1fr))' } }, [...Array(extra ? 16 : 12).keys()].map(chip)));
+        sgEl.innerHTML = '';
+        if (cur.wide) {
+          const sg = I.sgarbossa(m);
+          const yes = (b) => h('span.pill' + (b ? '.bad' : '.good'), b ? 'met' : 'not met');
+          const crit = h('div.findings',
+            h('div.finding', yes(sg.concSTE.length), h('div', h('b', 'Concordant ST elevation ≥ 1 mm'), h('span.muted', ' in a lead with a positive QRS' + (sg.concSTE.length ? ': ' + sg.concSTE.join(', ') : '')))),
+            h('div.finding', yes(sg.concSTD.length), h('div', h('b', 'Concordant ST depression ≥ 1 mm in V1–V3'), h('span.muted', sg.concSTD.length ? ': ' + sg.concSTD.join(', ') : ''))),
+            h('div.finding', yes(sg.ratio.length), h('div', h('b', 'Excessively discordant ST elevation: ST/S ≤ −0.25'), h('span.muted', sg.ratio.length ? ': ' + sg.ratio.join(', ') : ''),
+              h('div.muted', 'Original third criterion (discordant elevation ≥ 5 mm): ' + (sg.disc5.length ? sg.disc5.join(', ') : 'none')))));
+          const flag = (r) => (r.ratio <= -0.25 && r.st >= 1) || r.conc;
+          const table = h('table.tbl',
+            h('thead', h('tr', h('th', 'Lead'), sg.rows.map((r) => h('th', r.name)))),
+            h('tbody',
+              h('tr', h('td', 'QRS'), sg.rows.map((r) => h('td.mono', r.pos ? '+' : '−'))),
+              h('tr', h('td', 'R or S (mm)'), sg.rows.map((r) => h('td.mono', r.dom.toFixed(0)))),
+              h('tr', h('td', 'ST (mm)'), sg.rows.map((r) => h('td.mono', r.st.toFixed(1)))),
+              h('tr', h('td', 'ST ÷ QRS'), sg.rows.map((r) => h('td.mono', { style: { fontWeight: flag(r) ? '700' : '400', color: flag(r) ? 'var(--bad)' : '' } }, r.ratio.toFixed(2))))));
+          sgEl.append(h('section.card',
+            h('div.card-h', h('h3', 'Sgarbossa calculator'), h('span.grow'), h('span.pill' + (sg.modified ? '.bad' : '.good'), sg.modified ? 'modified criteria POSITIVE' : 'modified criteria negative'), h('span.pill', 'original score ' + sg.original)),
+            h('div.card-b', crit, h('div.scroll-x', { style: { marginTop: '10px' } }, table))));
+        }
+      }
+      function show(id) {
+        cur = S.byId[id] || S.list[0]; stage = 0.36; extra = !!cur.extra;
+        if (sel.sel) sel.sel.value = cur.id; else sel.value = cur.id;
+        ctl.innerHTML = '';
+        const exChk = UI.check('Show V4R and posterior leads V7–V9', extra, (v) => { extra = v; render(true); });
+        if (cur.evol) {
+          const out = h('b', I.stageName(stage));
+          const rng = h('input', { type: 'range', min: 0.02, max: 1, step: 0.02, value: stage, 'aria-label': 'Time since occlusion', style: { flex: '1', minWidth: '160px' }, oninput: () => { stage = +rng.value; out.textContent = I.stageName(stage); clearTimeout(timer); timer = setTimeout(() => render(true), 90); } });
+          ctl.append(h('div.row', h('span.muted', 'Onset'), rng, h('span.muted', 'Weeks'), out));
+        }
+        ctl.append(h('div.row', { style: { marginTop: cur.evol ? '8px' : '0' } }, exChk));
+        head.innerHTML = ''; head.append(h('div', h('div.eyebrow', (S.groups.find((g) => g.id === cur.group) || {}).name), h('h2', { style: { fontSize: '17px' } }, cur.name)));
+        teach.innerHTML = ''; teach.append(UI.teach(cur.teach));
+        if (player.heart) {
+          if (corH) corH.remove();
+          corH = I.addCoronaries(player.heart, cur.occl);
+          player.heart.setTint(cur.terr ? I.terr(cur.terr).w : null);
+          player.heart.setMode('anat'); player.modeSeg.set('anat'); player._legend('anat');
+          player.setOpacity(cur.terr === 'septal' ? 0.45 : 1); player.heart.setView(cur.view || 'front');
+        }
+        fill(); render(false);
+      }
+      const rules = h('section.card', h('div.card-h', h('h3', 'Reading for occlusion, not for millimetres')), h('div.card-b.prose', UI.list([
+        'STEMI criteria (≥ 1 mm in two contiguous leads; in V2–V3 ≥ 2 mm men ≥ 40, ≥ 2.5 mm men < 40, ≥ 1.5 mm women) miss a quarter to a third of acute coronary occlusions. The patterns under "Subtle occlusion" are how the rest are found.',
+        'Reciprocal change is the most useful single discriminator: ST elevation with depression in the opposite leads is an occlusion; diffuse elevation without it is usually not.',
+        'Proportion matters more than size: a 1 mm ST elevation after a 3 mm QRS is large; 4 mm after a 40 mm S wave is not.',
+        'The ECG is a single frame of a film. Repeat it every 10–15 minutes while symptoms continue, and compare with an old one.',
+        'Add leads when the story and the standard 12 disagree: V7–V9 for ST depression in V1–V4, V4R for any inferior MI.',
+        'Arrhythmias by territory: inferior MI → sinus bradycardia and nodal AV block (atropine-responsive, transient). Anterior MI → bundle branch block and infranodal block (abrupt, needs pacing). Any territory → VF in the first hours; accelerated idioventricular rhythm at reperfusion (leave it alone).'])));
+      root.append(h('div.lab', rail, h('div.stack', sel, h('section.card', ctl), player.ecgCard, stEl, sgEl, h('section.card', head, teach), rules),
+        h('div.side', player.heartCard || h('div'), h('div.note', 'The shaded area is the ischaemic territory; the dark band marks the occlusion. ST vectors are computed from that territory, so reciprocal changes follow from the anatomy. Lower the "Wall" slider to see the septum.'))));
+      show('ladProx');
+      return { unmount() { player.destroy(); } };
+    },
+  });
+})(globalThis.EP = globalThis.EP || {});
+
+
 /* ---- js/ui-cases.js ---- */
 /* EP Simulator — Clinical scenarios: pharmacological vs electrical management.
  * A live monitor, a set of interventions, and a simulated physiological response to each. */
@@ -5173,41 +5631,292 @@ table.tbl td { padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-
     },
   });
 
-  // ---------------------------------------------------------------------------------------------
-  // Quiz: name the rhythm
-  EP.Modules.push({
-    id: 'quiz', title: 'Quiz',
-    mount(root) {
-      const canvas = h('canvas', { 'aria-label': 'Unknown ECG' }), box = h('div.ecg-scroll', canvas);
-      const view = new EP.ECGView(canvas, { layout: '12', strips: [1], ladder: false });
-      const opts = h('div.opts'), fb = h('div'), scoreEl = h('span.mono', '0 / 0');
-      let score = UI.store.get('quiz', { right: 0, total: 0 }), cur = null, answered = false;
-      const pool = R.list.filter((r) => !['sinus-arr'].includes(r.id));
-      const show = () => { scoreEl.textContent = score.right + ' / ' + score.total; };
-      function next() {
-        answered = false; cur = pool[Math.floor(Math.random() * pool.length)];
-        const same = pool.filter((r) => r.group === cur.group && r !== cur).sort(() => Math.random() - 0.5).slice(0, 2);
-        const other = pool.filter((r) => r.group !== cur.group).sort(() => Math.random() - 0.5).slice(0, 2);
-        const choices = same.concat(other, [cur]).sort(() => Math.random() - 0.5);
-        const rec = R.record(cur, { params: {} });
-        view.set({ ladder: false }); view.setRecording(rec);
-        opts.innerHTML = ''; fb.innerHTML = '';
-        for (const c of choices) opts.append(h('button.opt', { type: 'button', onclick: (ev) => {
-          if (answered) return; answered = true; score.total++;
-          for (const b of opts.children) { b.disabled = true; if (b.textContent === cur.name) b.classList.add('right'); }
-          if (c === cur) score.right++; else ev.currentTarget.classList.add('wrong');
-          UI.store.set('quiz', score); show();
-          view.set({ ladder: true });
-          fb.append(h('div.note' + (c === cur ? '.good' : '.bad'), h('b', c === cur ? 'Correct. ' : 'This is ' + cur.name + '. '), cur.teach.ecg[0]),
-            h('div.prose', { style: { marginTop: '10px', fontSize: '13px' } }, h('h4', 'What to look for'), UI.list(cur.teach.ecg)),
-            h('div.row', { style: { marginTop: '10px' } }, h('button.btn.primary', { type: 'button', onclick: next }, 'Next ECG'), h('button.btn', { type: 'button', onclick: () => { UI.store.set('rhythm', cur.id); EP.go('rhythms', true); } }, 'Open in Rhythm Lab')));
-        } }, c.name));
+})(globalThis.EP = globalThis.EP || {});
+
+
+/* ---- js/ui-assess.js ---- */
+/* EP Simulator — Assessment: mixed-domain, fellow-level questions (generated ECG items + written items),
+ * a confidence rating on every answer, and a gap map by domain. History is kept in the browser and, when
+ * the page runs as a Claude artifact, in its database (collection "assessment"). */
+(function (EP) {
+  'use strict';
+  const h = EP.h, UI = EP.UI, R = EP.Rhythms, Mo = EP.Morph;
+  const DOM = {
+    rhythm: ['Rhythm recognition', 'rhythms'], mech: ['Mechanisms & EP concepts', 'rhythms'], local: ['Localisation from the 12-lead', 'localise'], isch: ['Ischaemia / STEMI', 'stemi'],
+    device: ['Pacemaker function & troubleshooting', 'pacemaker'], hardware: ['Devices, leads & imaging', 'devices'], temp: ['Temporary pacing', 'temp'], icd: ['ICD', 'icd'],
+    tox: ['Tox & electrolytes', 'tox'], mgmt: ['Acute management', 'cases'],
+  };
+  const QUOTA = { rhythm: 4, mech: 3, local: 3, isch: 4, device: 4, hardware: 2, temp: 2, icd: 2, tox: 3, mgmt: 3 };
+
+  // ---- written items: [domain, topic, stem, options (first is correct), explanation] ----------------
+  const W = [
+    ['mech', 'AVNRT', 'In typical (slow-fast) AVNRT, which limb conducts retrogradely to the atria?', ['The fast pathway', 'The slow pathway', 'An accessory pathway', 'The His bundle'], 'Antegrade conduction is down the slow pathway (long AH), retrograde up the fast pathway — so atria and ventricles activate almost together and the P is buried in or just after the QRS (VA < 70 ms).'],
+    ['mech', 'AVRT', 'During orthodromic AVRT using a left lateral pathway the patient develops left bundle branch block aberrancy. What happens to the tachycardia?', ['Cycle length lengthens by ≥ 35 ms', 'Nothing — the QRS widens but the rate is unchanged', 'It terminates', 'It accelerates'], 'Coumel\'s sign: bundle branch block ipsilateral to the pathway forces the impulse across the septum before it can reach the pathway, lengthening the circuit (and the VA interval). It proves the pathway is on that side and participates in the circuit.'],
+    ['mech', 'AF', 'The ventricular response in atrial fibrillation is irregular mainly because of:', ['Concealed conduction in the AV node', 'Variable atrial fibrillatory amplitude', 'Phase 4 block in the His bundle', 'Supernormal conduction'], 'Impulses that penetrate the node without reaching the ventricles reset its refractoriness unpredictably. The same concept explains 2:1 and 4:1 flutter ratios.'],
+    ['mech', 'Aberrancy', 'Ashman aberrancy describes:', ['An aberrant (usually RBBB) beat ending a short cycle that follows a long cycle', 'Rate-related LBBB at slow heart rates', 'A fusion beat during VT', 'Aberrancy of the beat ending a long cycle'], 'Bundle refractoriness is proportional to the preceding cycle length. A long cycle lengthens it; the next early beat finds the right bundle (longer refractory period) still refractory.'],
+    ['mech', 'AV block', 'In typical Wenckebach, why do the R-R intervals shorten before the dropped beat?', ['The increment in PR gets smaller each beat', 'The sinus rate accelerates', 'The PR interval shortens', 'The His-Purkinje delay shortens'], 'The largest PR increment is on the second beat; later increments are smaller, so each R-R = P-P + (a decreasing increment).'],
+    ['mech', 'Flutter', 'The critical isthmus of typical atrial flutter lies between:', ['The tricuspid annulus and the inferior vena cava', 'The mitral annulus and the left inferior pulmonary vein', 'The crista terminalis and the SVC', 'The coronary sinus os and the fossa ovalis'], 'The cavotricuspid isthmus: a line of block across it cures typical flutter in either direction of rotation.'],
+    ['mech', 'SVT diagnosis', 'Adenosine during a regular narrow-complex tachycardia at 170/min produces AV block for 4 seconds while P waves continue at 170/min. The diagnosis is:', ['Atrial tachycardia (or flutter) — not AV-node dependent', 'AVNRT', 'Orthodromic AVRT', 'Junctional tachycardia'], 'If the tachycardia continues in the atria despite AV block, the AV node is a bystander. AVNRT and AVRT would terminate.'],
+    ['mech', 'Wide-complex tachycardia', 'Which finding is most specific for ventricular tachycardia?', ['AV dissociation with capture or fusion beats', 'QRS duration > 140 ms', 'Left axis deviation', 'Heart rate above 180/min'], 'Independent atrial activity (and the capture/fusion beats it produces) proves a ventricular origin. Width and axis are only supportive.'],
+    ['mech', 'Torsades', 'Torsades de pointes is typically initiated by:', ['A short-long-short sequence with an early after-depolarisation on a prolonged T-U wave', 'A late-coupled PVC in a patient with a normal QT', 'Atrial fibrillation conducted over an accessory pathway', 'Phase 4 automaticity in the Purkinje network'], 'A pause prolongs the next QT and enlarges the T-U wave; an EAD-triggered beat then lands on it. This is why pacing faster prevents recurrence.'],
+    ['mech', 'Pre-excitation', 'Why is pre-excitation often subtle in sinus rhythm with a left lateral accessory pathway?', ['The pathway is far from the sinus node, so the AV node/His wavefront arrives almost as early', 'Left-sided pathways conduct decrementally', 'The delta wave is isoelectric in all leads', 'Left-sided pathways only conduct retrogradely'], 'The degree of pre-excitation depends on the race between the two routes: atrial conduction time to the pathway versus AV-nodal delay. Atrial pacing near the pathway or slowing the node exaggerates the delta wave.'],
+
+    ['device', 'Upper rate', 'DDD pacemaker: sensed AV delay 150 ms, PVARP 250 ms, upper tracking rate 120/min. At what atrial rate does 2:1 block begin?', ['150/min', '120/min', '130/min', '171/min'], 'TARP = AVD + PVARP = 400 ms → 60 000 / 400 = 150/min. Between 120 and 150/min the device shows Wenckebach behaviour; above 150/min every other P falls in PVARP.'],
+    ['device', 'Upper rate', 'The same patient (2:1 point 150/min, upper tracking rate 120/min) exercises to a sinus rate of 135/min. The strip shows:', ['Progressive AS–VP prolongation with intermittent untracked P waves', 'Abrupt halving of the paced rate', 'Mode switch to DDI', 'Atrial pacing at the lower rate'], 'Pacemaker Wenckebach: the device delays ventricular output to respect the upper rate until a P wave lands in PVARP.'],
+    ['device', 'PMT', 'Pacemaker-mediated tachycardia requires:', ['Retrograde VA conduction with a VA time longer than PVARP', 'Atrial fibrillation', 'Loss of ventricular capture', 'A unipolar ventricular lead'], 'A retrograde P sensed after PVARP triggers ventricular pacing, which conducts retrogradely again. A magnet, longer PVARP or post-PVC PVARP extension breaks the loop.'],
+    ['device', 'Magnet', 'Applying a magnet to a pacemaker and to an ICD respectively causes:', ['Asynchronous pacing; suspension of tachycardia therapy without changing pacing', 'Inhibition of pacing; asynchronous pacing', 'Asynchronous pacing in both', 'No effect; delivery of a test shock'], 'Pacemaker: sensing off, fixed-rate pacing at the magnet rate. ICD: detection/therapy suspended while the magnet stays on; bradycardia pacing unchanged.'],
+    ['device', 'Sensing', 'VVI 60: pacing spikes fall on the ST-T of conducted beats and those beats do not reset the timer. The correct reprogramming is:', ['Lower the sensitivity value (mV) to make the channel more sensitive', 'Raise the sensitivity value (mV)', 'Increase the output', 'Lengthen the refractory period'], 'Under-sensing: the R wave is smaller than the sensitivity setting. A lower mV number lowers the fence so smaller signals are seen.'],
+    ['device', 'Lead failure', 'Pauses without pacing spikes, non-physiological noise on the ventricular channel and a lead impedance of 2800 Ω indicate:', ['Conductor fracture', 'Insulation breach', 'Lead dislodgement', 'Battery depletion'], 'High impedance = open circuit (fracture, loose set screw). Insulation failure gives LOW impedance (< 200–250 Ω) with current leak.'],
+    ['device', 'Crosstalk', 'In a DDD device a ventricular sensed event 60 ms after atrial pacing triggers a ventricular pace at 110 ms. This is:', ['Ventricular safety pacing', 'Pacemaker-mediated tachycardia', 'Upper rate behaviour', 'Fusion'], 'A sense in the crosstalk window might be the atrial stimulus rather than a true R wave. Rather than risk asystole by inhibiting, the device commits to an early ventricular pace (a characteristically short AV delay on the strip).'],
+    ['device', 'Oversensing', 'T-wave over-sensing in a VVI pacemaker produces a paced rate that is:', ['Slower than the programmed lower rate', 'Faster than the programmed lower rate', 'Irregular with pauses of twice the lower rate interval', 'Unchanged'], 'The escape interval restarts from the over-sensed T wave, so each cycle is lengthened by the QRS-to-T time.'],
+    ['device', 'Threshold', 'A dialysis patient with a pacemaker has spikes without capture. Lead position and impedance are unchanged. Most likely cause:', ['Hyperkalaemia raising the capture threshold', 'Battery depletion', 'Pacemaker-mediated tachycardia', 'Far-field R-wave sensing'], 'Hyperkalaemia, acidosis, class I antiarrhythmics and infarction at the lead tip raise thresholds. Treat the potassium; pacing returns.'],
+    ['device', 'Insulation', 'Lead impedance 180 Ω, intermittent under-sensing and premature battery depletion suggest:', ['Insulation breach', 'Conductor fracture', 'Exit block', 'Twiddler\'s syndrome'], 'Current leaks through the insulation defect: low impedance, high current drain, attenuated electrogram.'],
+
+    ['hardware', 'Lead position', 'A "right ventricular" lead paces with an RBBB morphology and on the lateral film runs posteriorly toward the spine. The lead is most likely in:', ['A cardiac vein via the coronary sinus, or the left ventricle', 'The RV apex', 'The RV outflow tract', 'The right atrial appendage'], 'RV apical/septal leads go ANTERIORLY on the lateral view and pace with an LBBB pattern. A posterior course means coronary sinus/cardiac vein or passage across a PFO/ASD into the LV (stroke risk).'],
+    ['hardware', 'LBB area pacing', 'Which supports true left bundle capture during left bundle branch area pacing?', ['Terminal R in V1 with a short, constant stimulus-to-peak R time in V5–V6', 'QS in V1 with QRS 160 ms', 'An isoelectric interval equal to the HV interval with a QRS identical to the native beat', 'Negative QRS in leads I and aVL'], 'LV is activated first, so V1 shows Qr/rSR′; LV activation time < 75–80 ms and unchanged at high vs low output indicates conduction-system capture. An isoelectric interval with a native QRS is selective HIS capture.'],
+    ['hardware', 'Leadless', 'How does a Micra AV maintain AV synchrony?', ['Its accelerometer detects atrial contraction mechanically (VDD)', 'It senses the far-field P wave electrically', 'It communicates with an atrial capsule', 'It paces the atrium through the septum'], 'The A4 signal (atrial kick) on the accelerometer times ventricular pacing. It cannot pace the atrium, and tracking is limited at faster sinus rates.'],
+    ['hardware', 'Leadless', 'What makes AVEIR DR a dual-chamber system?', ['Beat-to-beat implant-to-implant (i2i) conducted communication between an atrial and a ventricular capsule', 'A thin lead joining the two capsules', 'Mechanical sensing of atrial contraction', 'Far-field sensing from the ventricle'], 'Each capsule senses and paces its own chamber and tells the other on every beat, giving true DDD(R) including atrial pacing.'],
+    ['hardware', 'S-ICD', 'Which patient is a poor candidate for a subcutaneous ICD?', ['Recurrent monomorphic VT that responds to anti-tachycardia pacing, with complete heart block', 'A 24-year-old with long QT syndrome', 'Previous transvenous device infection', 'Occluded subclavian veins'], 'The S-ICD cannot deliver ATP or bradycardia pacing (only brief post-shock pacing) and cannot resynchronise.'],
+    ['hardware', 'CRT', 'A CRT patient\'s paced ECG changes from Q waves in lead I with an R in V1 to a positive lead I with QS in V1 and a wider QRS. This means:', ['Loss of left ventricular capture', 'Loss of right ventricular capture', 'Atrial lead dislodgement', 'Normal battery depletion'], 'Only the RV lead is capturing (LBBB pattern, activation right-to-left → positive lead I). Causes: LV lead dislodgement or threshold rise.'],
+
+    ['temp', 'Transvenous', 'A temporary transvenous wire has a capture threshold of 0.8 mA. The output should be set to about:', ['2 mA', '0.8 mA', '1 mA', '20 mA'], 'Two to three times threshold gives a safety margin for threshold rise without unnecessary current (which promotes diaphragmatic pacing and, rarely, arrhythmia).'],
+    ['temp', 'Transvenous', 'Turning the sensitivity dial of a temporary pacing box from 2 mV to 10 mV:', ['Makes it less sensitive — risking pacing spikes on T waves', 'Makes it more sensitive — risking inhibition by T waves', 'Increases the output', 'Converts it to asynchronous mode only at 20 mV'], 'The number is the minimum signal size that counts as an R wave. A higher number ignores more: under-sensing and competitive pacing.'],
+    ['temp', 'Transcutaneous', 'The most reliable confirmation of capture during transcutaneous pacing is:', ['An arterial or pulse-oximeter waveform with every stimulus', 'A wide deflection after every stimulus on the monitor', 'Palpable carotid pulsation', 'Visible chest wall twitching'], 'The stimulus artefact can mimic a QRS and muscle contraction mimics a carotid pulse. Look for a T wave after the complex and confirm mechanical capture.'],
+    ['temp', 'Transvenous', 'A temporary wire that was pacing with an LBBB pattern now paces with an RBBB pattern and the patient has hiccups. Suspect:', ['Perforation into the pericardium / left ventricle', 'Normal variation', 'Atrial capture', 'Battery depletion'], 'A change in paced morphology means the tip has moved; RBBB pattern suggests LV capture, and diaphragmatic stimulation suggests perforation. Echo, and do not simply pull it back blindly.'],
+
+    ['icd', 'Programming', 'Which programming change reduces inappropriate shocks AND mortality in primary-prevention ICD patients?', ['High-rate cut-off (≥ 200/min) and/or prolonged detection', 'Lower VT zone to 140/min', 'Shock-only therapy without ATP', 'Shorter detection (12 intervals)'], 'MADIT-RIT and ADVANCE III: many VTs self-terminate and many fast rhythms are supraventricular. Waiting and treating only fast rhythms is safer.'],
+    ['icd', 'ATP', 'Anti-tachycardia pacing is most likely to terminate:', ['Monomorphic VT below 200/min', 'Ventricular fibrillation', 'Polymorphic VT', 'Sinus tachycardia'], 'ATP needs a stable re-entrant circuit with an excitable gap. Success ≈ 70–90% for slower monomorphic VT.'],
+    ['icd', 'Inappropriate therapy', 'An awake patient in sinus rhythm on the monitor receives four ICD shocks in ten minutes. The first step is:', ['Place a magnet over the generator', 'Give amiodarone 300 mg IV', 'External defibrillation', 'Start transcutaneous pacing'], 'Shocks in sinus rhythm are inappropriate (lead fracture noise, T-wave over-sensing, EMI). The magnet suspends detection; then pads on and interrogate.'],
+    ['icd', 'Storm', 'Electrical storm with recurrent appropriate shocks for monomorphic VT. Best initial pharmacological strategy:', ['Beta-blockade (e.g. propranolol), amiodarone and sedation', 'Flecainide', 'Verapamil', 'Isoprenaline'], 'Sympathetic drive sustains the storm. Non-selective beta-blockade with amiodarone, sedation/anxiolysis, electrolyte correction, then ablation or sympathetic blockade if refractory.'],
+
+    ['mgmt', 'Pre-excited AF', 'Stable patient, irregular wide-complex tachycardia at 220/min with varying QRS width. Drug of choice:', ['Procainamide', 'Adenosine', 'Diltiazem', 'Digoxin'], 'Pre-excited AF: AV-nodal blockers favour conduction over the pathway and can precipitate VF. Procainamide or ibutilide; cardiovert if unstable.'],
+    ['mgmt', 'VT', 'Stable monomorphic VT at 170/min in a patient with prior MI. Which drug should NOT be given?', ['Verapamil', 'Procainamide', 'Amiodarone', 'Lidocaine'], 'Calcium-channel blockers cause haemodynamic collapse in VT. Procainamide has the best termination data; amiodarone is acceptable; cardioversion is always an option.'],
+    ['mgmt', 'Torsades', 'Recurrent torsades continues after 4 g of magnesium and potassium replacement. Next step:', ['Overdrive pacing at 90–110/min (or isoprenaline)', 'Amiodarone infusion', 'Procainamide', 'Metoprolol'], 'Increasing the heart rate shortens the QT and abolishes pauses. Amiodarone and procainamide prolong the QT; beta-blockers slow the rate in acquired long QT.'],
+    ['mgmt', 'Unstable tachycardia', 'AF at 170/min with hypotension and pulmonary oedema, onset unknown. Management:', ['Immediate synchronised cardioversion', 'Diltiazem bolus', 'TEE before any cardioversion', 'Digoxin loading'], 'Instability attributable to the rhythm overrides the 48-hour rule. Anticoagulate afterwards.'],
+    ['mgmt', 'Bradycardia', 'Complete heart block with a wide escape at 28/min and BP 70/40. Atropine has no effect. Next:', ['Transcutaneous pacing (with a chronotrope infusion as a bridge)', 'More atropine to 6 mg', 'Adenosine', 'Amiodarone'], 'Infranodal block does not respond to atropine. Pace; epinephrine/dopamine/isoprenaline while arranging a transvenous wire.'],
+    ['mgmt', 'AF', 'Stable AF of 5 days\' duration, not anticoagulated. Which is contraindicated today?', ['Elective cardioversion without TEE', 'Beta-blocker', 'Starting a DOAC', 'Diltiazem'], 'Electrical or chemical cardioversion beyond 48 h risks embolism: 3 weeks of anticoagulation or TEE first, and 4 weeks after.'],
+    ['mgmt', 'Digoxin', 'Bidirectional VT in a patient on digoxin with K⁺ 5.9. Treatment:', ['Digoxin-specific antibody fragments', 'Synchronised cardioversion at 200 J', 'IV calcium', 'Amiodarone'], 'Fab fragments reverse the arrhythmia and the hyperkalaemia. Cardioversion can provoke refractory VF in digoxin toxicity.'],
+
+    ['isch', 'Posterior MI', 'Chest pain with horizontal ST depression maximal in V1–V4 and upright T waves. Next step:', ['Record posterior leads V7–V9 and treat as posterior occlusion', 'Treat as NSTEMI and repeat troponin in 3 hours', 'Exercise stress test', 'Attribute to diffuse subendocardial ischaemia'], 'ST depression maximal in V1–V4 is the mirror image of posterior ST elevation. Diffuse subendocardial ischaemia is maximal in V4–V6/II with ST elevation in aVR.'],
+    ['isch', 'RV infarction', 'Inferior STEMI with ST elevation III > II and ST elevation in V1. Which is correct?', ['Record V4R; avoid nitrates and support preload', 'The culprit is the circumflex', 'Give IV nitroglycerin for the hypotension', 'It indicates posterior extension'], 'III > II with STE in V1 points to a proximal RCA occlusion with RV infarction: preload-dependent, nitrate-sensitive.'],
+    ['isch', 'Sgarbossa', 'In LBBB, the Smith-modified Sgarbossa criteria replace "discordant ST elevation ≥ 5 mm" with:', ['ST elevation ÷ S-wave depth ≥ 0.25 (ST/S ≤ −0.25)', 'ST elevation ÷ R-wave height ≥ 0.5', 'Discordant ST elevation ≥ 3 mm', 'T/QRS ratio ≥ 0.36'], 'Proportion rather than absolute size: improves sensitivity from ≈ 20–36% to ≈ 80–90% with similar specificity. The T/QRS ≥ 0.36 rule distinguishes acute anterior MI from LV aneurysm.'],
+    ['isch', 'Swirl', 'ST elevation in V1 and aVR with ST depression in V5–V6 in a patient with chest pain and a narrow QRS most suggests:', ['LAD occlusion proximal to the first septal perforator', 'Circumflex occlusion', 'Isolated posterior MI', 'Pericarditis'], 'The "precordial swirl": a septal injury vector pointing rightward/anteriorly. Distinguish from LVH and LBBB, where the QRS is abnormal.'],
+    ['isch', 'Wellens', 'A pain-free patient has biphasic T waves in V2–V3 after an episode of angina. What should be avoided?', ['Exercise stress testing', 'Aspirin', 'Admission', 'Coronary angiography'], 'Wellens syndrome: a critical proximal LAD lesion that has reperfused. Stress testing can precipitate occlusion.'],
+    ['isch', 'de Winter', 'Upsloping ST depression at the J point in V1–V6 continuing into tall symmetrical T waves, with slight ST elevation in aVR, indicates:', ['Acute LAD occlusion (STEMI equivalent)', 'Hyperkalaemia', 'Benign early repolarisation', 'Posterior MI'], 'The de Winter pattern does not evolve to ST elevation; it needs immediate angiography.'],
+    ['isch', 'Conduction', 'New RBBB with left anterior fascicular block during an anterior STEMI implies:', ['A very proximal LAD occlusion with risk of sudden infranodal complete heart block', 'A benign rate-related change', 'Right coronary occlusion', 'Successful reperfusion'], 'Both fascicles are supplied by the first septal perforator. Block here is infranodal: abrupt, with an unreliable escape.'],
+    ['isch', 'Reciprocal change', 'Which is the most sensitive reciprocal sign of early inferior MI?', ['ST depression (± T inversion) in aVL', 'ST depression in V5–V6', 'ST elevation in aVR', 'Tall R wave in V1'], 'aVL faces almost directly away from lead III. New down-sloping ST depression in aVL may precede inferior ST elevation.'],
+
+    ['tox', 'Sodium-channel block', 'Tricyclic overdose: QRS 150 ms, terminal R in aVR, BP 85/50. First treatment:', ['Sodium bicarbonate boluses', 'Amiodarone', 'Procainamide', 'Physostigmine'], 'Sodium load plus alkalinisation reverses channel block; class Ia/Ic/III drugs worsen it.'],
+    ['tox', 'Hyperkalaemia', 'K⁺ 7.9 with a wide QRS and absent P waves. First drug:', ['IV calcium', 'Insulin-dextrose', 'Sodium polystyrene', 'Furosemide'], 'Calcium stabilises the membrane within minutes; it does not lower potassium, so shifting and removal follow.'],
+    ['tox', 'Calcium-channel blocker', 'Verapamil overdose with refractory shock despite calcium and vasopressors. Next:', ['High-dose insulin euglycaemia therapy', 'Glucagon alone', 'Transvenous pacing', 'Digoxin Fab'], 'Insulin at 1 unit/kg bolus then 1–10 units/kg/h improves contractility. Pacing may capture without improving pressure.'],
+    ['tox', 'Calcium', 'A long QT made up of a long flat ST segment with a normal-width T wave suggests:', ['Hypocalcaemia', 'Hypokalaemia', 'Hypercalcaemia', 'Tricyclic toxicity'], 'Calcium determines plateau (ST segment) length. Hypokalaemia flattens the T and adds a U wave.'],
+    ['tox', 'Digoxin', 'A patient with chronic AF on digoxin now has a perfectly regular ventricular rhythm at 50/min with a narrow QRS. This is:', ['Complete AV block with a junctional escape — digoxin toxicity', 'Conversion to sinus rhythm', 'Good rate control', 'Atrial flutter with 4:1 block'], '"Regularised AF": fibrillatory baseline persists but none of it conducts; the regular rhythm is an escape.'],
+    ['tox', 'QT drugs', 'Torsades in a patient on methadone and a macrolide. Which drug is contraindicated?', ['Amiodarone', 'Magnesium', 'Potassium', 'Isoprenaline'], 'Class III (and Ia) drugs prolong repolarisation further.'],
+  ];
+
+  // ---- generated ECG items -----------------------------------------------------------------------------
+  const pick = (a) => a[Math.floor(Math.random() * a.length)];
+  const shuffle = (a) => a.slice().sort(() => Math.random() - 0.5);
+  const others = (all, self, n) => shuffle(all.filter((x) => x !== self)).slice(0, n);
+  const GEN = {
+    rhythm() {
+      const pool = R.list.filter((r) => r.id !== 'sinus-arr'), cur = pick(pool);
+      const opts = shuffle(pool.filter((r) => r.group === cur.group && r !== cur)).slice(0, 2).concat(shuffle(pool.filter((r) => r.group !== cur.group)).slice(0, 2));
+      return { id: 'g-rh-' + cur.id, domain: 'rhythm', topic: (R.groups.find((g) => g.id === cur.group) || {}).name, stem: 'What is the rhythm?', ecg: { rec: () => R.record(cur, { params: {} }) }, right: cur.name, wrong: opts.map((o) => o.name), explain: cur.teach.ecg.slice(0, 2).join(' ') };
+    },
+    localPvc() {
+      const P = EP.LocData.PRESETS, cur = pick(P);
+      return { id: 'g-pvc-' + cur[0], domain: 'local', topic: 'PVC / VT origin', stem: 'Sinus beats alternate with ectopic beats. Where do the wide beats arise?',
+        ecg: { rec: () => { const sim = EP.simulate({ sinus: { cl: 900, resp: 0 }, avn: { fast: { retro: { block: true } } }, foci: [{ id: 'x', node: 'V', kind: 'coupled', after: 'hps', coupling: 470, every: 1, spec: Mo.spec(cur[0]), label: 'PVC' }] }, 10000); const r = EP.Synth.build(sim, 0, 10000); r.sim = sim; return r; } },
+        right: cur[1], wrong: others(P, cur, 4).map((x) => x[1]), explain: 'Read V1 (LBBB pattern = right ventricle/septum, RBBB pattern = left ventricle), then the inferior leads (positive = high origin, negative = low), then the precordial transition and lead I. Open the Localise tab to see the map for this site.' };
+    },
+    localAp() {
+      const keys = Object.keys(R.AP), k = pick(keys);
+      return { id: 'g-ap-' + k, domain: 'local', topic: 'Accessory pathway', stem: 'Sinus rhythm with maximal pre-excitation. Where is the accessory pathway?',
+        ecg: { rec: () => { const sim = EP.simulate({ sinus: { cl: 880, resp: 0 }, avn: { fast: { min: 150 } }, ap: R.apCfg(k) }, 10000); const r = EP.Synth.build(sim, 0, 10000); r.sim = sim; return r; } },
+        right: R.AP[k].name, wrong: others(keys, k, 3).map((x) => R.AP[x].name), explain: 'The delta wave is negative in leads facing the insertion: negative in I/aVL with a positive V1 → left lateral; negative in III/aVF → posterior/posteroseptal; negative V1 with a left axis → right free wall; positive inferior leads with a negative V1 → anteroseptal.' };
+    },
+    localPace() {
+      const P = EP.LocData.PACE, cur = pick(P);
+      return { id: 'g-pace-' + cur[0], domain: 'local', topic: 'Pacing site', stem: 'Complete heart block with P-synchronous ventricular pacing. Where is the ventricle being paced from?',
+        ecg: { rec: () => { const sim = new EP.HeartSim({ sinus: { cl: 820, resp: 0 }, avn: { fast: { block: true, retro: { block: true } } } }); new EP.Pacemaker(sim, { mode: 'DDD', lrl: 60, vSpec: cur[2](), vSite: 'rvApex' }); sim.runUntil(12500); const r = EP.Synth.build(sim, 2000, 12000); r.sim = sim; return r; } },
+        right: cur[1], wrong: others(P, cur, 3).map((x) => x[1]), explain: 'LBBB pattern = right ventricular site (superior axis → apex; inferior axis → outflow tract). Terminal R in V1 with a narrow QRS → left bundle area. Dominant R in V1 with negative lead I → left ventricular site. An isoelectric gap then a native QRS → His bundle.' };
+    },
+    isch() {
+      const S = EP.Stemi.list, cur = pick(S);
+      const label = (x) => x.name + (x.sub ? ' — ' + x.sub : '');
+      return { id: 'g-is-' + cur.id, domain: 'isch', topic: (EP.Stemi.groups.find((g) => g.id === cur.group) || {}).name, stem: 'Which is the best interpretation of this ECG?', ecg: { rec: () => EP.Stemi.record(cur, 0.36) },
+        right: label(cur), wrong: shuffle(S.filter((x) => x.group === cur.group && x !== cur)).slice(0, 2).concat(shuffle(S.filter((x) => x.group !== cur.group)).slice(0, 2)).map(label), explain: cur.teach.ecg.slice(0, 2).join(' ') };
+    },
+    fault() {
+      const D = EP.PacerData, q = pick(D.QUIZ), f = D.FAULTS[q.fault], pat = D.PATIENTS[q.patientOverride || q.patient];
+      const keys = Object.keys(D.FAULTS).filter((k) => k !== 'none');
+      return { id: 'g-pm-' + q.fault, domain: 'device', topic: 'Reading a paced strip', stem: 'Patient: ' + pat.name + '. Programmed ' + q.pm.mode + ' ' + (q.pm.lrl || 60) + '/min. Lead II with the marker channel. What is wrong?',
+        ecg: { layout: 'strip', markers: true, rec: () => { const sim = new EP.HeartSim(pat.cfg()); const c = Object.assign({}, EP.Pacemaker.DEF, q.pm, q.force || {}, f.set); if (f.set.forceMode) c.mode = f.set.forceMode; const pm = new EP.Pacemaker(sim, c); if (f.set.intermittent) { const flip = (t) => { pm.c.noOutput = sim.rng() < f.set.intermittent; sim.schedule(t + 900 + 1500 * sim.rng(), flip); }; sim.schedule(600, flip); } sim.runUntil(13500); const r = EP.Synth.build(sim, 3000, 13000); r.sim = sim; return r; } },
+        right: f.name, wrong: others(keys, q.fault, 3).map((k) => D.FAULTS[k].name), explain: f.dx + '. ' + f.why };
+    },
+    tox() {
+      const T = EP.Tox.list, cur = pick(T), v = cur.variants ? pick(cur.variants) : null, s = cur.fixed || cur.variants ? cur.def : (cur.id === 'ca' ? pick([0.08, 0.95]) : 0.55 + 0.35 * Math.random());
+      const label = (t, vv) => t.name + (vv ? ' — ' + vv[1].toLowerCase() : t.id === 'ca' ? '' : '');
+      return { id: 'g-tx-' + cur.id + (v ? v[0] : ''), domain: 'tox', topic: cur.group, stem: 'Which best explains this ECG?', ecg: { rec: () => { const sim = EP.simulate(cur.cfg(s, v ? v[0] : null), 10000); const r = EP.Synth.build(sim, 0, 10000); r.sim = sim; return r; } },
+        right: label(cur, v) + (cur.id === 'ca' ? (s < 0.5 ? ' — hypocalcaemia' : ' — hypercalcaemia') : ''), wrong: others(T, cur, 4).map((t) => t.name + (t.id === 'ca' ? (s < 0.5 ? ' — hypercalcaemia' : ' — hypocalcaemia') : '')), explain: cur.teach.ecg.slice(0, 2).join(' ') };
+    },
+  };
+  const GEN_BY = { rhythm: ['rhythm'], local: ['localPvc', 'localAp', 'localPace'], isch: ['isch'], device: ['fault'], tox: ['tox'] };
+
+  function written(domain, used) {
+    const pool = W.map((w, i) => ({ w, i })).filter((x) => x.w[0] === domain && !used.has('w' + x.i));
+    if (!pool.length) return null;
+    const x = pick(pool), w = x.w;
+    return { id: 'w' + x.i, domain, topic: w[1], stem: w[2], right: w[3][0], wrong: w[3].slice(1), explain: w[4] };
+  }
+  /* Build a question set. spec: { n, domain (optional focus) } */
+  function build(spec) {
+    const out = [], used = new Set();
+    const add = (d) => {
+      const gens = GEN_BY[d];
+      const tryGen = () => { for (let k = 0; k < 6; k++) { const c = GEN[pick(gens)](); if (!used.has(c.id)) return c; } return null; };
+      const preferGen = !!gens && (d === 'rhythm' || d === 'local' || Math.random() < 0.5);
+      let q = preferGen ? tryGen() : written(d, used);
+      if (!q) q = gens && !preferGen ? tryGen() : written(d, used);
+      if (q) { used.add(q.id); out.push(q); }
+    };
+    if (spec.domain) for (let i = 0; i < spec.n; i++) add(spec.domain);
+    else {
+      const doms = Object.keys(QUOTA), total = doms.reduce((a, d) => a + QUOTA[d], 0);
+      for (const d of doms) { const k = Math.max(1, Math.round((QUOTA[d] / total) * spec.n)); for (let i = 0; i < k && out.length < spec.n + 2; i++) add(d); }
+    }
+    return shuffle(out).slice(0, spec.n);
+  }
+
+  // ---- history ---------------------------------------------------------------------------------------
+  const Store = {
+    sessions: UI.store.get('assess', []),
+    db: null,
+    async init(onChange) {
+      try {
+        const c = globalThis.claude;
+        if (!c || !c.use) return;
+        const db = await c.use('db');
+        if (!db) return;
+        this.db = db;
+        const snap = await Promise.race([db.collection('assessment').orderBy('t', 'desc').limit(40).get(), new Promise((r) => setTimeout(() => r(null), 10000))]);
+        if (!snap) return;
+        const seen = new Set(this.sessions.map((s) => s.t));
+        for (const d of snap.docs) { const x = d.data(); if (x && x.t && !seen.has(x.t)) this.sessions.push(x); }
+        this.sessions.sort((a, b) => a.t - b.t);
+        UI.store.set('assess', this.sessions.slice(-40));
+        if (onChange) onChange();
+      } catch (e) { /* database unavailable: the browser copy is still used */ }
+    },
+    save(s) {
+      this.sessions.push(s); UI.store.set('assess', this.sessions.slice(-40));
+      if (this.db) this.db.collection('assessment').add(s).catch(() => {});
+    },
+    clear() { this.sessions = []; UI.store.set('assess', []); },
+    /* → { domain: { n, right, sureWrong, guessRight, topics: {topic: [n, right]} } } */
+    stats() {
+      const st = {};
+      for (const s of this.sessions) for (const it of s.items || []) {
+        const d = (st[it.d] = st[it.d] || { n: 0, right: 0, sureWrong: 0, guessRight: 0, topics: {} });
+        d.n++; if (it.ok) d.right++; if (!it.ok && it.c === 2) d.sureWrong++; if (it.ok && it.c === 0) d.guessRight++;
+        const tp = (d.topics[it.s] = d.topics[it.s] || [0, 0]); tp[0]++; if (it.ok) tp[1]++;
       }
-      root.append(h('div.sim', h('div.sim-main', h('section.card', h('div.card-h', h('h2', 'Name the rhythm'), h('span.grow'), h('span.muted', 'Score'), scoreEl, h('button.btn.sm', { type: 'button', onclick: () => { score = { right: 0, total: 0 }; UI.store.set('quiz', score); show(); } }, 'Reset')), box,
-        h('div.card-b', h('p.muted', { style: { fontSize: '13px' } }, 'Use the calipers: drag across the trace. The ladder diagram appears after you answer.')))),
-        h('div.sim-main', h('section.card', h('div.card-h', h('h3', 'Your answer')), h('div.card-b', opts, h('div', { style: { marginTop: '10px' } }, fb))))));
-      show(); next();
-      return { unmount() { if (view.ro) view.ro.disconnect(); } };
+      return st;
+    },
+  };
+  EP.Assess = { W, DOM, build, Store };
+
+  function gapMap(st, compact) {
+    const rows = Object.keys(DOM).map((d) => ({ d, x: st[d] })).filter((r) => r.x && r.x.n);
+    if (!rows.length) return h('p.muted', 'No answers recorded yet. Take the baseline set to see where to focus.');
+    rows.sort((a, b) => a.x.right / a.x.n - b.x.right / b.x.n);
+    const el = h('div', { style: { display: 'grid', gap: '8px' } });
+    for (const r of rows) {
+      const pct = Math.round((100 * r.x.right) / r.x.n), col = pct >= 80 ? 'var(--good)' : pct >= 55 ? 'var(--gold)' : 'var(--bad)';
+      const weak = Object.keys(r.x.topics).filter((t) => r.x.topics[t][1] < r.x.topics[t][0]).sort((a, b) => r.x.topics[a][1] / r.x.topics[a][0] - r.x.topics[b][1] / r.x.topics[b][0]).slice(0, 3);
+      el.append(h('div', h('div.row', { style: { justifyContent: 'space-between' } }, h('button.btn.sm', { type: 'button', onclick: () => EP.go(DOM[r.d][1], true), title: 'Open the related tab' }, DOM[r.d][0]), h('span.mono', r.x.right + ' / ' + r.x.n + ' · ' + pct + '%')),
+        h('div', { style: { height: '8px', background: 'var(--surface-2)', borderRadius: '4px', overflow: 'hidden', marginTop: '4px' } }, h('div', { style: { width: pct + '%', height: '100%', background: col } })),
+        compact || (!weak.length && !r.x.sureWrong) ? null : h('div.muted', { style: { fontSize: '12px', marginTop: '3px' } }, (weak.length ? 'Missed: ' + weak.join(', ') + '. ' : '') + (r.x.sureWrong ? r.x.sureWrong + ' confident but wrong. ' : '') + (r.x.guessRight ? r.x.guessRight + ' right by guessing.' : ''))));
+    }
+    return el;
+  }
+
+  EP.Modules = EP.Modules || [];
+  EP.Modules.push({
+    id: 'assess', title: 'Assessment',
+    mount(root) {
+      let view = null, qs = [], qi = 0, items = [], chosen = null, review = [];
+      const main = h('div');
+      const destroyView = () => { if (view && view.ro) view.ro.disconnect(); view = null; };
+      function home() {
+        destroyView(); main.innerHTML = '';
+        const st = Store.stats(), tot = Object.values(st).reduce((a, x) => a + x.n, 0);
+        const weakest = Object.keys(st).filter((d) => st[d].n >= 2).sort((a, b) => st[a].right / st[a].n - st[b].right / st[b].n)[0];
+        const domBtns = h('div.variants', Object.keys(DOM).map((d) => h('button.btn.sm', { type: 'button', onclick: () => start({ n: 8, domain: d }) }, DOM[d][0])));
+        main.append(h('div.two',
+          h('section.card', h('div.card-h', h('h2', 'Find your gaps')), h('div.card-b.prose',
+            h('p', 'Fellow-level questions across ten domains. Most are built on ECGs generated fresh by the simulator, so you cannot memorise them; the rest are short written items on mechanisms, device behaviour and management.'),
+            h('p', 'After each answer you say how sure you were. That separates what you know, what you guessed, and — most useful — what you were confident about and got wrong.'),
+            h('div.row', { style: { marginTop: '12px' } }, h('button.btn.primary', { type: 'button', onclick: () => start({ n: 30 }) }, 'Baseline assessment · 30 questions'), h('button.btn', { type: 'button', onclick: () => start({ n: 10 }) }, 'Quick set · 10'),
+              weakest ? h('button.btn', { type: 'button', onclick: () => start({ n: 8, domain: weakest }) }, 'Drill my weakest: ' + DOM[weakest][0]) : null),
+            h('h4', { style: { marginTop: '14px' } }, 'Or drill one domain (8 questions)'), domBtns)),
+          h('section.card', h('div.card-h', h('h3', 'Gap map'), h('span.grow'), h('span.muted.mono', tot + ' answered'), tot ? h('button.btn.sm', { type: 'button', onclick: () => { Store.clear(); home(); } }, 'Clear') : null), h('div.card-b', gapMap(st),
+            h('p.muted', { style: { fontSize: '12px', marginTop: '10px' } }, 'Sorted weakest first. Each domain name opens its tab. ' + (Store.db ? 'History is saved with this page.' : 'History is saved in this browser.'))))));
+      }
+      function start(spec) { qs = build(spec); qi = 0; items = []; review = []; ask(); }
+      function ask() {
+        destroyView(); main.innerHTML = ''; chosen = null;
+        const q = qs[qi], opts = shuffle([q.right].concat(q.wrong));
+        const optEl = h('div.opts'), fb = h('div', { style: { marginTop: '10px' } });
+        let ecgCard = null;
+        if (q.ecg) {
+          const canvas = h('canvas', { 'aria-label': 'ECG for this question' }), box = h('div.ecg-scroll', canvas);
+          ecgCard = h('section.card', h('div.card-h', h('h3', 'ECG'), h('span.grow'), h('span.muted', { style: { fontSize: '12px' } }, 'drag on the trace to measure')), box);
+          view = new EP.ECGView(canvas, q.ecg.layout === 'strip' ? { layout: 'strip', strips: [1], markers: !!q.ecg.markers, rowMm: 34 } : { layout: '12', strips: [1] });
+          try { view.setRecording(q.ecg.rec()); } catch (e) { console.error(e); }
+        }
+        const reveal = (conf) => {
+          const ok = chosen === q.right;
+          items.push({ d: q.domain, s: q.topic, q: q.id, ok, c: conf });
+          if (!ok || conf === 0) review.push({ q, chosen, ok, conf });
+          for (const b of optEl.children) { b.disabled = true; if (b.textContent === q.right) b.classList.add('right'); else if (b.textContent === chosen) b.classList.add('wrong'); }
+          fb.innerHTML = '';
+          fb.append(h('div.note' + (ok ? '.good' : '.bad'), h('b', ok ? 'Correct. ' : 'Answer: ' + q.right + '. '), q.explain),
+            h('div.row', { style: { marginTop: '10px' } }, h('button.btn.primary', { type: 'button', onclick: () => { qi++; if (qi < qs.length) ask(); else finish(); } }, qi + 1 < qs.length ? 'Next question' : 'See results'),
+              h('span.pill', DOM[q.domain][0]), h('span.muted', { style: { fontSize: '12px' } }, q.topic || '')));
+        };
+        for (const o of opts) optEl.append(h('button.opt', { type: 'button', onclick: (ev) => {
+          if (chosen) return; chosen = o;
+          for (const b of optEl.children) b.disabled = true;
+          ev.currentTarget.style.borderColor = 'var(--accent)';
+          fb.innerHTML = '';
+          fb.append(h('div.eyebrow', { style: { marginBottom: '6px' } }, 'How sure were you?'), h('div.row', [['Guessing', 0], ['Fairly sure', 1], ['Certain', 2]].map(([t, c]) => h('button.btn', { type: 'button', onclick: () => reveal(c) }, t))));
+        } }, o));
+        const qCard = h('section.card', h('div.card-h', h('h3', 'Question ' + (qi + 1) + ' of ' + qs.length), h('span.grow'), h('button.btn.sm', { type: 'button', onclick: () => (items.length ? finish() : home()) }, 'End')),
+          h('div.card-b', h('p', { style: { fontWeight: '500', marginBottom: '10px' } }, q.stem), optEl, fb));
+        main.append(ecgCard ? h('div.sim', h('div.sim-main', ecgCard), h('div.sim-main', qCard)) : h('div', { style: { maxWidth: '760px' } }, qCard));
+      }
+      function finish() {
+        destroyView(); main.innerHTML = '';
+        const right = items.filter((i) => i.ok).length, sess = { t: Date.now(), n: items.length, right, items };
+        if (items.length) Store.save(sess);
+        const st = {}; for (const it of items) { const d = (st[it.d] = st[it.d] || { n: 0, right: 0, sureWrong: 0, guessRight: 0, topics: {} }); d.n++; if (it.ok) d.right++; if (!it.ok && it.c === 2) d.sureWrong++; if (it.ok && it.c === 0) d.guessRight++; const tp = (d.topics[it.s] = d.topics[it.s] || [0, 0]); tp[0]++; if (it.ok) tp[1]++; }
+        const sure = review.filter((r) => !r.ok && r.conf === 2), wrong = review.filter((r) => !r.ok && r.conf !== 2), lucky = review.filter((r) => r.ok);
+        const block = (title, note, arr) => (arr.length ? [h('h4', title), h('p.muted', { style: { fontSize: '12px' } }, note), h('div.findings', { style: { marginTop: '6px' } }, arr.map((r) => h('div.finding', h('span.pill', DOM[r.q.domain][0].split(' ')[0]), h('div', h('b', r.q.stem), r.ok ? null : h('div', { style: { color: 'var(--bad)' } }, 'You chose: ' + r.chosen), h('div', 'Answer: ' + r.q.right), h('div.muted', r.q.explain)))))] : null);
+        main.append(h('div.two',
+          h('section.card', h('div.card-h', h('h2', 'This set: ' + right + ' / ' + items.length)), h('div.card-b', gapMap(st), h('div.row', { style: { marginTop: '12px' } }, h('button.btn.primary', { type: 'button', onclick: home }, 'Back to overview'), h('button.btn', { type: 'button', onclick: () => start({ n: 10 }) }, 'Another 10')))),
+          h('section.card', h('div.card-h', h('h3', 'All sessions')), h('div.card-b', gapMap(Store.stats(), true)))),
+          h('section.card', { style: { marginTop: '14px' } }, h('div.card-h', h('h3', 'Review')), h('div.card-b.prose', { style: { maxWidth: 'none' } },
+            block('Confident but wrong', 'These are misconceptions rather than gaps — the highest-value items to revisit.', sure),
+            block('Wrong', 'Knowledge gaps you were already unsure about.', wrong),
+            block('Right by guessing', 'Correct, but not yet reliable.', lucky),
+            !review.length ? h('p', 'Nothing to review: every answer was correct and none was a guess.') : null)));
+      }
+      root.append(main);
+      home();
+      Store.init(() => { if (!qs.length) home(); });
+      return { unmount() { destroyView(); } };
     },
   });
 })(globalThis.EP = globalThis.EP || {});
@@ -5222,7 +5931,7 @@ table.tbl td { padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-
     const tabs = document.getElementById('tabs'), page = document.getElementById('page');
     let current = null, handle = null;
     const mods = EP.Modules;
-    const order = ['rhythms', 'localise', 'devices', 'pacemaker', 'temp', 'icd', 'tox', 'cases', 'quiz'];
+    const order = ['rhythms', 'localise', 'stemi', 'devices', 'pacemaker', 'temp', 'icd', 'tox', 'cases', 'assess', 'quiz'];
     mods.sort((a, b) => order.indexOf(a.id) - order.indexOf(b.id));
     for (const m of mods) tabs.appendChild(h('button.tab', { type: 'button', role: 'tab', id: 'tab-' + m.id, 'aria-selected': 'false', onclick: () => go(m.id, true) }, m.title));
     function go(id, push) {

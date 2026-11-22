@@ -65,6 +65,7 @@
     { patient: 'chb', pm: { mode: 'VVI', lrl: 70 }, fault: 'fracture' }, { patient: 'chb', pm: { mode: 'DDD' }, fault: 'aUnder' },
     { patient: 'chb', pm: { mode: 'DDD' }, fault: 'ffr' }, { patient: 'chb', pm: { mode: 'DDD' }, fault: 'battery' }, { patient: 'chb', pm: { mode: 'VVI', lrl: 70 }, fault: 'exit' },
   ];
+  EP.PacerData = { FAULTS, PATIENTS, QUIZ };
   PATIENTS.asys2 = { name: 'Complete heart block, sinus bradycardia 45/min, no escape', hidden: true, cfg: () => ({ sinus: { cl: 1330 }, avn: CHB() }) };
 
   /* Read the last few seconds of the strip the way a clinician would. → [[level, title, text]] */

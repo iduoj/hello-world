@@ -192,7 +192,7 @@
 
   /* Heart dipole time series from a LAT field. Returns { vcg: Float32Array(3n) in mV, n (ms samples),
    * t0 (ms of first sample relative to LAT zero), dur, area:[x,y,z] (mV·ms) }. */
-  M.dipole = function (T, sigma) {
+  M.dipole = function (T, sigma, scarW, scarK) {
     let tmax = 0, tmin = Infinity;
     for (let i = 0; i < nv; i++) { const t = T[i]; if (t < Infinity) { if (t > tmax) tmax = t; if (t < tmin) tmin = t; } }
     const pad = 12;
@@ -220,7 +220,7 @@
       const gl = Math.sqrt(gx * gx + gy * gy + gz * gz);
       if (gl > gmax) { const k = gmax / gl; gx *= k; gy *= k; gz *= k; }
       const f = t - t0, b = Math.floor(f), w = f - b;
-      const wt = (wall[i] === 3 ? M.OTW : wall[i] === 2 ? M.RVW : 1) * (M.BASE_FADE ? EP.smoothstep(-0.35, M.BASE_FADE, va[i]) : 1) * M.KV * dV;
+      const wt = (wall[i] === 3 ? M.OTW : wall[i] === 2 ? M.RVW : 1) * (M.BASE_FADE ? EP.smoothstep(-0.35, M.BASE_FADE, va[i]) : 1) * M.KV * dV * (scarW ? 1 - scarK * scarW[i] : 1);
       const k0 = wt * (1 - w), k1 = wt * w;
       D[b * 3] += gx * k0; D[b * 3 + 1] += gy * k0; D[b * 3 + 2] += gz * k0;
       if (b + 1 < n) { D[b * 3 + 3] += gx * k1; D[b * 3 + 4] += gy * k1; D[b * 3 + 5] += gz * k1; }
@@ -229,6 +229,35 @@
     const area = [0, 0, 0];
     for (let i = 0; i < n; i++) { area[0] += D[i * 3]; area[1] += D[i * 3 + 1]; area[2] += D[i * 3 + 2]; }
     return { vcg: D, n, t0, dur: tmax - tmin, tmin, tmax, area };
+  };
+
+  /* Voxel weights (0..1) for a myocardial territory described by spheres in heart-local coordinates.
+   * spheres: [[s, n, a, radius, 'rv' | undefined]] — 'rv' spheres select right-ventricular wall only. */
+  M.territory = function (spheres) {
+    const w = new Float32Array(nv);
+    for (let i = 0; i < nv; i++) {
+      let m = 0;
+      for (const sp of spheres) {
+        const rv = wall[i] >= 2;
+        if ((sp[4] === 'rv') !== rv) continue;
+        const d = Math.sqrt((vs[i] - sp[0]) ** 2 + (vn[i] - sp[1]) ** 2 + (va[i] - sp[2]) ** 2);
+        const k = 1 - EP.smoothstep(sp[3] * 0.72, sp[3], d);
+        if (k > m) m = k;
+      }
+      w[i] = m;
+    }
+    return w;
+  };
+  /* Injury-current vector of a territory: sum of transmural (endo → epi) directions. For the septum this
+   * points from the LV side to the RV side. Pass w = null for the whole left ventricle. */
+  M.injury = function (w) {
+    const o = [0, 0, 0], dV = H * H * H;
+    for (let i = 0; i < nv; i++) {
+      const k = (w ? w[i] : (wall[i] < 2 ? 1 : 0)) * (wall[i] >= 2 ? 0.45 : 1);   // thin RV wall counts less
+      if (!k) continue;
+      o[0] += tx[i] * k * dV; o[1] += ty[i] * k * dV; o[2] += tz[i] * k * dV;
+    }
+    return o;
   };
 
   /* Map each vertex of a mesh to its nearest myocardial voxel (-1 if the vertex is not ventricular). */
@@ -347,5 +376,8 @@
     [-0.515, -0.157, 0.917], [0.044, -0.164, 1.387], [0.882, -0.098, 1.277],
     [1.213, -0.127, 0.601], [1.125, -0.127, 0.086], [0.831, -0.076, -0.230],
   ];
+  // additional leads: right-sided and posterior (indices 12–15)
+  L.names.push('V4R', 'V7', 'V8', 'V9');
+  L.vec.push([-0.62, -0.1, 0.56], [0.6, -0.05, -0.5], [0.34, -0.05, -0.72], [0.08, -0.05, -0.8]);
   L.project = function (x, y, z, lead) { const v = L.vec[lead]; return v[0] * x + v[1] * y + v[2] * z; };
 })(globalThis.EP = globalThis.EP || {});

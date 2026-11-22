@@ -66,9 +66,16 @@ QRS events are emitted `FW` (100 ms) after onset so late contributors can fuse.
 ### ui.js — `EP.h`, `EP.UI.{seg,check,range,select,kv,teach,store}`, `EP.Player` (ECG card + heart card).
 ### device.js — `new EP.Pacemaker(sim, cfg)` (modes AOO/AAI/VOO/VVI/VDD/DOO/DDI/DDD/OFF; emits `mark` and
 `timer` events; `.set(cfg)` live), `new EP.ICD(sim, cfg)` (`.log`), `new EP.Live({sim, strips, pulse, onTick})`.
+### ischemia.js — `EP.Isch`: `I.TERR` territories (spheres in local coords), `I.terr(name)` → `{w, vec}`,
+`I.vent({terr, stage, amp, sub, st, t, q})` → `{mods, scar}` for `cfg.vent`, `I.coronaries()`,
+`I.addCoronaries(heart, [artery, fraction])`, `I.measure(rec, qrsEvent)`, `I.sgarbossa(measure)`.
+Engine hooks: `M.territory`, `M.injury`, scar mask in `M.dipole`, `cfg.vent.scar`, `cfg.atria.prDep`,
+`mods.stShape` may be a function, leads 12–15 = V4R, V7, V8, V9, `Heart3D.setTint(voxelWeights)`.
 ### devices3d.js — `EP.Hardware.build(parts)`, `EP.Hardware.add3D(heart, hw)`, `new EP.XRay(el)`.
 ### ui-*.js — one module per tab: rhythms, localise, devices (`EP.Devices` catalogue), pacer, temp, icd,
-tox (`EP.Tox`), cases (+ quiz).
+tox (`EP.Tox`), stemi (`EP.Stemi`), cases, assess (`EP.Assess`: written bank `W`, generators, `Store`).
+Assessment history: localStorage key `ep.assess` and, in the artifact, db collection `assessment`
+(one doc per finished set: `{t, n, right, items:[{d domain, s topic, q id, ok, c confidence 0–2}]}`).
 ### app.js — modules register in `EP.Modules = [{id,title,mount(root)→{unmount}}]`; tabs + hash routing.
 
 ## Dev tools

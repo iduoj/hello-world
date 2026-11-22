@@ -197,41 +197,4 @@
     },
   });
 
-  // ---------------------------------------------------------------------------------------------
-  // Quiz: name the rhythm
-  EP.Modules.push({
-    id: 'quiz', title: 'Quiz',
-    mount(root) {
-      const canvas = h('canvas', { 'aria-label': 'Unknown ECG' }), box = h('div.ecg-scroll', canvas);
-      const view = new EP.ECGView(canvas, { layout: '12', strips: [1], ladder: false });
-      const opts = h('div.opts'), fb = h('div'), scoreEl = h('span.mono', '0 / 0');
-      let score = UI.store.get('quiz', { right: 0, total: 0 }), cur = null, answered = false;
-      const pool = R.list.filter((r) => !['sinus-arr'].includes(r.id));
-      const show = () => { scoreEl.textContent = score.right + ' / ' + score.total; };
-      function next() {
-        answered = false; cur = pool[Math.floor(Math.random() * pool.length)];
-        const same = pool.filter((r) => r.group === cur.group && r !== cur).sort(() => Math.random() - 0.5).slice(0, 2);
-        const other = pool.filter((r) => r.group !== cur.group).sort(() => Math.random() - 0.5).slice(0, 2);
-        const choices = same.concat(other, [cur]).sort(() => Math.random() - 0.5);
-        const rec = R.record(cur, { params: {} });
-        view.set({ ladder: false }); view.setRecording(rec);
-        opts.innerHTML = ''; fb.innerHTML = '';
-        for (const c of choices) opts.append(h('button.opt', { type: 'button', onclick: (ev) => {
-          if (answered) return; answered = true; score.total++;
-          for (const b of opts.children) { b.disabled = true; if (b.textContent === cur.name) b.classList.add('right'); }
-          if (c === cur) score.right++; else ev.currentTarget.classList.add('wrong');
-          UI.store.set('quiz', score); show();
-          view.set({ ladder: true });
-          fb.append(h('div.note' + (c === cur ? '.good' : '.bad'), h('b', c === cur ? 'Correct. ' : 'This is ' + cur.name + '. '), cur.teach.ecg[0]),
-            h('div.prose', { style: { marginTop: '10px', fontSize: '13px' } }, h('h4', 'What to look for'), UI.list(cur.teach.ecg)),
-            h('div.row', { style: { marginTop: '10px' } }, h('button.btn.primary', { type: 'button', onclick: next }, 'Next ECG'), h('button.btn', { type: 'button', onclick: () => { UI.store.set('rhythm', cur.id); EP.go('rhythms', true); } }, 'Open in Rhythm Lab')));
-        } }, c.name));
-      }
-      root.append(h('div.sim', h('div.sim-main', h('section.card', h('div.card-h', h('h2', 'Name the rhythm'), h('span.grow'), h('span.muted', 'Score'), scoreEl, h('button.btn.sm', { type: 'button', onclick: () => { score = { right: 0, total: 0 }; UI.store.set('quiz', score); show(); } }, 'Reset')), box,
-        h('div.card-b', h('p.muted', { style: { fontSize: '13px' } }, 'Use the calipers: drag across the trace. The ladder diagram appears after you answer.')))),
-        h('div.sim-main', h('section.card', h('div.card-h', h('h3', 'Your answer')), h('div.card-b', opts, h('div', { style: { marginTop: '10px' } }, fb))))));
-      show(); next();
-      return { unmount() { if (view.ro) view.ro.disconnect(); } };
-    },
-  });
 })(globalThis.EP = globalThis.EP || {});

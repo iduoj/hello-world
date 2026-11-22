@@ -6,7 +6,7 @@
     const tabs = document.getElementById('tabs'), page = document.getElementById('page');
     let current = null, handle = null;
     const mods = EP.Modules;
-    const order = ['rhythms', 'localise', 'devices', 'pacemaker', 'temp', 'icd', 'tox', 'cases', 'quiz'];
+    const order = ['rhythms', 'localise', 'stemi', 'devices', 'pacemaker', 'temp', 'icd', 'tox', 'cases', 'assess', 'quiz'];
     mods.sort((a, b) => order.indexOf(a.id) - order.indexOf(b.id));
     for (const m of mods) tabs.appendChild(h('button.tab', { type: 'button', role: 'tab', id: 'tab-' + m.id, 'aria-selected': 'false', onclick: () => go(m.id, true) }, m.title));
     function go(id, push) {

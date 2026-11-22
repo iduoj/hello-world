@@ -48,6 +48,7 @@
   const PACE = [['rvApex', 'RV apex', () => Mo.spec('rvApex')], ['rvMidSeptum', 'RV mid-septum', () => Mo.spec('rvMidSeptum')], ['rvotSeptal', 'RV outflow tract', () => Mo.spec('rvotSeptal')],
     ['his', 'His bundle (selective)', () => ({ seeds: Mo.hps({ t: 42 }), purkLV: 1, purkRV: 1 })], ['lbbArea', 'Left bundle branch area', () => Mo.spec('lbbArea')],
     ['lvLatEpi', 'LV lateral vein (LV only)', () => Mo.spec('lvLatEpi')], ['biv', 'Biventricular', () => Mo.fuse([{ spec: Mo.spec('rvApex'), t: 0 }, { spec: Mo.spec('lvLatEpi'), t: 0 }])], ['lvInfApical', 'LV endocardium (lead across a PFO)', () => Mo.spec('lvInfApical')], ['midCardiacVein', 'Middle cardiac vein', () => Mo.spec('midCardiacVein')]];
+  EP.LocData = { PRESETS, PACE };
   const PACE_NOTE = {
     rvApex: 'LBBB pattern, superior axis (negative II/III/aVF), positive I and aVL. The widest of the right-sided sites.',
     rvMidSeptum: 'LBBB pattern but narrower; axis normal to leftward. Lead I positive.',

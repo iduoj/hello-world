@@ -47,7 +47,7 @@
   EP.ISO_RAMP = ISO;
 
   const BASE_V = [0.6, 0.25, 0.23], BASE_A = [0.68, 0.38, 0.36], BASE_ENDO = [0.42, 0.16, 0.16];
-  const APD_V = 300, APD_A = 190;
+  const APD_V = 300, APD_A = 190, TINT = [0.2, 0.24, 0.5];
 
   const VIEWS = {
     front: { az: 0, el: 0.08, dist: 48, target: [1.2, 0.2, -0.6] },
@@ -306,6 +306,15 @@
       this.setTime(this.t);
     }
     setMode(m) { this.o.mode = m; this.setTime(this.t); }
+    /* Shade an ischaemic territory. w: per-voxel weights (0..1) or null to clear. */
+    setTint(w) {
+      if (!w) { this.tintV = null; this.tintC = null; this.setTime(this.t); return; }
+      const vox = A.voxOfVert, n = this.nv;
+      this.tintV = new Float32Array(n);
+      for (let i = 0; i < n; i++) this.tintV[i] = vox[i] >= 0 ? w[vox[i]] : 0;
+      this.tintC = this.cav.map((c) => { const a = new Float32Array(c.n); for (let i = 0; i < c.n; i++) a[i] = c.vox[i] >= 0 ? w[c.vox[i]] : 0; return a; });
+      this.setTime(this.t);
+    }
     setOpts(o) {
       Object.assign(this.o, o);
       const op = this.o.opacity;
@@ -383,6 +392,7 @@
           const f = ph[i] / (atr ? apdA : apdV);
           if (f >= 1) { tmp[0] = base[0]; tmp[1] = base[1]; tmp[2] = base[2]; } else rampAt(RAMP, f, base, tmp);
         }
+        if (this.tintV && this.tintV[i] > 0) { const k = this.tintV[i] * 0.82; tmp[0] += (TINT[0] - tmp[0]) * k; tmp[1] += (TINT[1] - tmp[1]) * k; tmp[2] += (TINT[2] - tmp[2]) * k; }
         col[i * 3] = tmp[0]; col[i * 3 + 1] = tmp[1]; col[i * 3 + 2] = tmp[2];
       }
       this.muscle.geometry.attributes.color.needsUpdate = true;
@@ -391,6 +401,7 @@
         for (let i = 0; i < cv.n; i++) {
           if (mode === 'iso' && isoV && cv.vox[i] >= 0) rampAt(ISO, EP.clamp((this._vlat(isoV.act).c[c][i] - isoV.act.tmin) / Math.max(40, isoV.act.tmax - isoV.act.tmin), 0, 1), BASE_ENDO, tmp);
           else { const f = cp[i] / apdV; if (f >= 1) { tmp[0] = BASE_ENDO[0]; tmp[1] = BASE_ENDO[1]; tmp[2] = BASE_ENDO[2]; } else rampAt(RAMP, f, BASE_ENDO, tmp); }
+          if (this.tintC && this.tintC[c][i] > 0) { const k = this.tintC[c][i] * 0.82; tmp[0] += (TINT[0] - tmp[0]) * k; tmp[1] += (TINT[1] - tmp[1]) * k; tmp[2] += (TINT[2] - tmp[2]) * k; }
           cv.col[i * 3] = tmp[0]; cv.col[i * 3 + 1] = tmp[1]; cv.col[i * 3 + 2] = tmp[2];
         }
         cv.mesh.geometry.attributes.color.needsUpdate = true;

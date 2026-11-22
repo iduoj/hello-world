@@ -87,7 +87,7 @@
     opts = opts || {};
     const fs = opts.fs || S.FS, dt = 1000 / fs, n = Math.max(1, Math.round((t1 - t0) / dt));
     const xyz = new Float32Array(3 * n);
-    const add = new Array(12).fill(null);
+    const add = new Array(EP.Leads.vec.length).fill(null);
     const events = [], spikes = [];
     for (const ev of sim.out) {
       if (ev.t > t1 + 50) break;
@@ -137,7 +137,7 @@
     }
     const leads = [], Lv = EP.Leads.vec;
     const nz = opts.noise == null ? 0.006 : opts.noise, r = EP.rng(977);
-    for (let l = 0; l < 12; l++) {
+    for (let l = 0; l < Lv.length; l++) {
       const a = new Float32Array(n), v = Lv[l], ad = add[l];
       for (let i = 0; i < n; i++) a[i] = v[0] * xyz[i * 3] + v[1] * xyz[i * 3 + 1] + v[2] * xyz[i * 3 + 2] + (ad ? ad[i] : 0) + (nz ? nz * (r() - 0.5) * 2 : 0);
       leads.push(a);

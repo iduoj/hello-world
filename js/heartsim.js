@@ -203,7 +203,7 @@
       if (t - A.last < c.atria.erp) { this.emit({ t, type: 'cond', path: 'atrium', dir: o.kind === 'retro' ? 'r' : 'f', t0: t, t1: t, ok: false, why: 'refractory' }); return false; }
       A.last = t; this.acount++;
       const asp = Mo.aspec(o.site, c.atria.speed);
-      const wave = Mo.pwave(asp, { amp: c.atria.pAmp });
+      const wave = Mo.pwave(asp, { amp: c.atria.pAmp, prDep: c.atria.prDep });
       const act = wave.act;
       this.emit({ t, type: 'P', wave, site: o.site, kind: o.kind || 'sinus', act });
       this._atrialOut(t, (s) => this._latA(act, s), o.via);
@@ -273,6 +273,7 @@
       if (V.mode !== 'normal') return false;
       let spec = c.spec;
       if (cfg.vent.slow && cfg.vent.slow !== 1 && !spec.vm) spec = Object.assign({}, spec, { vm: M.VM / cfg.vent.slow, vp: M.VP / cfg.vent.slow });
+      if (cfg.vent.scar && !spec.scar) spec = Object.assign({}, spec, { scar: cfg.vent.scar });
       const pend = V.pending;
       if (pend && t <= pend.t0 + FW) {
         const rel = t - pend.t0, a = Mo.vent(spec);

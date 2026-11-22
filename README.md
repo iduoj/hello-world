@@ -12,13 +12,14 @@ Educational tool only — not for clinical decision-making.
 | --- | --- |
 | **Rhythms** | 40 rhythms with a 12-lead, rhythm strips, automatic ladder diagram, calipers, measurements, a synchronised 3D activation map and teaching notes |
 | **Localise** | Click the ventricles to launch a beat from that point and read its 12-lead; slide an accessory pathway round either AV ring; compare pacing sites |
+| **STEMI / OMI** | Occlusion by artery with a timeline (hyperacute T → ST elevation → Q waves), coronary tree and territory on the 3D heart, subtle occlusion patterns (precordial swirl, de Winter, Aslanger, Wellens, South African flag, posterior), LBBB/paced rhythms with a modified Sgarbossa calculator, mimics, V4R and V7–V9 |
 | **Devices** | Single/dual chamber, LBB-area and His pacing, CRT, Micra, AVEIR, transvenous / subcutaneous / extravascular ICD, temporary wire — hardware in 3D, simulated PA and lateral chest films, correct vs malpositioned, with the paced 12-lead |
 | **Pacemaker** | Programmable device on a simulated patient: marker channel, timing-cycle bars, automatic strip interpretation, fault injection and troubleshooting cases |
 | **Temporary pacing** | Transvenous box (rate / mA / mV) and transcutaneous pads: capture and sensing threshold drills with an arterial trace |
 | **ICD** | Zones, discriminators, ATP, shocks, inappropriate therapy, electrical storm |
 | **Tox & electrolytes** | Hyper/hypokalaemia, calcium, hypothermia, tricyclics and other sodium-channel blockers, digoxin, beta-blocker / calcium-channel blocker overdose, acquired long QT — each with a severity slider |
 | **Cases** | Ten scenarios on drugs versus electricity; the monitor responds to each intervention |
-| **Quiz** | Name the rhythm |
+| **Assessment** | Fellow-level mixed questions (generated ECG items + written items) across ten domains, with a confidence rating and a gap map |
 
 ## How it works
 
