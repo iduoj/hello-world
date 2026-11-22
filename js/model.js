@@ -143,6 +143,23 @@
     return best;
   };
 
+  /* k nearest voxels to a point → [[index, distance], …] (grid-accelerated). */
+  M.nearestK = function (p, k) {
+    const ci = Math.round((p[0] - B[0]) / H), cj = Math.round((p[1] - B[1]) / H), ck = Math.round((p[2] - B[2]) / H);
+    const found = [];
+    for (let r = 1; r <= 4 && found.length < k; r++) {
+      found.length = 0;
+      for (let kk = ck - r; kk <= ck + r; kk++) for (let j = cj - r; j <= cj + r; j++) for (let i = ci - r; i <= ci + r; i++) {
+        if (i < 0 || j < 0 || kk < 0 || i >= nx || j >= ny || kk >= nz) continue;
+        const v = gidx[i + nx * (j + ny * kk)];
+        if (v < 0) continue;
+        found.push([v, Math.sqrt((vx[v] - p[0]) ** 2 + (vy[v] - p[1]) ** 2 + (vz[v] - p[2]) ** 2)]);
+      }
+    }
+    found.sort((a, b) => a[1] - b[1]);
+    return found.slice(0, k);
+  };
+
   /* Multi-source activation. seeds: [{v, t}] (voxel index, start ms).
    * opts: { vm, vp, purkLV, purkRV } — purk* scale the Purkinje-layer velocity per ventricle
    * (1 = intact His-Purkinje delivery, <1 = network only engaged retrogradely / diseased). */

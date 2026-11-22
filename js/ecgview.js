@@ -44,7 +44,7 @@
     }
     set(o) { Object.assign(this.o, o); this.resize(); }
     setRecording(rec) { this.rec = rec; this.cal = null; this.resize(); }
-    setCursor(t) { this.cursor = t; this.draw(); }
+    setCursor(t) { this.cursor = t; this.draw(true); }
     durMs() { return this.rec ? this.rec.t1 - this.rec.t0 : 10000; }
     resize() {
       const o = this.o, par = this.c.parentElement;
@@ -82,10 +82,26 @@
       this.stripBottom = g.top + r * g.row;
       return cells;
     }
-    draw() {
-      const ctx = this.ctx, g = this.g, o = this.o, rec = this.rec;
+    draw(overlayOnly) {
+      const g = this.g;
       if (!g) return;
+      if (!this.base) this.base = document.createElement('canvas');
+      const b = this.base;
+      if (!overlayOnly || b.width !== this.c.width || b.height !== this.c.height || !this._baseOk) {
+        b.width = this.c.width; b.height = this.c.height;
+        this._drawBase(b.getContext('2d'));
+        this._baseOk = true;
+      }
+      const ctx = this.ctx;
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.drawImage(b, 0, 0);
+      ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
+      if (this.rec) this._overlay(this.col);
+    }
+    _drawBase(ctx) {
+      const g = this.g, o = this.o, rec = this.rec;
       const col = (this.col = cssColors(this.c));
+      this.bctx = ctx;
       ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
       drawGrid(ctx, 0, 0, g.W, g.H, g.mm, col);
       if (!rec) return;
@@ -131,11 +147,10 @@
       ctx.fillStyle = col.label; ctx.font = `${Math.max(9, g.mm * 2.4)}px ${col.font}`; ctx.textBaseline = 'bottom';
       ctx.fillText(`${o.speed} mm/s   ${o.gain} mm/mV`, g.left, g.H - g.mm * 0.8);
       if (o.note) { ctx.textAlign = 'right'; ctx.fillText(o.note, g.W - g.mm * 2, g.H - g.mm * 0.8); ctx.textAlign = 'left'; }
-      this._overlay(col);
     }
     _stripX(t) { return this.g.left + (t - this.rec.t0) * this.g.pxPerMs; }
     _markers(y, col) {
-      const ctx = this.ctx, g = this.g, rec = this.rec;
+      const ctx = this.bctx, g = this.g, rec = this.rec;
       ctx.fillStyle = col.mark; ctx.strokeStyle = col.mark; ctx.lineWidth = 1;
       ctx.font = `600 ${Math.max(9, g.mm * 2.5)}px ${col.font}`; ctx.textBaseline = 'middle'; ctx.textAlign = 'center';
       for (const ev of rec.events) {
@@ -147,7 +162,7 @@
       ctx.textAlign = 'left';
     }
     _ladder(y, col) {
-      const ctx = this.ctx, g = this.g, rec = this.rec, H = g.lad;
+      const ctx = this.bctx, g = this.g, rec = this.rec, H = g.lad;
       const yA0 = y + H * 0.08, yA1 = y + H * 0.26, yN = y + H * 0.62, yV0 = y + H * 0.74, yV1 = y + H * 0.92;
       ctx.fillStyle = col.paper; ctx.globalAlpha = 0.82; ctx.fillRect(0, y, g.W, H); ctx.globalAlpha = 1;
       ctx.strokeStyle = col.tier; ctx.lineWidth = 1;
@@ -234,19 +249,19 @@
       c.addEventListener('pointerdown', (e) => {
         if (!this.o.calipers) return;
         const [x, y] = pos(e), h = this.hit(x, y);
-        if (!h) { this.cal = null; this.draw(); return; }
+        if (!h) { this.cal = null; this.draw(true); return; }
         drag = { cell: h.cell }; this.cal = { x0: x, x1: x, y: h.cell.y };
         c.setPointerCapture(e.pointerId); e.preventDefault();
       });
       c.addEventListener('pointermove', (e) => {
         if (!drag) return;
         const [x] = pos(e);
-        this.cal.x1 = EP.clamp(x, drag.cell.x, drag.cell.x + drag.cell.w); this.draw();
+        this.cal.x1 = EP.clamp(x, drag.cell.x, drag.cell.x + drag.cell.w); this.draw(true);
       });
       const end = (e) => {
         if (!drag) return;
         const wasClick = Math.abs(this.cal.x1 - this.cal.x0) <= 2;
-        if (wasClick) { const [x, y] = pos(e), h = this.hit(x, y); this.cal = null; if (h && this.o.onSeek) this.o.onSeek(h.t); this.draw(); }
+        if (wasClick) { const [x, y] = pos(e), h = this.hit(x, y); this.cal = null; if (h && this.o.onSeek) this.o.onSeek(h.t); this.draw(true); }
         drag = null;
       };
       c.addEventListener('pointerup', end); c.addEventListener('pointercancel', end);
