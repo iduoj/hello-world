@@ -202,10 +202,16 @@ reports back: (a) `node tools/course_walk.mjs --track <id>` must print WALK OK; 
 with `node tools/course_dump.mjs --track <id>` and check it medically, paying most attention to the
 items the author listed as uncertain; (c) look at one screenshot per bench; (d) fix, then commit that
 track. After all six: full walk with no `--track`, Assessment links, README, bundle, publish, push.
-Track status: tox = written, reviewed, committed (t1–t4, 30 scored steps). isch = written, reviewed,
-committed (s1–s5, 42 scored steps; adds `I.SEG` export and a course-only territory `ladDistal`). arr, loc,
-mgmt, dev2 = authors still working (their files may be half-written in the working tree: do not commit them until
-the author has reported and the track has been reviewed).
+Track status (all reviewed by reading the full content dump and running the walker, then committed):
+tox t1–t4 (30 scored steps) · isch s1–s5 (42; adds `I.SEG` and a course-only territory `ladDistal`) ·
+arr a1–a6 (52) · loc l1–l4 (31) · mgmt m1–m6 (52). dev2 = author still working: do not commit as
+reviewed until it has reported.
+Found by the localisation author and fixed: the pacing-site notes for "LV endocardium" and "middle
+cardiac vein" said RBBB pattern while the model draws a negative V1. New site `lvInfLatEndo` (V1 +, I −,
+superior axis) now backs the "LV endocardium" entry; the middle-cardiac-vein note says it resembles RV
+apical pacing; the assessment no longer uses it as an unknown. STILL TO DO after dev2 reports: the same
+correction in the Devices tab (`ui-devices.js` variants `cs` and `asd`, and the `lvViaASD` route tip in
+`devices3d.js`), which that author may be relying on.
 Also done in this round: the device questions were rebalanced because the correct option was the
 longest in 21 of 30 (a cue for test-wise readers); the walker now fails a track above 45 %.
 
