@@ -22,6 +22,7 @@
     rv1: [5.6, 0.6, 2.2, 2.6, 'rv'], rv2: [5.0, 2.4, 3.0, 2.4, 'rv'], rv3: [5.4, -1.2, 3.6, 2.4, 'rv'],
   };
   const T = (keys) => keys.split(' ').map((k) => S[k]);
+  I.SEG = S;   // the wall segments, so that other modules can compose a territory (I.TERR[name] = { segs: [I.SEG.x, …] })
   I.TERR = {
     ladProx: { segs: T('septBase septMid septApical antBase antMid antApical alBase alMid apex') },
     ladMid: { segs: T('septApical antMid antApical alMid apex') },

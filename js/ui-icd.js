@@ -26,6 +26,8 @@
       note: 'Three or more separate VT/VF episodes in 24 hours. Each shock raises sympathetic tone, which begets more VT. The device is doing its job; the treatment is of the patient: sedation, beta-blockade (propranolol or esmolol), amiodarone, correction of potassium and magnesium, treating ischaemia, reprogramming to favour ATP, and urgent ablation or sympathetic blockade if it continues.' },
   };
 
+  EP.IcdCases = CASES;   // read by the Devices II course (js/course-dev2.js)
+
   EP.Modules = EP.Modules || [];
   EP.Modules.push({
     id: 'icd', title: 'ICD',
