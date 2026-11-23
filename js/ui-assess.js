@@ -6,7 +6,7 @@
   const h = EP.h, UI = EP.UI, R = EP.Rhythms, Mo = EP.Morph;
   const DOM = {
     rhythm: ['Rhythm recognition', 'rhythms'], mech: ['Mechanisms & EP concepts', 'rhythms'], local: ['Localisation from the 12-lead', 'localise'], isch: ['Ischaemia / STEMI', 'stemi'],
-    device: ['Pacemaker function & troubleshooting', 'course'], hardware: ['Devices, leads & imaging', 'devices'], temp: ['Temporary pacing', 'temp'], icd: ['ICD', 'icd'],
+    device: ['Pacemaker function & troubleshooting', 'pacemaker'], hardware: ['Devices, leads & imaging', 'devices'], temp: ['Temporary pacing', 'temp'], icd: ['ICD', 'icd'],
     tox: ['Tox & electrolytes', 'tox'], mgmt: ['Acute management', 'cases'],
   };
   const QUOTA = { rhythm: 4, mech: 3, local: 3, isch: 4, device: 4, hardware: 2, temp: 2, icd: 2, tox: 3, mgmt: 3 };
@@ -322,7 +322,7 @@
     for (const r of rows) {
       const pct = Math.round((100 * r.x.right) / r.x.n), col = pct >= 80 ? 'var(--good)' : pct >= 55 ? 'var(--gold)' : 'var(--bad)';
       const weak = Object.keys(r.x.topics).filter((t) => r.x.topics[t][1] < r.x.topics[t][0]).sort((a, b) => r.x.topics[a][1] / r.x.topics[a][0] - r.x.topics[b][1] / r.x.topics[b][0]).slice(0, 3);
-      el.append(h('div', h('div.row', { style: { justifyContent: 'space-between' } }, h('button.btn.sm', { type: 'button', onclick: () => EP.go(DOM[r.d][1], true), title: 'Open the related tab' }, DOM[r.d][0]), h('span.mono', r.x.right + ' / ' + r.x.n + ' · ' + pct + '%')),
+      el.append(h('div', h('div.row', { style: { justifyContent: 'space-between' } }, h('span.row', h('button.btn.sm', { type: 'button', onclick: () => EP.go(DOM[r.d][1], true), title: 'Open the related lab' }, DOM[r.d][0]), (() => { const t = EP.Course && EP.Course.trackFor(r.d); return t && !compact ? h('button.btn.sm', { type: 'button', onclick: () => EP.open('course', { track: t.id }), title: 'Open the course that teaches this' }, 'Course →') : null; })()), h('span.mono', r.x.right + ' / ' + r.x.n + ' · ' + pct + '%')),
         h('div', { style: { height: '8px', background: 'var(--surface-2)', borderRadius: '4px', overflow: 'hidden', marginTop: '4px' } }, h('div', { style: { width: pct + '%', height: '100%', background: col } })),
         compact || (!weak.length && !r.x.sureWrong) ? null : h('div.muted', { style: { fontSize: '12px', marginTop: '3px' } }, (weak.length ? 'Missed: ' + weak.join(', ') + '. ' : '') + (r.x.sureWrong ? r.x.sureWrong + ' confident but wrong. ' : '') + (r.x.guessRight ? r.x.guessRight + ' right by guessing.' : ''))));
     }
@@ -361,10 +361,11 @@
               weakest ? h('button.btn', { type: 'button', onclick: () => start({ n: 8, domain: weakest }) }, 'Drill my weakest: ' + DOM[weakest][0]) : null),
             h('h4', { style: { marginTop: '14px' } }, 'Or drill one domain (8 questions)'), domBtns)),
           h('section.card', h('div.card-h', h('h3', 'Gap map'), h('span.grow'), h('span.muted.mono', tot + ' answered'), tot ? h('button.btn.sm', { type: 'button', onclick: () => { Store.clear(); home(); } }, 'Clear') : null), h('div.card-b', gapMap(st),
-            h('p.muted', { style: { fontSize: '12px', marginTop: '10px' } }, 'Sorted weakest first. Each domain name opens its tab. ' + (Store.db ? 'History is saved with this page.' : 'History is saved in this browser.'))))), planCard, histCard,
+            h('p.muted', { style: { fontSize: '12px', marginTop: '10px' } }, 'Sorted weakest first. Each domain name opens its lab; “Course” opens the course that teaches it from first principles. ' + (Store.db ? 'History is saved with this page.' : 'History is saved in this browser.'))))), planCard, histCard,
           h('section.card', { style: { marginTop: '14px' } }, h('div.card-h', h('h3', 'How to use this')), h('div.card-b.prose', h('ol', { style: { margin: 0, paddingLeft: '1.2em' } },
             h('li', h('b', 'Baseline once. '), '30 questions gives 2–4 per domain: enough to point, not enough to grade. Treat a domain as weak only when it stays low over two sets.'),
             h('li', h('b', 'Work the study plan, not the score. '), 'For each item do the exercise in its tab — it asks you to predict or measure something before the answer is shown — then re-test.'),
+            h('li', h('b', 'Take the course for a weak domain. '), 'If a domain stays low because the ideas are not there yet, questions will not fix it: the Courses tab teaches each domain from first principles and tests it step by step.'),
             h('li', h('b', 'Drill the weakest domain. '), '8 fresh questions on one domain. The ECG items are regenerated, so you are practising the reading, not recalling the picture.'),
             h('li', h('b', 'Come back in a few days. '), 'Re-test what you missed again. Getting it right after a gap is what makes it stick; right twice on separate sets clears the item.'),
             h('li', h('b', 'Re-baseline every week or two. '), 'Compare the gap map with the last one.')))));

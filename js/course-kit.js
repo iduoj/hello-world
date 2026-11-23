@@ -352,7 +352,7 @@
               : h('p', Object.keys(pd.steps).length ? 'Nothing is due. ' + (isFinite(nd) ? 'The next items come back in ' + Math.max(1, Math.ceil(nd / DAY)) + ' day' + (Math.ceil(nd / DAY) > 1 ? 's' : '') + '.' : '') : 'Review starts after your first unit. Missed steps stay due until you get them right; correct ones return after 2, 7, 21 and 60 days.'),
             due.length ? h('div.row', { style: { marginTop: '10px' } }, h('button.btn.primary', { type: 'button', onclick: () => open({ unit: reviewUnit(due) }) }, 'Review ' + Math.min(8, due.length) + ' now')) : null,
             h('p.muted', { style: { fontSize: '12px', marginTop: '10px' } }, 'Course answers also count in the Assessment gap map. ' + (Prog.db ? 'Progress is saved with this page.' : 'Progress is saved in this browser.'))))),
-          cards,
+          ...cards,
           h('section.card', { style: { marginTop: '14px' } }, h('div.card-h', h('h3', 'How the testing gets harder')), h('div.card-b.prose', { style: { maxWidth: '82ch' } }, list([
             '**Predict** before you touch a control, then see whether the tracing agrees with you.',
             '**Measure and calculate** from the tracing or the programmed values, with numbers that change every run.',
