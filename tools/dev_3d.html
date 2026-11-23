@@ -1,0 +1,20 @@
+<!doctype html><meta charset="utf-8"><title>dev 3d</title>
+<style>body{margin:0;font:12px sans-serif;background:#f4f1ee} .row{display:flex;flex-wrap:wrap} .v{width:560px;height:520px;position:relative;border:1px solid #ccc;background:#e9e6e2}
+.h3d-labels{position:absolute;inset:0;pointer-events:none;overflow:hidden}.h3d-label{position:absolute;left:0;top:0;font:600 11px sans-serif;color:#222;background:rgba(255,255,255,.7);padding:1px 5px;border-radius:3px;white-space:nowrap}</style>
+<div class="row" id="row"></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="../js/util.js"></script><script src="../js/geometry.js"></script><script src="../js/model.js"></script>
+<script src="../js/morph.js"></script><script src="../js/heartsim.js"></script><script src="../js/synth.js"></script>
+<script src="../js/rhythms.js"></script><script src="../js/ecgview.js"></script><script src="../js/heart3d.js"></script>
+<script>
+const q = new URLSearchParams(location.search);
+const id = q.get('id') || 'nsr', views = (q.get('views') || 'front,back').split(','), times = (q.get('t') || '300').split(',').map(Number), op = +(q.get('op') || 1), mode = q.get('mode') || 'prop';
+const t0 = performance.now();
+const rec = EP.Rhythms.record(id);
+window.H = [];
+views.forEach((vw, i) => {
+  const d = document.createElement('div'); d.className = 'v'; document.getElementById('row').appendChild(d);
+  const h = new EP.Heart3D(d, {}); h.setOpts({ opacity: op }); h.setMode(mode); h.setRecording(rec); h.setView(vw, true); h.setTime(times[i % times.length]); window.H.push(h);
+});
+console.log('setup ms', Math.round(performance.now() - t0));
+</script>

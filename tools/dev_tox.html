@@ -1,0 +1,18 @@
+<!doctype html><meta charset="utf-8"><title>dev tox</title>
+<style>body{margin:12px;font:13px sans-serif;background:#fff} .w{margin-bottom:10px} canvas{display:block}</style>
+<div id="root"></div>
+<script>window.THREE=undefined</script>
+<script src="../js/util.js"></script><script src="../js/geometry.js"></script><script src="../js/model.js"></script>
+<script src="../js/morph.js"></script><script src="../js/heartsim.js"></script><script src="../js/synth.js"></script>
+<script src="../js/rhythms.js"></script><script src="../js/device.js"></script><script src="../js/ecgview.js"></script><script src="../js/ui.js"></script><script src="../js/ui-tox.js"></script>
+<script>
+const q = new URLSearchParams(location.search), items = (q.get('id') || 'hyperk:0.3,hyperk:0.6,hyperk:0.9').split(',');
+for (const it of items) {
+  const [id, s, v] = it.split(':'), t = EP.Tox.byId[id];
+  const sim = EP.simulate(t.cfg(+s, v), 10000), rec = EP.Synth.build(sim, 0, 10000); rec.sim = sim;
+  const d = document.createElement('div'); d.className = 'w';
+  d.innerHTML = '<b>' + t.name + '</b> ' + t.unit(+s) + ' ' + (v || '') + '<div><canvas></canvas></div>';
+  document.getElementById('root').appendChild(d);
+  new EP.ECGView(d.querySelector('canvas'), { layout: '12', strips: [], rowMm: 22 }).setRecording(rec);
+}
+</script>
