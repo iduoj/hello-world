@@ -202,6 +202,9 @@ reports back: (a) `node tools/course_walk.mjs --track <id>` must print WALK OK; 
 with `node tools/course_dump.mjs --track <id>` and check it medically, paying most attention to the
 items the author listed as uncertain; (c) look at one screenshot per bench; (d) fix, then commit that
 track. After all six: full walk with no `--track`, Assessment links, README, bundle, publish, push.
+Track status: tox = written, reviewed, committed (t1–t4, 30 scored steps). arr, loc, isch, mgmt, dev2 =
+authors still working (their files may be half-written in the working tree: do not commit them until
+the author has reported and the track has been reviewed).
 Also done in this round: the device questions were rebalanced because the correct option was the
 longest in 21 of 30 (a cue for test-wise readers); the walker now fails a track above 45 %.
 
