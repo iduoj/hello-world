@@ -29,6 +29,8 @@ page.on('console', (m) => { if (m.type() === 'error') errors.push('[console] ' +
 page.on('pageerror', (e) => errors.push('[pageerror] ' + e.message + '\n' + (e.stack || '').split('\n').slice(0, 4).join('\n')));
 await page.route('**/cdnjs.cloudflare.com/**three**', (r) => r.fulfill({ path: THREE, contentType: 'text/javascript' }));
 await page.route('**/fonts.googleapis.com/**', (r) => r.fulfill({ body: '', contentType: 'text/css' }));
+// With --track, the other tracks' files are served empty, so a track can be tested while others are being written.
+if (sel.track.length) await page.route('**/js/course-*.js', (r) => { const m = /course-([a-z0-9]+)\.js/.exec(r.request().url()); return m && ['kit', 'dev'].concat(sel.track).indexOf(m[1]) < 0 ? r.fulfill({ body: '', contentType: 'text/javascript' }) : r.continue(); });
 await page.goto(`http://localhost:${srv.address().port}/index.html#course`, { waitUntil: 'load' });
 await page.waitForTimeout(2500);
 
