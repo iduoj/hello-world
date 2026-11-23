@@ -64,7 +64,7 @@
   // ---- a2: dual AV-nodal physiology -----------------------------------------------------------------
   /* cp is the coupling interval as measured on the ECG (sinus P to premature P); the focus sits 16 ms from the sinus node. */
   const dual = (o) => ({ sinus: { cl: 850, resp: 0, sd: 0 },
-    avn: { fast: { erp: o.ferp }, slow: { min: 205, alpha: 150, tau: 80, erp: o.serp || 235, conceal: 0, retro: { delay: 200, erp: 330, block: false } } },
+    avn: { fast: { erp: o.ferp }, slow: { min: o.smin || 205, alpha: 150, tau: 80, erp: o.serp || 235, conceal: 0, retro: { delay: 200, erp: 330, block: false } } },
     foci: [{ id: 'pac', node: 'A', kind: 'coupled', after: 'sinus', coupling: o.cp - 16, every: 4, site: 'crista', label: 'PAC', count: 1 }], script: o.script || [] });
   const T_BLOCK = 6000;
   const BLOCK_AT = {
@@ -72,7 +72,7 @@
     his: [{ t: T_BLOCK, do: (s, t) => { s.cfg.hps.block = 'ante'; s.schedule(t + 2400, () => { s.cfg.hps.block = false; }); } }],
     rbb: [{ t: T_BLOCK, do: (s) => { s.cfg.hps.pattern = 'rbbb'; } }],
   };
-  const dualMake = (ferp, serp) => (p) => record(dual({ ferp, serp, cp: p.cp, script: BLOCK_AT[p.site] }), 9000, 1300);
+  const dualMake = (ferp, serp, smin) => (p) => record(dual({ ferp, serp, smin, cp: p.cp, script: BLOCK_AT[p.site] }), 9000, 1300);
   function dualRead(rc) {
     const p = PW(rc), q = QRS(rc), pac = p.find((e) => e.kind === 'PAC'), m = { via: null, pacPr: null, echo: 0, started: false, running: false, cl: null, rp: null, sinusPr: null };
     const s0 = q[0] && p.filter((e) => e.kind === 'sinus' && e.t < q[0].t).pop(); if (s0) m.sinusPr = rnd(q[0].t + q[0].wave.qrsOn - s0.t);
@@ -90,7 +90,7 @@
   }
   const dualReadout = (rc, p, m) => [['Coupling interval', m.coupling, 'ms'], ['PR in sinus rhythm', m.sinusPr, 'ms'], ['Premature beat', m.txt], ['PR of premature beat', m.pacPr, 'ms'], ['Tachycardia cycle', m.started ? m.cl : null, 'ms'], ['RP in tachycardia', m.started ? m.rp : null, 'ms']];
   const CP = { k: 'cp', label: 'Coupling interval of the premature atrial beat', min: 250, max: 500, step: 10, unit: 'ms' };
-  const dualBench = (ferp, cp, o) => strip(Object.assign({ make: dualMake(ferp), p: { cp }, ctl: [CP], strips: [1, 6], measure: dualRead, read: dualReadout, title: 'Leads II and V1 with ladder diagram',
+  const dualBench = (ferp, smin, cp, o) => strip(Object.assign({ make: dualMake(ferp, 0, smin), p: { cp }, ctl: [CP], strips: [1, 6], measure: dualRead, read: dualReadout, title: 'Leads II and V1 with ladder diagram',
     cap: 'Ladder: blue = fast pathway and His-Purkinje system, orange = slow pathway. Sinus rhythm, then one premature atrial beat.' }, o));
 
   // ---- a3: accessory pathways -----------------------------------------------------------------------
@@ -152,7 +152,7 @@
   const afBench = (p, ctl, o) => strip(Object.assign({ make: afMake, p, ctl: ctl || [], strips: [1, 6], ladder: false, measure: afRead, read: afReadout, title: 'Leads II and V1' }, o));
 
   // ---- a5: wide-complex tachycardia -----------------------------------------------------------------
-  const vtCfg = (o) => ({ sinus: { cl: 760, resp: 0 }, avn: { fast: { retro: { block: !o.va, delay: 70, erp: 290 } } }, hps: { retro: { delay: 60, erp: 200 } },
+  const vtCfg = (o) => ({ sinus: { cl: o.scl || 760, resp: 0 }, avn: { fast: { retro: { block: !o.va, delay: 70, erp: 290 } } }, hps: { retro: { delay: 60, erp: 200 } },
     foci: [{ id: 'vt', node: 'V', cl: o.cl || 333, site: 'lvInfBase', label: 'VT', startAt: o.start == null ? 60 : o.start, reentrant: true }],
     script: o.aden ? [{ t: 5200, do: (s, t) => s.blockAVN(t, 3600) }] : [] });
   function vtRead(rc) {
@@ -240,7 +240,7 @@
           mcq('decrement', 'Predict: a faster atrial rate', `The atrial rate is about to be raised from 50 to ${r1}/min by pacing, with autonomic tone unchanged. What will the PR interval do?`,
             ['Lengthen: the node has had less time to recover', 'Shorten, as it does when the rate rises on exercise', 'Stay the same: conduction time is a fixed property', 'Stay the same until alternate P waves are blocked'],
             'Decremental conduction: the time an impulse takes to cross the node depends on how long the node has had since the last one. On exercise the PR shortens only because sympathetic drive speeds the node at the same time. Pacing changes the rate alone, which is how the node is tested in the EP laboratory.'),
-          num('pr-rate', 'Measure the conduction time', `The atrial rate is now ${r1}/min. Measure the PR interval (drag on the tracing from the start of a P wave to the start of its QRS).`, (b) => b.m.pr0, 20, 'ms',
+          num('pr-rate', 'Measure the conduction time', `The atrial rate is now ${r1}/min. Measure the PR interval (drag on the tracing from the start of a P wave to the start of its QRS).`, (b) => b.m.pr0, 15, 'ms',
             `${at.pr0} ms, against ${base.pr0} ms at 50/min. Same node, same autonomic tone: the only change is that each impulse arrives ${rnd(60000 / 50 - 60000 / r1)} ms sooner after the last. Every beat still conducts: a PR over 200 ms is first-degree AV block, produced here by the rate alone.`, { bench: avBench(r1, false) }),
           act('wenck', 'Find the Wenckebach point', 'Raise the atrial rate until the node can no longer conduct every beat, and stop where you can see the PR lengthen over at least two beats before the dropped one.', { bench: avBench(60, true),
             check: (x) => x.m.kind === 'wenck', solve: (b) => b.set('rate', 74),
@@ -287,28 +287,28 @@
           '**Atypical (fast–slow) AVNRT** runs the other way: down the fast pathway, up the slow one. Retrograde conduction is now the slow limb, so the P wave arrives late, nearer to the next QRS than to the last: a long-RP tachycardia with P waves inverted in the inferior leads.',
           '**What stops it.** The circuit is made of nodal tissue, which depends on calcium current and is slowed by acetylcholine and adenosine. One blocked lap ends the tachycardia. The His bundle and ventricles below are bystanders: block there does not stop it.'])],
       steps: () => {
-        const ferp = pick([345, 365, 385, 405]), erp = ferp - 15, mid = 320;
-        const s0 = once('du0-' + ferp, () => dualRead(dualMake(ferp)({ cp: 500 }))), t0 = once('du1-' + ferp, () => dualRead(dualMake(ferp)({ cp: mid }))), lastFast = once('du2-' + ferp, () => dualRead(dualMake(ferp)({ cp: erp + 10 })));
+        const ferp = pick([345, 365, 385, 405]), smin = pick([205, 245, 285]), erp = ferp - 15, mid = 320, id = ferp + '-' + smin, mk = dualMake(ferp, 0, smin);
+        const s0 = once('du0-' + id, () => dualRead(mk({ cp: 500 }))), t0 = once('du1-' + id, () => dualRead(mk({ cp: mid }))), lastFast = once('du2-' + id, () => dualRead(mk({ cp: erp + 10 })));
         const ec = once('echo', () => dualRead(dualMake(405, 300)({ cp: 380 }))), aty = once('atyp', () => { const rc = R.record('avnrt-atyp', { dur: 8000, warm: 800 }), q = QRS(rc).filter((e) => e.t > 5000), p = PW(rc), rp = p.find((e) => e.t > q[1].t); return { cl: rnd(q[2].t - q[1].t), rp: rnd(rp.t - q[1].t), pr: rnd(q[2].t - rp.t) }; });
         const SITE = { k: 'site', label: 'Block conduction for about three seconds in…', opts: [['none', '— choose —'], ['rbb', 'the right bundle branch'], ['his', 'the His bundle'], ['node', 'the AV node']] };
         return [
-          look('Two inputs, one output', `Sinus rhythm, PR ${s0.sinusPr} ms, then one premature atrial beat ${s0.coupling} ms after the last sinus P wave. On the ladder diagram every atrial impulse enters two routes: the blue line (fast pathway) reaches the bottom of the node first; the orange stub (slow pathway) is extinguished by collision. The premature beat also conducts over the fast pathway, with a PR of ${s0.pacPr} ms.`, dualBench(ferp, 500, { ctl: [] })),
+          look('Two inputs, one output', `Sinus rhythm, PR ${s0.sinusPr} ms, then one premature atrial beat ${s0.coupling} ms after the last sinus P wave. On the ladder diagram every atrial impulse enters two routes: the blue line (fast pathway) reaches the bottom of the node first; the orange stub (slow pathway) is extinguished by collision. The premature beat also conducts over the fast pathway, with a PR of ${s0.pacPr} ms.`, dualBench(ferp, smin, 500, { ctl: [] })),
           mcq('jump', 'Predict: an earlier premature beat', 'You are about to bring the premature beat earlier in 10 ms steps. What will tell you that this node has two pathways?',
             ['A sudden increase in its PR of 50 ms or more for a 10 ms change in coupling', 'A gradual increase in its PR of a few ms with each step, ending in block', 'A sudden shortening of its PR as the faster of the two pathways takes over conduction', 'A delta wave on the premature beat as the second pathway begins to conduct'],
             'One decremental pathway gives a smooth curve. A discontinuity, defined as a jump of 50 ms or more in nodal conduction time for a 10 ms decrement in coupling, means conduction has switched pathways: the fast pathway has reached its refractory period and the slow pathway, which recovers sooner, conducts alone.'),
-          act('start', 'Start the tachycardia', 'Do it: shorten the coupling interval until a single premature beat starts a sustained tachycardia.', { bench: dualBench(ferp, 500), keep: true,
+          act('start', 'Start the tachycardia', 'Do it: shorten the coupling interval until a single premature beat starts a sustained tachycardia.', { bench: dualBench(ferp, smin, 500), keep: true,
             check: (x) => x.m.running, solve: (b) => b.set('cp', mid),
             live: (x) => (x.m.via === 'block' ? 'Too early: the beat is blocked in both pathways and nothing follows.' : x.m.via === 'fast' ? 'Still conducted over the fast pathway (PR ' + x.m.pacPr + ' ms).' : null),
             hint: 'The window lies between the two refractory periods: late enough for the slow pathway, too early for the fast one.',
             why: (b) => `At ${b.m.coupling} ms the premature beat finds the fast pathway refractory and conducts over the slow pathway: its PR is ${b.m.pacPr} ms, against ${lastFast.pacPr} ms just outside the window. By the time it reaches the bottom of the node the fast pathway has recovered and carries it back up: the ladder diagram shows orange down, blue up, on every cycle.` }),
           num('fast-erp', 'Measure the fast pathway', 'Scan the coupling interval from 500 ms downwards. What is the longest coupling interval at which the premature beat is no longer conducted over the fast pathway? That is the refractory period of the fast pathway.', erp, 5, 'ms',
-            `${erp} ms. At ${erp + 10} ms the PR of the premature beat is ${lastFast.pacPr} ms; at ${erp} ms it is ${t0.pacPr} ms: a jump of ${t0.pacPr - lastFast.pacPr} ms for a 10 ms step. At 290 ms and below the beat is blocked in the slow pathway as well. The tachycardia can be started only between those two limits.`, { bench: dualBench(ferp, 500), keep: true }),
-          num('cl', 'One lap of the circuit', 'The tachycardia is running. Measure its cycle length (R-R interval).', (b) => b.m.cl, 20, 'ms',
-            (b) => `${b.m.cl} ms, about ${perMin(b.m.cl)}/min. One lap is the slow pathway down (about 260 ms here) plus the fast pathway back up (70 ms) and a few ms in the atrium between them. The rate of AVNRT is set almost entirely by the slow pathway.`, { bench: dualBench(ferp, mid, { ctl: [] }) }),
+            `${erp} ms. At ${erp + 10} ms the PR of the premature beat is ${lastFast.pacPr} ms; at ${erp} ms it is ${t0.pacPr} ms: a jump of ${t0.pacPr - lastFast.pacPr} ms for a 10 ms step. At 290 ms and below the beat is blocked in the slow pathway as well. The tachycardia can be started only between those two limits.`, { bench: dualBench(ferp, smin, 500), keep: true }),
+          num('cl', 'One lap of the circuit', 'The tachycardia is running. Measure its cycle length (R-R interval): measuring across several cycles and dividing is more accurate.', (b) => b.m.cl, 15, 'ms',
+            (b) => `${b.m.cl} ms, about ${perMin(b.m.cl)}/min. One lap is the slow pathway down (about ${b.m.cl - 80} ms here) plus the fast pathway back up (70 ms) and a few ms in the atrium between them. The rate of AVNRT is set almost entirely by the slow pathway.`, { bench: dualBench(ferp, smin, mid, { ctl: [] }) }),
           mcq('p-where', 'Find the P wave', 'In this tachycardia each QRS ends with a small deflection that the sinus beats at the start of the strip do not have: negative in II, positive in V1. No other P wave can be seen. Where is atrial activation, and why?',
             ['At the end of the QRS: atria and ventricles are activated from the same turning point', 'Midway between two QRS complexes: the atria are reached late, over a slow retrograde limb', 'In the ST segment: the impulse crosses the ventricle to reach an accessory pathway', 'Before each QRS with a normal PR: an atrial focus is driving the ventricles'],
-            `The terminal deflections are the retrograde P wave: a pseudo-S in II and a pseudo-r′ in V1. The RP interval here is ${t0.rp} ms. An RP under 70 ms is too short for the impulse to have travelled through the ventricle to an accessory pathway, so it points to AVNRT.`, { bench: dualBench(ferp, mid, { ctl: [] }), keep: true }),
-          act('stop', 'Stop it: what does the circuit need?', 'You can block conduction for a few seconds in one structure. Choose the one that terminates the tachycardia. Try the others as well: what they fail to do is the lesson.', { bench: dualBench(ferp, mid, { ctl: [SITE], p: { cp: mid, site: 'none' } }),
+            `The terminal deflections are the retrograde P wave: a pseudo-S in II and a pseudo-r′ in V1. The RP interval here is ${t0.rp} ms. An RP under 70 ms is too short for the impulse to have travelled through the ventricle to an accessory pathway, so it points to AVNRT.`, { bench: dualBench(ferp, smin, mid, { ctl: [] }), keep: true }),
+          act('stop', 'Stop it: what does the circuit need?', 'You can block conduction for a few seconds in one structure. Choose the one that terminates the tachycardia. Try the others as well: what they fail to do is the lesson.', { bench: dualBench(ferp, smin, mid, { ctl: [SITE], p: { cp: mid, site: 'none' } }),
             check: (x) => x.p.site === 'node' && x.m.started && !x.m.running, solve: (b) => b.set('site', 'node'),
             live: (x) => (x.p.site === 'his' ? 'No QRS complexes for more than two seconds, yet the retrograde P waves continue at the same rate: the circuit does not need the ventricles.' : x.p.site === 'rbb' ? 'Right bundle branch block appears and the cycle length does not change: the bundle branches are not part of the circuit.' : null),
             hint: 'Which tissue lies on the path of every lap?',
@@ -344,7 +344,7 @@
         const side = pick(['leftLateral', 'rightFreeWall']), ips = side === 'leftLateral' ? 'lbbb' : 'rbbb', con = side === 'leftLateral' ? 'rbbb' : 'lbbb', nm = { lbbb: 'left', rbbb: 'right' };
         const cm = once('coumel-' + side, () => ({ ips: avrtRead(avrtMake(side)({ bbb: ips })), con: avrtRead(avrtMake(side)({ bbb: con })) }));
         const anti = once('anti', () => R.measure(R.record('avrt-anti', { dur: 9000, warm: 300 })));
-        const erp = pick([205, 215, 230, 250, 270, 290]), pa = once('paf' + erp, () => ({ a: pafRead(pafMake({ erp })), b: pafRead(pafMake({ erp, avb: true })) }));
+        const erp = pick([205, 240, 275, 310]), pa = once('paf' + erp, () => ({ a: pafRead(pafMake({ erp })), b: pafRead(pafMake({ erp, avb: true })) }));
         const BBB = { k: 'bbb', label: 'Bundle branch block that develops during the tachycardia', opts: [['none', 'None'], ['lbbb', 'Left bundle branch block'], ['rbbb', 'Right bundle branch block']] };
         const wpwBench = (p, ctl) => strip({ make: wpwMake, p, ctl: ctl || [], strips: [0, 1, 6], rowMm: 26, wide: false, measure: wpwRead, read: wpwReadout, title: 'Leads I, II and V1 with ladder diagram', cap: 'Ladder: the dashed line is the accessory pathway, the solid blue line the AV node and His-Purkinje system.' });
         const cBench = (bbb) => strip({ make: avrtMake(side), p: { bbb }, ctl: [BBB], strips: [6, 1], rowMm: 30, ladder: false, measure: avrtRead, read: avrtReadout, title: 'Leads V1 and II', cap: 'Sinus rhythm, a premature atrial beat, then tachycardia. Any bundle branch block you choose appears about five seconds into the strip.' });
@@ -373,7 +373,7 @@
             ['Down the pathway to the ventricle, back to the atrium over the His bundle and node', 'Down the node and His bundle, back over the pathway, with a bundle branch block as well', 'Round a scar in the ventricle, with each beat conducted back to the atrium', 'Round the right atrium, with every second lap conducted over the pathway'],
             `Antidromic AVRT at ${anti.vRate}/min: the ventricles are activated entirely from the pathway insertion, muscle to muscle, so the QRS is fully pre-excited (${anti.qrs} ms). Here the premature beat blocked in the node, not in the pathway. On a single tracing this cannot be told from VT with certainty, and a regular wide-complex tachycardia of uncertain origin is managed as VT.`,
             { bench: strip({ make: () => R.record('avrt-anti', { dur: 9000, warm: 300 }), ladder: false, strips: [1, 6], measure: R.measure, read: (rc, p, m) => [['Rate', m.vRate, '/min'], ['QRS', m.qrs, 'ms']], title: 'Leads II and V1' }) }),
-          num('sprr', 'Pre-excited AF: how fast can the pathway conduct?', 'Atrial fibrillation in a patient with a left lateral pathway. Find the shortest R-R interval between two pre-excited (wide) beats and measure it.', (b) => b.m.sp, 25, 'ms',
+          num('sprr', 'Pre-excited AF: how fast can the pathway conduct?', 'Atrial fibrillation in a patient with a left lateral pathway. Find the shortest R-R interval between two pre-excited (wide) beats and measure it.', (b) => b.m.sp, 15, 'ms',
             (b) => `${b.m.sp} ms, which is an instantaneous rate of ${b.m.max}/min; the mean rate is ${b.m.vRate}/min. The shortest pre-excited R-R interval is a measure of the pathway's refractory period (${erp} ms in this patient). ${b.m.sp <= 250 ? 'At 250 ms or less the pathway can drive the ventricles fast enough for AF to degenerate into VF: this is a high-risk pathway.' : 'Above 250 ms the risk of VF is lower, though the tachycardia is still dangerous.'} Note the rhythm: irregular, with a QRS that varies in width from beat to beat but keeps the same axis.`,
             { bench: strip({ make: pafMake, p: { erp }, ctl: [], strips: [1, 6], rowMm: 30, ladder: false, measure: pafRead, read: pafReadout, title: 'Leads II and V1' }) }),
           mcq('avn-block', 'Predict: block the AV node', `The same patient: mean ventricular rate ${pa.a.vRate}/min, ${pa.a.full} of ${pa.a.n} beats fully pre-excited. Suppose conduction through the AV node is now blocked completely. What happens to the ventricular rate in this model?`,
@@ -400,14 +400,14 @@
           '**What sets the rate in AF.** The refractory period and conduction of the node (autonomic tone, drugs) and, paradoxically, the atrial rate: more atrial impulses mean more concealment and a slower ventricle. This is why the ventricular rate can rise when fibrillation organises into flutter.',
           '**Ashman aberrancy.** The refractory period of a bundle branch lengthens after a long cycle. A beat that ends a short cycle following a long one may find the right bundle still refractory and conduct with right bundle branch block. It is a supraventricular beat, not a PVC.'])],
       steps: () => {
-        const cl = pick([200, 207, 215, 222]), f0 = once('fl0', () => flRead(flMake({}), {}));
+        const cl = pick([200, 215, 230, 250]), f0 = once('fl0', () => flRead(flMake({}), {}));
         const lo = 300, hi = 550, s1 = once('af' + lo, () => afRead(afMake({ arate: lo }))), s2 = once('af' + hi, () => afRead(afMake({ arate: hi }))), n2 = once('afn' + hi, () => afRead(afMake({ arate: hi, noconceal: true })));
         const ASH = { arate: 400, erp: 330, hps: { ashman: 0.6, rbExtra: 100 }, warm: 5500 }, as = once('ash', () => afRead(afMake(ASH)));
         const ERP = { k: 'erp', label: 'AV-nodal refractory period', min: 250, max: 520, step: 10, unit: 'ms' };
         return [
           look('The sawtooth and the ladder', `Typical flutter. The atrial cycle is ${f0.cl} ms (${f0.aRate}/min); on the ladder diagram every second lap is blocked in the node and the ventricular rate is ${f0.vRate}/min. In lead II the negative flutter waves run into the QRS and T wave; in V1 they are small, discrete and positive, two for each QRS. With 2:1 conduction half of them are hidden.`, flBench({ cl: 207, erp: 290 })),
-          num('fl-rate', 'Measure the atrial rate', 'A different patient with flutter and a slow ventricular response, so the waves are easy to see. Measure the interval between two flutter waves and give the atrial rate.', 60000 / cl, 15, '/min',
-            (b) => `Cycle ${cl} ms, so 60 000 ÷ ${cl} = ${perMin(cl)}/min. Conduction is ${b.m.txt}, giving a ventricular rate of ${b.m.vRate}/min. Measure from one sharp negative peak in lead II to the next, or measure across several waves and divide.`, { bench: flBench({ cl, erp: 500 }) }),
+          num('fl-rate', 'Measure the atrial rate', 'A different patient with flutter and a slow ventricular response, so the waves are easy to see. Measure the interval between flutter waves (across several waves is more accurate) and give the atrial rate.', 60000 / cl, 9, '/min',
+            (b) => `Cycle ${cl} ms, so 60 000 ÷ ${cl} = ${perMin(cl)}/min. Conduction is ${b.m.txt}, giving a ventricular rate of ${b.m.vRate}/min. Measure from one sharp negative peak in lead II to the next.`, { bench: flBench({ cl, erp: rnd(2.37 * cl) }) }),
           mcq('why-150', 'Why every second wave?', 'In untreated flutter the waves arrive at the AV node every 200 ms. Why does a healthy node conduct exactly every second one?',
             ['Its refractory period is longer than 200 ms but shorter than 400 ms', 'The flutter circuit passes through the node only on alternate laps of the atrium', 'Alternate flutter waves are too small to depolarise the node', 'The ventricles cannot respond at rates faster than 150/min'],
             'After conducting one wave the node is still refractory when the next arrives 200 ms later, and has recovered by the one after. The blocked wave is not without effect: it penetrates part of the way and delays recovery (concealed conduction), which helps to keep 2:1 conduction stable. A regular narrow tachycardia at about 150/min is flutter until proved otherwise.'),
@@ -455,16 +455,16 @@
           '**Morphology, in outline.** Aberrancy must look like a real bundle branch block: a rapid first 40 ms, because the working bundle activates the septum normally, and a slow finish. VT starts in muscle, so it starts slowly: an interval from the onset of R to the nadir of S over 100 ms in a precordial lead, an initial R wave in aVR, a QRS that is all positive or all negative from V1 to V6, or an axis in the north-west.',
           '**Three mechanisms of monomorphic VT.** Scar re-entry after infarction or in cardiomyopathy: a fixed circuit through surviving channels in the scar. Focal outflow-tract VT in a normal heart: triggered activity from delayed after-depolarisations, brought on by catecholamines and sensitive to adenosine; left bundle pattern with an inferior axis. Fascicular VT in a normal heart: re-entry involving the left posterior fascicle, sensitive to verapamil; right bundle pattern with left-axis deviation and a QRS that is only modestly wide.'])],
       steps: () => {
-        const v = once('vt', () => vtRead(R.record('vt', { dur: 9000, warm: 1500 }))), rv = once('rvot', () => vtRead(rvotMake()));
+        const scl = pick([640, 760, 900]), vtMake = () => record(vtCfg({ scl }), 9000, 1500), v = once('vt' + scl, () => vtRead(vtMake())), rv = once('rvot', () => vtRead(rvotMake()));
         const fa = once('fasc', () => vtRead(R.record('vt-fasc', { dur: 10000, warm: 1000 })));
         const k = pick(['vt', 'svt', 'anti']), U = WCT[k], all = Object.keys(WCT).map((x) => WCT[x]), other = (f) => all.filter((x) => x !== U).map((x) => x[f]);
-        const vtBench = (o) => strip(Object.assign({ make: () => R.record('vt', { dur: 9000, warm: 1500 }), strips: [1, 6], measure: vtRead, read: vtReadout, title: 'Leads II and V1 with ladder diagram', cap: 'Ladder: thick ticks on the V line are wide beats.' }, o));
+        const vtBench = (o) => strip(Object.assign({ make: vtMake, strips: [1, 6], measure: vtRead, read: vtReadout, title: 'Leads II and V1 with ladder diagram', cap: 'Ladder: thick ticks on the V line are wide beats.' }, o));
         return [
           look('Two rhythms at once', `A regular wide-complex tachycardia at ${v.vRate}/min, QRS ${v.qrs} ms. Now look at the A line of the ladder diagram: the atria are in sinus rhythm at their own rate, and the sinus impulses run down into the node and are blocked or wasted, because the ventricles and His-Purkinje system have just been used from below. In V1 the P waves show as small extra deflections that fall in a different place in each cycle.`, vtBench()),
           mcq('prior', 'Before any criteria', 'A 68-year-old who had an anterior infarct five years ago has a regular wide-complex tachycardia at 160/min with a blood pressure of 125/80 mmHg. Before any ECG criteria are applied, how likely is VT?',
             ['Over 90 %: a previous infarct makes VT by far the likeliest', 'About 50 %: a normal blood pressure makes SVT as likely as VT', 'Under 20 %: a tolerated tachycardia at 160/min is usually SVT', 'Unknown: nothing can be said before the morphology is analysed'],
             'Wide-complex tachycardia is VT in about 80 % of unselected patients and in well over 90 % of those with a previous infarct. Whether it is tolerated depends on the rate, ventricular function and vascular tone, not on where it starts. The dangerous error is to call a tolerated VT "SVT" and give verapamil.'),
-          num('a-rate', 'Find the atria', 'On this tracing the atria and ventricles are dissociated. Use the A line of the ladder diagram, or the P waves in V1, to measure the atrial rate.', (b) => b.m.aRate, 8, '/min',
+          num('a-rate', 'Find the atria', 'On this tracing the atria and ventricles are dissociated. Use the A line of the ladder diagram, or the P waves in V1, to measure the atrial rate.', (b) => b.m.aRate, 6, '/min',
             (b) => `${b.m.aRate}/min, against a ventricular rate of ${b.m.vRate}/min. More QRS complexes than P waves, with no fixed relation between them, is AV dissociation: the ventricles do not depend on the atria, so the tachycardia is ventricular. On a real tracing you find the P waves by looking for small deflections that deform the ST segment or T wave of some beats and not others.`, { bench: vtBench(), keep: true }),
           mcq('fusion', 'The odd beats out', 'A few beats in this wide-complex tachycardia are narrower than the rest and differently shaped (clearest in V1). Each one comes shortly after a sinus P wave. What are they, and what do they prove?',
             ['Fusion or capture beats: the atria are competing, so the wide beats are ventricular', 'Aberrant beats: the tachycardia is supraventricular with intermittent bundle branch block', 'PVCs from a second focus: the tachycardia has more than one ventricular origin', 'Pauses in the tachycardia with a junctional escape beat in each of them'],
@@ -545,7 +545,7 @@
       } },
   ];
 
-  C._arr = { avRead, dualRead, wpwRead, avrtRead, pafRead, flRead, afRead, vtRead, pmRead };
+  C._arr = { avRead, dualRead, wpwRead, avrtRead, pafRead, flRead, afRead, vtRead, pmRead, dualMake, vtCfg, record };
   C.addTrack({ id: 'arr', title: 'Arrhythmia mechanisms', short: 'Arrhythmias', dom: 'mech', bench: 'ecg',
     blurb: 'From decrement in the AV node to re-entry, pre-excitation, flutter, wide-complex tachycardia and torsades: make each one happen and say why.', units: UNITS });
 })(globalThis.EP = globalThis.EP || {});
