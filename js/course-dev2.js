@@ -262,6 +262,7 @@
   };
   const ITOG = { onset: 'Sudden onset', stab: 'Stability', morph: 'Morphology', magnet: 'Magnet over the generator' };
   const LEGEND = 'Lower row, what the device sensed or paced: VS below the zones · TS in the VT zone · FS in the VF zone · TP anti-tachycardia pace. Upper row, what it decided: TD / FD detection met · CHG charging · CD shock delivered · ABT charge aborted · SVT therapy withheld.';
+  const LEGEND2 = 'Upper row, the atrial channel: AS atrial sense (a bare tick in atrial fibrillation). Lower row, the ventricular channel: VS below the zones · TS in the VT zone · FS in the VF zone · TP anti-tachycardia pace, and what the device decided: TD / FD detection met · CHG charging · CD shock delivered · ABT charge aborted · SVT therapy withheld.';
 
   /* spec { phases:[{ sc, want:'none'|'treat', name }], icd:{ programming }, show:[slider keys], tog:[toggle keys], pat, blind }
    * Each phase is one rhythm played from its start; when it has a verdict the next one starts. A change of programming
@@ -276,7 +277,7 @@
       this.logEl = h('div.findings', { style: { marginTop: '8px' } }); this.find = h('div.findings', { style: { marginTop: '10px' } });
       this.el = h('section.card', h('div.card-h', h('h3', 'Bench — ICD: lead II, arterial pressure, markers'), h('span.grow'), this.state, h('button.btn.sm', { type: 'button', onclick: () => this.go(this.pi) }, 'Replay'), this.freeze),
         h('div.live', this.canvas),
-        h('div.card-b', h('p.muted', { style: { fontSize: '11.5px', marginBottom: '8px' } }, LEGEND), this.pat, this.ph, this.ctl, this.tog, this.ivs, this.logEl, this.find));
+        h('div.card-b', (this.legend = h('p.muted', { style: { fontSize: '11.5px', marginBottom: '8px' } }, LEGEND)), this.pat, this.ph, this.ctl, this.tog, this.ivs, this.logEl, this.find));
       this.strip = new EP.LiveStrip(this.canvas, { channels: [{ lead: 1 }, { key: 'pulse', label: 'Arterial pressure' }], windowMs: 9000, markers: true, rowMm: 25, gain: 7 });
       this.showFind = false; this.setters = {};
     }
@@ -318,7 +319,7 @@
     }
     describe() {
       const s = this.s, sp = this.spec, on = [s.onset && 'onset', s.stab && 'stability', s.morph && 'morphology'].filter(Boolean);
-      this.pat.innerHTML = '';
+      this.pat.innerHTML = ''; this.legend.textContent = s.dual ? LEGEND2 : LEGEND;
       if (sp.pat) this.pat.append(h('b', 'Patient: '), sp.pat + ' ');
       this.pat.append(h('span.muted', `Programmed: VT zone from ${s.vtRate}/min (${Math.round(60000 / s.vtRate)} ms), ${s.nidVT} intervals in a row · VF zone from ${s.vfRate}/min (${Math.round(60000 / s.vfRate)} ms), ${s.nidVF} of the last ${Math.ceil(s.nidVF * 4 / 3)} · ` +
         `${s.dual ? 'dual-chamber (V > A is called VT)' : 'single-chamber'} · discriminators in the VT zone: ${on.length ? on.join(', ') : 'none'} · ${s.atp ? s.atp + ' ATP burst' + (s.atp > 1 ? 's' : '') + ', then shock' : 'shock only'}${s.shock ? '' : ' (shocks off)'}.`));
@@ -539,10 +540,10 @@
   /* Unknown films: what the film shows → what follows from it → what to do. q2 = the second question when it is not the default. */
   const XCASE = {
     twid: { title: 'Twiddler\'s syndrome', ref: 'ddd', pat: 'aged 84, with dementia, three months after a dual-chamber pacemaker for complete heart block. Dizzy spells, and the left arm twitches rhythmically.',
-      see: ['The leads are wound round the generator, and neither tip is in the heart', 'The atrial lead has lost its J, and the ventricular lead is where it was left', 'The ventricular lead has gone through the wall and ends outside the heart', 'Both leads are where they were left, and the generator has moved downward'],
+      see: ['The leads are wound round the generator, and both tips have been pulled back', 'The atrial lead has lost its J, and the ventricular lead is where it was left', 'The ventricular lead has gone through the wall and ends outside the heart', 'Both leads are where they were left, and the generator has moved downward'],
       seeNote: 'Turns of lead round the generator, and tips pulled back to the superior vena cava and the right atrium: the generator has been rotated in its pocket, by the patient or because the pocket is loose, and has reeled the leads in. The film after implant shows where they started.',
       then: ['No capture or sensing in either chamber, and stimulation of nerve or muscle near the tips', 'Normal ventricular pacing, with the loss of atrial capture and atrial sensing only', 'Normal capture and sensing, with a very high impedance measured on both leads', 'A paced QRS of right bundle branch block pattern, with a normal threshold'],
-      thenNote: 'Neither electrode touches myocardium. A tip that has retracted to the great veins lies beside the phrenic nerve or the brachial plexus, which is why the arm twitches. In a pacing-dependent patient this is an emergency.',
+      thenNote: 'Neither electrode is still in its chamber. A tip that has retracted to the great veins lies beside the phrenic nerve or the brachial plexus, which is why the arm twitches. In a pacing-dependent patient this is an emergency.',
       act: ['Reposition the leads and revise the pocket; temporary pacing if needed', 'Raise both outputs to their maximum, and repeat the chest film in six weeks', 'Reprogram the device to VVI, and leave both leads where they are now', 'Start anticoagulation, and plan extraction of the ventricular lead'],
       actNote: 'No programming reaches a ventricle that the lead is no longer in. The leads are repositioned or replaced and the generator is fixed in a snug pocket so that it cannot turn again.' },
     dis: { title: 'ventricular lead dislodgement', ref: 'ddd', pat: 'day 2 after a dual-chamber pacemaker for complete heart block. Bradycardia again on the monitor this morning.',
@@ -834,7 +835,7 @@
           '**The systems.** Single-chamber: one ventricular lead. Dual-chamber: add the atrial J. CRT: add a third lead through the coronary sinus to the lateral left ventricle, well apart from the right ventricular tip. A left bundle branch area lead ends on the septum, higher than the apex, and gives a narrow paced QRS.',
           '**Leadless pacemakers.** A Micra is one capsule in the right ventricle: VVI, or in the AV model tracking of the atrium from the mechanical signal of atrial contraction, with no atrial pacing. An AVEIR capsule screws in and can be paired: a ventricular and an atrial capsule that signal to each other on every beat make a true dual-chamber pacemaker, which senses and paces the atrium.',
           '**Defibrillators with nothing in the heart.** Subcutaneous ICD: generator on the left chest wall, coil under the skin in front of the sternum; it shocks, and cannot pace for bradycardia or deliver ATP. Extravascular ICD: the lead lies behind the sternum, close to the heart, and can also deliver ATP and brief pause-prevention pacing. The lateral view tells them apart.',
-          '**Malposition.** A lead in the **coronary sinus or a cardiac vein** can look acceptable on the PA view and is given away by its posterior course on the lateral. A lead in the **left ventricle** (through a patent foramen ovale or a septal defect, or by an arterial puncture and the aortic valve) also runs posteriorly, works perfectly, and causes strokes. **Dislodgement:** the tip is no longer where the implant film shows it. **Perforation:** the tip lies at or beyond the edge of the heart. **Twiddler\'s syndrome:** leads wound round a rotated generator, tips pulled out of the heart. After a subclavian puncture, look at the lung apex for a **pneumothorax**.',
+          '**Malposition.** A lead in the **coronary sinus or a cardiac vein** can look acceptable on the PA view and is given away by its posterior course on the lateral. A lead in the **left ventricle** (through a patent foramen ovale or a septal defect, or by an arterial puncture and the aortic valve) also runs posteriorly, works perfectly, and causes strokes. **Dislodgement:** the tip is no longer where the implant film shows it. **Perforation:** the tip lies at or beyond the edge of the heart. **Twiddler\'s syndrome:** leads wound round a rotated generator, tips pulled back out of their chambers. After a subclavian puncture, look at the lung apex for a **pneumothorax**.',
           '**The paced QRS is the cross-check.** A lead in the right ventricle activates the right ventricle first, so the paced QRS has a left bundle branch block pattern, negative in V1. A dominant R wave in V1 from a supposedly right ventricular lead means the left ventricle is being activated first, and the lead has to be found. The expected exceptions are a left ventricular lead and left bundle branch area pacing.'])],
       steps: (want) => {
         const cnt = pick(['vvi', 'ddd', 'crt', 'icd']), sys = cnt === 'icd' ? 'crt' : cnt === 'crt' ? 'icd' : pick(['icd', 'crt']), ex = pick(['sicd', 'evicd']);
