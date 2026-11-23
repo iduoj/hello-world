@@ -196,6 +196,15 @@ Plan (tick as done):
 - [ ] 4. Independent content review of every track; fix what it finds.
 - [ ] 5. Assessment links (course button per domain), docs, bundle, publish, push.
 
+Status note (update as it changes): steps 1–2 are committed. The six tracks in step 3 were handed to
+six background authors (one per file) with `docs/COURSE_AUTHORING.md` as the contract. When each
+reports back: (a) `node tools/course_walk.mjs --track <id>` must print WALK OK; (b) read the content
+with `node tools/course_dump.mjs --track <id>` and check it medically, paying most attention to the
+items the author listed as uncertain; (c) look at one screenshot per bench; (d) fix, then commit that
+track. After all six: full walk with no `--track`, Assessment links, README, bundle, publish, push.
+Also done in this round: the device questions were rebalanced because the correct option was the
+longest in 21 of 30 (a cue for test-wise readers); the walker now fails a track above 45 %.
+
 File ownership while tracks are being written in parallel: each track file has one author; shared
 files (kit, index.html, app.js, css, docs) are edited only by the coordinating session.
 
