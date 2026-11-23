@@ -47,7 +47,7 @@
     ['papAL', 'Anterolateral papillary muscle'], ['papPM', 'Posteromedial papillary muscle'], ['fascPost', 'Left posterior fascicle'], ['fascAnt', 'Left anterior fascicle'], ['moderator', 'Moderator band'], ['rvInflow', 'Tricuspid annulus'], ['rvApex', 'RV apex'], ['rvFreeWall', 'RV free wall'], ['lvApex', 'LV apex'], ['lvInfBase', 'LV inferobasal (inferior MI scar)'], ['lvAntWall', 'LV anterior wall'], ['lvLatEpi', 'LV lateral wall (epicardial)']];
   const PACE = [['rvApex', 'RV apex', () => Mo.spec('rvApex')], ['rvMidSeptum', 'RV mid-septum', () => Mo.spec('rvMidSeptum')], ['rvotSeptal', 'RV outflow tract', () => Mo.spec('rvotSeptal')],
     ['his', 'His bundle (selective)', () => ({ seeds: Mo.hps({ t: 42 }), purkLV: 1, purkRV: 1 })], ['lbbArea', 'Left bundle branch area', () => Mo.spec('lbbArea')],
-    ['lvLatEpi', 'LV lateral vein (LV only)', () => Mo.spec('lvLatEpi')], ['biv', 'Biventricular', () => Mo.fuse([{ spec: Mo.spec('rvApex'), t: 0 }, { spec: Mo.spec('lvLatEpi'), t: 0 }])], ['lvInfApical', 'LV endocardium (lead across a PFO)', () => Mo.spec('lvInfApical')], ['midCardiacVein', 'Middle cardiac vein', () => Mo.spec('midCardiacVein')]];
+    ['lvLatEpi', 'LV lateral vein (LV only)', () => Mo.spec('lvLatEpi')], ['biv', 'Biventricular', () => Mo.fuse([{ spec: Mo.spec('rvApex'), t: 0 }, { spec: Mo.spec('lvLatEpi'), t: 0 }])], ['lvInfApical', 'LV endocardium (lead across a PFO)', () => Mo.spec('lvInfLatEndo')], ['midCardiacVein', 'Middle cardiac vein', () => Mo.spec('midCardiacVein')]];
   EP.LocData = { PRESETS, PACE };
   const PACE_NOTE = {
     rvApex: 'LBBB pattern, superior axis (negative II/III/aVF), positive I and aVL. The widest of the right-sided sites.',
@@ -57,8 +57,8 @@
     lbbArea: 'Narrow QRS with a terminal R in V1 (Qr / rSR′): the left ventricle leads, the right ventricle is late. Short stimulus-to-peak in V5–V6.',
     lvLatEpi: 'RBBB pattern (dominant R in V1), negative in I and aVL, right axis: activation runs from the left lateral wall toward the right.',
     biv: 'Fusion of RV apical and LV lateral wavefronts: narrower than either alone, Q/QS in lead I, superior or right-superior axis, usually an R in V1.',
-    lvInfApical: 'RBBB pattern with a superior axis. If you expected an RV lead, this lead is in the left ventricle.',
-    midCardiacVein: 'RBBB-type pattern with a superior axis — an "RV" lead that has entered the coronary sinus and a posterior vein.',
+    lvInfApical: 'RBBB pattern (dominant R in V1) with a superior axis and a negative lead I: the left ventricle is activated first. If you expected an RV lead, this lead is in the left ventricle.',
+    midCardiacVein: 'LBBB-like V1 with a superior axis, almost the same as RV apical pacing: this vein runs along the posterior septum, so the right ventricle is not late. The 12-lead cannot be relied on to show this malposition; the lateral film (a lead that runs backwards) does. Posterior and lateral veins, further from the septum, give the RBBB pattern.',
   };
 
   /* Small multi-lead thumbnail of one QRS-T. */

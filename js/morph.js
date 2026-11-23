@@ -64,6 +64,7 @@
     lvInfBase: { p: L(0.4, 3.0, 1.2), kind: 'any', name: 'LV inferobasal wall' },
     lvAntWall: { p: L(-0.6, -2.95, 3.4), kind: 'epi', name: 'LV anterior wall' },
     lvInfApical: { p: L(0.5, 2.2, 6.0), kind: 'any', name: 'LV inferoapical wall' },
+    lvInfLatEndo: { p: L(-1.2, 2.0, 4.5), kind: 'endo', name: 'LV inferolateral endocardium' },   // RBBB pattern, superior axis: a lead inside the LV cavity
     midCardiacVein: { p: L(1.6, 2.7, 3.2), kind: 'epi', name: 'Middle cardiac vein (posterior septum, epicardial)' },
   };
 

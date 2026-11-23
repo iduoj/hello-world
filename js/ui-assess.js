@@ -82,7 +82,7 @@
   const shuffle = (a) => a.slice().sort(() => Math.random() - 0.5);
   const others = (all, self, n) => shuffle(all.filter((x) => x !== self)).slice(0, n);
   // pairs the surface ECG cannot reliably separate: never offer one as a distractor for the other
-  const CONFUSE = [['lvInfApical', 'midCardiacVein'], ['mitralAnt', 'lvSummit'], ['papPM', 'fascPost'], ['papAL', 'fascAnt'], ['lvInfBase', 'mitralPost'], ['rvApex', 'moderator']];
+  const CONFUSE = [['rvApex', 'midCardiacVein'], ['rvMidSeptum', 'midCardiacVein'], ['mitralAnt', 'lvSummit'], ['papPM', 'fascPost'], ['papAL', 'fascAnt'], ['lvInfBase', 'mitralPost'], ['rvApex', 'moderator']];
   const clash = (a, b) => CONFUSE.some((c) => c.includes(a) && c.includes(b));
   const othersNC = (all, self, n) => shuffle(all.filter((x) => x !== self && !clash(x[0], self[0]))).slice(0, n);
   const GEN = {
@@ -104,10 +104,10 @@
         right: R.AP[k].name, wrong: others(keys, k, 3).map((x) => R.AP[x].name), explain: 'The delta wave is negative in leads facing the insertion: negative in I/aVL with a positive V1 → left lateral; negative in III/aVF → posterior/posteroseptal; negative V1 with a left axis → right free wall; positive inferior leads with a negative V1 → anteroseptal.' };
     },
     localPace(id) {
-      const P = EP.LocData.PACE, cur = (id && P.find((x) => x[0] === id)) || pick(P);
+      const P = EP.LocData.PACE, cur = (id && P.find((x) => x[0] === id)) || pick(P.filter((x) => x[0] !== 'midCardiacVein'));   // the middle cardiac vein looks like RV apical pacing: not a fair unknown
       return { id: 'g-pace-' + cur[0], domain: 'local', topic: 'Pacing site', stem: 'Complete heart block with P-synchronous ventricular pacing. Where is the ventricle being paced from?',
         ecg: { rec: () => { const sim = new EP.HeartSim({ sinus: { cl: 820, resp: 0 }, avn: { fast: { block: true, retro: { block: true } } } }); new EP.Pacemaker(sim, { mode: 'DDD', lrl: 60, vSpec: cur[2](), vSite: 'rvApex' }); sim.runUntil(12500); const r = EP.Synth.build(sim, 2000, 12000); r.sim = sim; return r; } },
-        right: cur[1], wrong: othersNC(P, cur, 3).map((x) => x[1]), explain: 'LBBB pattern = right ventricular site (superior axis → apex; inferior axis → outflow tract). Terminal R in V1 with a narrow QRS → left bundle area. Dominant R in V1 with negative lead I → left ventricular site. An isoelectric gap then a native QRS → His bundle.' };
+        right: cur[1], wrong: othersNC(P, cur, 3).map((x) => x[1]), explain: 'LBBB pattern = right ventricular site (superior axis → apex; inferior axis → outflow tract). Terminal R in V1 with a narrow QRS → left bundle area. Dominant R in V1 with negative lead I → left ventricular site (inferior leads positive → lateral vein; negative → inferior or apical wall). An isoelectric gap then a native QRS → His bundle.' };
     },
     isch(id) {
       const S = EP.Stemi.list, cur = (id && S.find((x) => x.id === id)) || pick(S);
