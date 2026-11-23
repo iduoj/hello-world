@@ -62,11 +62,11 @@
   const HEX = (() => {
     const cx = 120, cy = 104, r = 78, pt = (deg, k) => [cx + r * k * Math.cos(deg * Math.PI / 180), cy + r * k * Math.sin(deg * Math.PI / 180)];
     const leads = [['I', 0], ['II', 60], ['aVF', 90], ['III', 120], ['aVL', -30], ['aVR', -150]];
-    let s = '<svg viewBox="0 0 240 208" width="240" height="208" role="img" aria-label="Hexaxial reference: lead I at 0 degrees, II at +60, aVF at +90, III at +120, aVL at −30, aVR at −150" fill="none" stroke="currentColor" font-size="11" font-family="inherit">';
+    let s = '<svg viewBox="0 0 240 216" width="240" height="216" role="img" aria-label="Hexaxial reference: lead I at 0 degrees, II at +60, aVF at +90, III at +120, aVL at −30, aVR at −150" fill="none" stroke="currentColor" font-size="11" font-family="inherit">';
     const a = pt(-30, 1), b = pt(90, 1);
     s += `<path d="M${cx} ${cy} L${a[0].toFixed(1)} ${a[1].toFixed(1)} A${r} ${r} 0 0 1 ${b[0].toFixed(1)} ${b[1].toFixed(1)} Z" fill="currentColor" fill-opacity="0.09" stroke="none"/>`;
     for (const [n, d] of leads) {
-      const p = pt(d, 1), q = pt(d + 180, 1), t = pt(d, 1.2);
+      const p = pt(d, 1), q = pt(d + 180, 1), t = pt(d, d === 90 ? 1.3 : 1.2);
       s += `<line x1="${q[0].toFixed(1)}" y1="${q[1].toFixed(1)}" x2="${p[0].toFixed(1)}" y2="${p[1].toFixed(1)}" stroke-opacity="0.45"/><circle cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="2.6" fill="currentColor" stroke="none"/>`;
       s += `<text x="${t[0].toFixed(1)}" y="${(t[1] + 4).toFixed(1)}" text-anchor="middle" fill="currentColor" stroke="none"><tspan font-weight="600">${n}</tspan> ${d > 0 ? '+' + d : d < 0 ? '−' + -d : '0'}°</text>`;
     }
@@ -168,7 +168,7 @@
   // l2  PVC / VT origin
   // =====================================================================================================
   /* Answers at the grain the 12-lead supports. `no` lists the regions a shown site must not be offered against. */
-  const REG = { rvot: 'RV outflow tract', lvot: 'LV outflow tract or aortic cusp', rvApex: 'RV apex', rvFree: 'RV free wall', lvApex: 'LV apex', infBase: 'Basal inferior LV', latMA: 'Lateral mitral annulus',
+  const REG = { rvot: 'RV outflow tract', lvot: 'LV outflow tract or aortic cusp', rvApex: 'RV apex', rvFree: 'RV free wall (body)', lvApex: 'LV apex', infBase: 'Basal inferior LV', latMA: 'Lateral mitral annulus',
     antMA: 'Anterior mitral annulus', postFasc: 'Posteromedial papillary muscle or fascicle', antFasc: 'Anterolateral papillary muscle or fascicle' };
   const UNK = {
     rvotFree: { reg: 'rvot', no: [], why: 'V1 is negative throughout: the right ventricle or septum is first. II, III and aVF are tall and positive, so the origin is at the top of the heart: an outflow tract. The chest leads stay negative as far as V3, a late transition, so the origin lies in front, directly under V1–V3: the right ventricular outflow tract. A focus in the LV outflow tract or a cusp lies further back and shows a dominant R by V2.' },
