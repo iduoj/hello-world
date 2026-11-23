@@ -3,6 +3,12 @@
  *   tvp / tcp  TempBench — a patient, an external pacing box (EP.Pacemaker, kind 'temp' / 'tcp') and a live monitor.
  *              spec { patient, thr, rAmp, tAmp, pm:{ lrl, vOut, vSens, async, vSite }, show:[rate|out|sens], tog:[async],
  *                     event:{ at, set, text } }   (event = something that happens to the wire at a set time)
+ *   icd        IcdBench — scripted rhythms played to an ICD (Icd, a subclass of EP.ICD with separate discriminators).
+ *              spec { phases:[{ sc, want:'none'|'treat', name }], icd:{ programming }, show, tog, pat, blind }
+ *   film       FilmBench — a simulated PA / lateral film (EP.XRay) of a system from EP.Devices, with an optional paced
+ *              12-lead. Without three.js or WebGL it shows a written report of the same film instead.
+ *              spec { film, view, ref, ecg, pat }
+ * The unknown ICD episodes of unit d4 are built from the scenarios of the ICD lab (EP.IcdCases, exported by ui-icd.js).
  */
 (function (EP) {
   'use strict';
@@ -244,7 +250,9 @@
     nsvt: { name: 'A run of VT at 200/min that stops by itself', cfg: VTP(300, { count: 19 }), obs: 12000 },
     st167: { name: 'Exercise: sinus tachycardia rising to 167/min', cfg: STP(167), obs: 13000 },
     st172: { name: 'Exercise: sinus tachycardia rising to 172/min', cfg: STP(172), obs: 13000 },
-    af: lab('af'), st: lab('st'), tover: lab('tover', { cfg: () => Object.assign(LAB.tover.cfg(), { vent: { mods: { tAmp: 1.9 } } }) }), noise: lab('noise'), storm: lab('storm'), slow: lab('slow'), vf: lab('vf'), fvt: lab('fvt'),
+    afFast: { name: 'Atrial fibrillation conducting at about 190/min', cfg: () => ({ sinus: { on: false }, atria: { mode: 'fib', fibMean: 110 }, avn: { fast: { erp: 205, conceal: 0.2, min: 55 } } }) },
+    fracture: { name: 'Sinus rhythm, with noise from a fractured lead', cfg: () => ({ sinus: { cl: 850 } }), icd: { noise: 0.9 } },
+    af: lab('af'), st: lab('st'), tover: lab('tover', LAB.tover && { cfg: () => Object.assign(LAB.tover.cfg(), { vent: { mods: { tAmp: 1.9 } } }) }), noise: lab('noise'), storm: lab('storm'), slow: lab('slow'), vf: lab('vf'), fvt: lab('fvt'),
   };
   const ICTL = {
     vtRate: ['VT zone starts at', 130, 220, 5, (v) => v + ' /min (' + Math.round(60000 / v) + ' ms)'],
@@ -448,7 +456,7 @@
       this.viewSeg.set(this.v); this.refSeg.set('cur'); this.refSeg.style.display = spec.ref ? '' : 'none';
       this.pat.innerHTML = ''; if (spec.pat) this.pat.append(h('b', 'Patient: '), spec.pat);
       this.ecgBox.style.display = spec.ecg ? '' : 'none';
-      if (spec.ecg) { try { const [dev, va] = this.sys(spec.film); this.ecg.setRecording(EP.Devices.make(dev, va).rec); } catch (e) { console.error(e); this.ecgBox.style.display = 'none'; } }
+      if (spec.ecg) { try { const [dev, va] = this.sys(spec.film); this.ecg.setRecording(EP.Devices.make(dev, va).rec); } catch (e) { console.warn(e); this.ecgBox.style.display = 'none'; } }
       this.show();
     }
     setView(v, user) { this.v = v; this.viewSeg.set(v); this.changes++; this.show(); if (user && this.onChange) this.onChange(); }
@@ -456,7 +464,7 @@
       const id = this.ref ? this.spec.ref : this.spec.film, f = FILMS[id], r = f.rep, lat = this.v === 'lat';
       if (this.xr) {
         try { const [dev, va] = this.sys(id); this.xr.setHardware(this.made[id] || (this.made[id] = EP.Hardware.build(Object.assign({}, dev.parts(), va.parts || {})))); this.xr.setView(this.v); }
-        catch (e) { console.error(e); this.noPicture(); }
+        catch (e) { console.warn(e); this.noPicture(); }
       }
       this.txt.innerHTML = '';
       const line = (k, t) => h('p', { style: { marginTop: '4px' } }, h('b', k + ': '), t);
@@ -466,7 +474,7 @@
       else this.txt.append(h('div.muted', { style: { fontSize: '12px' } }, 'A simulated film, drawn from the same geometry as the 3D heart. PA: the patient\'s left is on your right. Lateral: the sternum is on your left, the spine on your right.'));
       this.find.innerHTML = '';
       if (this.showFind) this.find.append(finding(/dislodg|coiled|embol|Twiddler|crosses the atrial|coronary sinus|pneumothorax/.test(f.name) ? 'bad' : 'good', this.ref ? 'After implant' : 'What this is', f.name + '.'));
-      else this.find.append(h('div.muted', { style: { fontSize: '12px' } }, 'The report is hidden until you have answered.'));
+      else this.find.append(h('div.muted', { style: { fontSize: '12px' } }, 'The interpretation is hidden until you have answered.'));
     }
     findings(on) { this.showFind = on; if (this.spec) this.show(); }
     ctx() { return { view: this.v, ref: this.ref, changes: this.changes, film: this.spec.film, text: this.text }; }
@@ -509,11 +517,11 @@
     storm: { title: 'electrical storm', icd: {}, pat: 'single-chamber ICD, old anterior infarct. Repeated therapies over the last hour.', what: 'appr',
       seen: 'Each therapy follows the abrupt start of a wide-complex tachycardia with one marker per QRS and a collapsing arterial trace, and each one ends it.',
       why: ['Recurrent monomorphic VT: an electrical storm', 'Lead fracture noise, since the therapies keep recurring', 'Sinus tachycardia from pain after the first shock', 'T-wave over-sensing after each of the paced bursts'],
-      whyNote: 'The device is doing exactly what it should, again and again: the VT is real, is detected, and is terminated, and then it comes back. Three or more separate episodes in 24 hours is an electrical storm. Each shock raises sympathetic drive, which favours the next episode.',
+      whyNote: 'The device is doing exactly what it should, again and again: the VT is real, is detected, and is terminated, and then it comes back. Three or more separate episodes in 24 hours is an electrical storm, whether they end with pacing or with shocks. Pain, fear and every shock raise sympathetic drive, which favours the next episode.',
       fix: ['Treat the patient: sedation, beta-blocker, amiodarone, potassium and magnesium, ischaemia', 'Tape a magnet over the generator, and observe him on the ward overnight', 'Raise the detection rate until this VT is no longer treated', 'Replace the lead and the generator as an emergency'],
-      fixNote: 'Nothing is wrong with the hardware. Break the cycle in the patient, then reprogram to favour ATP, and plan ablation if it continues. A magnet would leave a real, haemodynamically significant VT untreated.' },
+      fixNote: 'Nothing is wrong with the hardware. Break the cycle in the patient, keep ATP as the first therapy, and plan ablation if it continues. A magnet would leave a real, haemodynamically significant VT untreated.' },
     slow: { title: 'slow VT below the detection rate', icd: {}, pat: 'single-chamber ICD. Amiodarone was started a month ago. Faint and breathless for an hour, no therapy.', what: 'miss',
-      seen: 'A wide-complex tachycardia begins in one beat and the arterial pressure falls, yet every beat is marked VS: sensed, and below the zones.',
+      seen: 'A wide-complex tachycardia begins in one beat and the arterial pressure falls, yet the beats are marked VS: sensed, and below the zones.',
       why: ['VT slowed by amiodarone to below the VT zone', 'Sinus tachycardia, which the device rightly ignores', 'Under-sensing of fibrillation by the ventricular lead', 'A magnet that has been left over the generator'],
       whyNote: 'The tachycardia runs at 150/min, intervals of 400 ms, and the VT zone begins at 170/min (353 ms). The device sees every beat and is not allowed to act. Antiarrhythmic drugs slow VT, so starting one calls for a review of the detection rate.',
       fix: ['Lower the VT zone to below the tachycardia rate, with ATP first', 'Raise the VT zone, because the device is right to ignore this rhythm', 'Hold a magnet over the generator in order to trigger a shock', 'Switch on the onset and stability discriminators in the VT zone'],
@@ -631,9 +639,9 @@
             (b) => `${b.dev.c.vThr} mA: the lowest output that captured every stimulus, not the first setting that failed. Below it the monitor showed stimuli at 70/min with nothing after them, the escape rhythm at 30/min, and an arterial pulse only with the escape beats.`, { bench: A }),
           act('margin', 'Set the output', 'Now leave the output where it should be for the next day. (Measure the threshold first if you have not.)', { bench: A, keep: true,
             check: (x) => x.c.vOut >= 2 * x.c.vThr - 1e-9 && x.c.vOut <= 3 * x.c.vThr + 1e-9 && x.nc === 0 && x.run >= 3 && x.since >= 4000, solve: (b) => b.set('out', r1(2.5 * b.dev.c.vThr)),
-            live: (x) => (x.c.vOut < x.c.vThr ? 'No capture at this output.' : x.c.vOut < 2 * x.c.vThr - 1e-9 ? 'It captures, but with less than twice the threshold a small rise will lose it.' : x.c.vOut > 3 * x.c.vThr + 1e-9 ? 'It captures, with more than three times the threshold.' : null),
+            live: (x) => (x.c.vOut < x.c.vThr ? 'No capture at this output.' : x.c.vOut < 2 * x.c.vThr - 1e-9 ? 'It captures, but with less than twice the threshold a small rise will lose it.' : x.c.vOut > 3 * x.c.vThr + 1e-9 ? 'It captures, with more than three times the threshold: more than the margin asked for.' : null),
             hint: 'Two to three times the threshold you measured.',
-            why: 'Two to three times the threshold. Less leaves no room for the rise that an unfixed wire can show within hours. The battery is not the concern here, as it is in an implanted device; a much higher output mainly adds the risk of stimulating the diaphragm.' }),
+            why: 'Two to three times the threshold. Less leaves no room for the rise that an unfixed wire can show within hours. The battery is not the concern here, as it is in an implanted device, but a much higher output adds little and can stimulate the diaphragm. Some units also set a floor of a few milliamps whatever the threshold.' }),
           num('daily', 'The margin next morning', `Yesterday the threshold was ${y[0]} mA and the output was left at ${y[1].toFixed(1)} mA. This morning the threshold measures ${y[2]} mA. What is the lowest output that restores a 2:1 margin?`, 2 * y[2], 0.05, 'mA',
             `2 × ${y[2]} = ${r1(2 * y[2])} mA. The output of ${y[1].toFixed(1)} mA is now only ${(y[1] / y[2]).toFixed(1)} times threshold, and nothing on the monitor would have told you. A threshold that doubles overnight is also a finding in itself: ask whether the wire has moved or is perforating, and what has changed in the drugs and the potassium.`),
           num('sthr', 'Measure the sensing threshold', 'A different patient: sinus bradycardia at 46/min. The rate is set to 30 ppm, below the patient\'s own, and the output to minimum so that a stray stimulus cannot capture. The sensitivity dial is at 20 mV and the box is blind: it paces through the sinus beats. Lower the number until VS appears on every beat. What is the sensing threshold?', (b) => b.dev.c.rAmp, 0.5, 'mV',
@@ -681,9 +689,9 @@
           look('Before pacing', 'Complete heart block with a ventricular escape rhythm at 30/min and a blood pressure of 72/38. Each escape beat has a QRS, a T wave and, a moment later, an arterial upstroke. The pads are on, anterior–posterior, and the pacer is on standby.', { patient: 'chb', thr, pm: { lrl: 70, vOut: 0 }, show: [] }),
           mcq('pads', 'Where the pads go', 'You are placing pads to pace a conscious patient with complete heart block. Which position is usually preferred, and why?',
             ['Anterior–posterior, left of the sternum and below the left scapula: the heart lies between the pads', 'Both pads on the front of the chest, one either side of the sternum: the shortest path between the two pads', 'Right shoulder and left hip: the widest possible spread of current through the whole of the chest', 'Either side of the upper abdomen: clear of the ribs and the lungs, which both resist the flow of current'],
-            'Only the fraction of the current that crosses the ventricle does anything useful. Anterior–posterior pads put the heart on the straight line between them and usually capture at a lower current. Anterior–lateral is the accepted alternative when the patient cannot be rolled.'),
-          mcq('false', 'Is this capture?', 'Pacing has been started at 70 ppm and 30 mA. The rate meter on the monitor reads about 70/min, and every stimulus is followed by a wide deflection. Look at both traces. Is the heart being paced?',
-            ['No: the arterial trace still shows 30 beats a minute, and no T wave follows the deflections', 'Yes: there is a wide complex after every stimulus, and the monitor is counting a rate of about 70/min', 'Yes, electrically, but each paced beat is too weak to open the aortic valve and produce a pulse', 'It cannot be judged from the monitor until the current has been raised to the maximum setting'],
+            'Only the fraction of the current that crosses the ventricle does anything useful. Anterior–posterior pads put the heart on the straight line between them and often capture at a lower current. Anterior–lateral is an accepted alternative, and the one to use when the patient cannot be rolled.'),
+          mcq('false', 'Is this capture?', 'Pacing has been started at 70 ppm and 30 mA. The ECG rate on the monitor now reads 70/min or more, and every stimulus is followed by a deflection. Look at both traces. Is the heart being paced?',
+            ['No: the arterial trace still shows 30 beats a minute, and no T wave follows the deflections', 'Yes: there is a complex after every stimulus, and the monitor is counting a rate of 70/min or more', 'Yes, electrically, but each paced beat is too weak to open the aortic valve and produce a pulse', 'It cannot be judged from the monitor until the current has been raised to the maximum setting'],
             'What follows each stimulus is the after-potential of a very large pulse: it is the same after every spike, it has no ST segment or T wave, and nothing follows it on the arterial line. The escape beats at 30/min, with their own T waves and pulses, are still running underneath. The rate meter is counting artefact.', { bench: T }),
           act('capture', 'Get true capture', 'Raise the current until the heart is truly captured: a pulse with every stimulus.', { bench: T, keep: true,
             check: (x) => x.run >= 4 && x.pulse >= 60 && x.since >= 3500, solve: (b) => b.set('out', b.dev.c.vThr + 25),
@@ -716,11 +724,11 @@
       teach: () => [
         para('A transvenous ICD senses through the same right ventricular lead it paces with. From that one channel it gets a list of intervals between ventricular events, and at first that is all it has: **how fast, and for how long**.'),
         list(['**Zones.** Every interval is put in a bin: slower than the lowest detection rate (ignored), the **VT zone**, or the **VF zone**. A zone boundary is an interval, 60 000 ÷ rate: 188/min is 320 ms.',
-          '**Duration.** Detection is met when enough intervals fall in a zone. For VT this is usually a number in a row; for VF a proportion, such as 30 of the last 40, because fibrillation electrograms are small and some are missed. On the bench VT needs 12 in a row and VF 9 of the last 12, unless you change it.',
+          '**Duration.** Detection is met when enough intervals fall in a zone. In many devices VT needs a set number in a row and VF a proportion, such as 30 of the last 40, because fibrillation electrograms are small and some are missed. On the bench VT needs 12 in a row and VF 9 of the last 12, unless you change it.',
           '**Rate is not a diagnosis.** Sinus tachycardia at 170/min and VT at 170/min give a single-chamber device the same list of intervals. Therapy for supraventricular rhythms, above all AF with a fast ventricular response and sinus tachycardia, is the classic ICD complication.',
           '**Discriminators** are extra tests applied in the VT zone to withhold therapy from a supraventricular rhythm. **Sudden onset:** VT starts in one beat, sinus tachycardia warms up. **Stability:** VT is regular, AF is not. **Morphology:** the electrogram of a conducted beat matches a stored template, and a ventricular beat does not. With an atrial lead: **more ventricular than atrial events is VT.**',
           '**Each one can be fooled.** Onset: AF and re-entrant SVT also start abruptly, and VT that begins during sinus tachycardia may not look sudden. Stability: sinus tachycardia, atrial tachycardia and flutter with fixed conduction are regular, very fast AF is nearly regular, and VT can be irregular. Morphology: rate-related bundle branch block changes the conducted electrogram. Atrial lead: a 1:1 tachycardia stays ambiguous, and atrial under-sensing or far-field R waves corrupt the count.',
-          '**No discriminators in the VF zone.** Withholding therapy from real VF is fatal; treating a fast SVT is not. Above the VF boundary the device therefore accepts false positives, and a supraventricular rhythm that is fast enough is shocked whatever is switched on.',
+          '**No discriminators at the fastest rates.** Withholding therapy from real VF is fatal; treating a fast SVT is not. Above a rate limit, which in most devices is the VF boundary, no discriminator is applied: the device accepts false positives, and a supraventricular rhythm that is fast enough is shocked whatever is switched on.',
           '**Programming is the main treatment for unnecessary shocks.** High detection rates (for primary prevention, no therapy below about 185–200/min) and long detection times let supraventricular and self-terminating rhythms pass. Against older settings this reduced inappropriate therapy and, in MADIT-RIT, mortality; ADVANCE III showed fewer therapies with detection of 30 of 40 intervals.',
           '**The price of a high rate cut-off** is that a VT slower than the lowest zone is watched and not treated. A patient with a known slow VT has the zone set below it, with discriminators doing the work that rate no longer can.'])],
       steps: () => {
@@ -753,15 +761,15 @@
             ['Morphology is switched on alone. Which supraventricular rhythm will it still call VT?', 'Sinus tachycardia with rate-related bundle branch block', ['Sinus tachycardia with its usual narrow QRS', 'Atrial fibrillation with its usual narrow QRS', 'Atrial flutter with 2:1 conduction and its usual narrow QRS'],
               'Morphology compares each electrogram with a template recorded in the patient\'s baseline rhythm. Aberrant conduction changes the electrogram, so a supraventricular beat no longer matches. An out-of-date template does the same.']]),
           act('nsvt', 'Give it time to stop', 'A third patient has frequent runs of VT at 200/min that stop by themselves after five or six seconds, and every one of them is being treated. He also has sustained VT at the same rate. Change the detection so that the device waits out the short runs and still treats the sustained VT. The short run is played first.', {
-            bench: { phases: [{ sc: 'nsvt', want: 'none' }, { sc: 'vt200', want: 'treat' }], icd: { vtRate: 170, nidVT: 12 }, show: ['nidVT'], pat: 'dilated cardiomyopathy, single-chamber ICD.' },
+            bench: { phases: [{ sc: 'nsvt', want: 'none', name: 'A run of 19 beats of VT at 200/min' }, { sc: 'vt200', want: 'treat', name: 'Sustained VT at 200/min' }], icd: { vtRate: 170, nidVT: 12 }, show: ['nidVT'], pat: 'dilated cardiomyopathy, single-chamber ICD.' },
             check: (x) => x.all, solve: (b) => b.set('nidVT', 24),
             live: (x) => (x.v.nsvt === 'fail' ? 'Detection was met before the run had time to stop.' : x.v.nsvt === 'pass' ? 'The short run ended by itself, untreated. Now the sustained VT…' : null),
             hint: 'The rate is the same in both. What differs is how long they last: 19 beats against indefinitely.',
             why: 'Detection needs duration as well as rate. Twelve intervals at 300 ms is under four seconds, and many runs of VT, and most SVT that strays into the zone, are over before a longer count is complete. The cost is a few more seconds of sustained VT before therapy; in ADVANCE III, detection of 30 of 40 intervals reduced therapies without more syncope or deaths.' }),
           mcq('vfzone', 'Shocked with the discriminators on', 'On the bench: atrial fibrillation with a fast ventricular response, with onset, stability and morphology all switched on. Therapy is withheld twice (the SVT markers), and then the device charges and shocks. Why?',
             ['Nine of twelve intervals fell in the VF zone, where discriminators are not applied', 'Stability failed, because atrial fibrillation as fast as this is as regular as a VT', 'Morphology failed, because fibrillation changes the conducted electrogram', 'The fibrillation had moved to the ventricles, and the shock was appropriate'],
-            'The marker before the charge is FD, not TD. Intervals shorter than the VF boundary (273 ms here) count towards VF whatever the rhythm, and in that zone the device does not ask about onset, stability or morphology. The treatment is to slow the ventricular rate and, where it is safe for the patient, to raise the boundary.',
-            { bench: { phases: [{ sc: 'af' }], icd: { onset: true, stab: true, morph: true }, show: [], tog: [], pat: 'single-chamber ICD; permanent atrial fibrillation.' } }),
+            'The marker before the charge is FD, not TD. Intervals shorter than the VF boundary (273 ms here) count towards VF whatever the rhythm, and above that boundary this device, like most, does not ask about onset, stability or morphology. The treatment is to slow the ventricular rate and, where it is safe for the patient, to raise the boundary.',
+            { bench: { phases: [{ sc: 'afFast' }], icd: { onset: true, stab: true, morph: true }, show: [], tog: [], pat: 'single-chamber ICD; permanent atrial fibrillation.' } }),
           mcq('dual', 'An atrial lead', 'On the bench: a dual-chamber ICD with therapy switched off, so that you can watch. The upper row of markers is the atrial channel. During the tachycardia there are far fewer atrial markers (AS) than ventricular ones. What does that establish?',
             ['Ventricular tachycardia: the ventricles are faster than the atria, which no SVT can produce', 'Nothing yet: onset and stability are still needed to exclude an atrial tachycardia', 'Atrial fibrillation in which the atrial lead is missing most of the fibrillation waves', 'Sinus tachycardia with 2:1 AV block, which the device should leave untreated'],
             'V > A settles it at once. The converse does not hold: A > V is AF or flutter, and 1:1 could be sinus tachycardia, atrial tachycardia or VT with retrograde conduction, so those still need the other criteria. The count is only as good as the atrial lead: under-sensed AF can masquerade as V > A.',
@@ -789,7 +797,7 @@
           look('Watch a burst', 'VT at 185/min, cycle length 325 ms. After detection the device paces eight times at 276 ms, which is 85 % of the tachycardia cycle length (the log gives the figure). The paced beats take over the ventricle, and when pacing stops the tachycardia has gone: sinus rhythm, no shock, and the patient may have felt nothing. Press Replay to watch it again.',
             { phases: [{ sc: 'vt185', want: 'treat' }], show: [], tog: [], pat: 'ischaemic cardiomyopathy, single-chamber ICD.' }),
           num('atp-cl', 'How fast is a burst', `A VT has a cycle length of ${cl} ms. The first burst is programmed at ${pct} % of the tachycardia cycle length. At what cycle length does the device pace?`, cl * pct / 100, 3, 'ms',
-            `${cl} × 0.${pct} = ${bcl} ms, which is ${Math.round(60000 / bcl)}/min for about two seconds. The train must be faster than the tachycardia to get ahead of it and enter the circuit, and only a little faster, because the shorter the paced cycle the greater the risk of acceleration.`),
+            `${cl} × 0.${pct} = ${bcl} ms, which is ${Math.round(60000 / bcl)}/min for two to three seconds. The train must be faster than the tachycardia to get ahead of it and enter the circuit, and only a little faster, because the shorter the paced cycle the greater the risk of acceleration.`),
           mcq('why-atp', 'Why pacing can stop a tachycardia', 'Why does a burst of pacing terminate monomorphic VT but not VF?',
             ['VT is one circuit with an excitable gap that a paced wavefront can enter and block; VF has no such circuit', 'Pacing depolarises the whole ventricle at once, which VT cannot survive, whereas fibrillation needs more energy', 'A burst suppresses the automatic focus that drives VT, whereas VF is driven by many foci that recover at once', 'VT is slow enough for every stimulus to capture, whereas in VF the ventricle is refractory all of the time'],
             'Termination needs a wavefront that gets into the circuit, collides with the returning wave and leaves refractory tissue behind it. That requires one organised circuit with a gap of excitable tissue. Pacing captures only the tissue near the electrode; depolarising everything at once is what a shock does.'),
@@ -803,7 +811,7 @@
             ['The burst accelerated the VT; the device redetects it in the faster zone and goes on to shock', 'The burst captured and the VT has stopped; the short intervals are the paced beats being counted', 'The burst failed to capture; the device repeats the same burst until one of them does capture', 'The device mistook sinus tachycardia for VT, and the pacing has provoked atrial fibrillation'],
             'ATP can drive a circuit faster or disorganise it into VF. That is why a pacing-only prescription is not used: every ATP sequence ends in shocks, and the device re-evaluates the rhythm after every attempt.'),
           act('magnet', 'Stop the shocks', 'A patient arrives after four shocks in ten minutes. She is awake, the monitor shows sinus rhythm, and as you watch the device shocks again. There is no programmer. External pads are on. Stop the shocks.', {
-            bench: { phases: [{ sc: 'noise' }], show: [], tog: ['magnet'], pat: 'single-chamber ICD implanted six years ago.', blind: true },
+            bench: { phases: [{ sc: 'fracture' }], show: [], tog: ['magnet'], pat: 'single-chamber ICD implanted six years ago.', blind: true },
             check: (x) => x.magnet && x.magFor >= 5000, solve: (b) => b.set('magnet', true),
             live: (x) => (x.magnet ? 'Detection suspended: no markers, no charging.' : x.shocks ? x.shocks + (x.shocks > 1 ? ' shocks' : ' shock') + ' so far, each one in sinus rhythm.' : null),
             hint: 'It is in the cardiac arrest trolley, and it needs no programmer.',
@@ -827,7 +835,7 @@
           '**Leadless pacemakers.** A Micra is one capsule in the right ventricle: VVI, or in the AV model tracking of the atrium from the mechanical signal of atrial contraction, with no atrial pacing. An AVEIR capsule screws in and can be paired: a ventricular and an atrial capsule that signal to each other on every beat make a true dual-chamber pacemaker, which senses and paces the atrium.',
           '**Defibrillators with nothing in the heart.** Subcutaneous ICD: generator on the left chest wall, coil under the skin in front of the sternum; it shocks, and cannot pace for bradycardia or deliver ATP. Extravascular ICD: the lead lies behind the sternum, close to the heart, and can also deliver ATP and brief pause-prevention pacing. The lateral view tells them apart.',
           '**Malposition.** A lead in the **coronary sinus or a cardiac vein** can look acceptable on the PA view and is given away by its posterior course on the lateral. A lead in the **left ventricle** (through a patent foramen ovale or a septal defect, or by an arterial puncture and the aortic valve) also runs posteriorly, works perfectly, and causes strokes. **Dislodgement:** the tip is no longer where the implant film shows it. **Perforation:** the tip lies at or beyond the edge of the heart. **Twiddler\'s syndrome:** leads wound round a rotated generator, tips pulled out of the heart. After a subclavian puncture, look at the lung apex for a **pneumothorax**.',
-          '**The paced QRS is the cross-check.** A lead in the right ventricle activates the right ventricle first, so the paced QRS has a left bundle branch block pattern, negative in V1. A dominant R wave in V1 from a supposedly right ventricular lead means the left ventricle is being activated first, and the lead has to be found. The expected exceptions are a left ventricular lead and conduction-system pacing.'])],
+          '**The paced QRS is the cross-check.** A lead in the right ventricle activates the right ventricle first, so the paced QRS has a left bundle branch block pattern, negative in V1. A dominant R wave in V1 from a supposedly right ventricular lead means the left ventricle is being activated first, and the lead has to be found. The expected exceptions are a left ventricular lead and left bundle branch area pacing.'])],
       steps: (want) => {
         const cnt = pick(['vvi', 'ddd', 'crt', 'icd']), sys = cnt === 'icd' ? 'crt' : cnt === 'crt' ? 'icd' : pick(['icd', 'crt']), ex = pick(['sicd', 'evicd']);
         const LV = 'single-chamber pacemaker implanted yesterday for atrial fibrillation with a slow ventricular rate. The threshold is higher than it was at implant.';
@@ -851,9 +859,9 @@
           mcq('leadless', 'Two capsules', 'No generator and no leads: two capsules, one over the right atrium and one over the right ventricle. What can this system do that a single ventricular capsule cannot?',
             ['Sense and pace the atrium electrically: a true dual-chamber pacemaker', 'Follow the atrium by detecting the mechanical signal of each atrial contraction', 'Deliver a shock for ventricular fibrillation between the two capsules', 'Resynchronise the ventricles by pacing the septum from both of its sides'],
             'A single Micra AV already follows the atrium, using its accelerometer to detect atrial contraction, but it cannot pace the atrium and it loses tracking at higher sinus rates. Two AVEIR capsules that communicate on every beat sense and pace both chambers: DDD without leads.', { bench: { film: 'aveir' } }),
-          mcq('sicd-ev', 'Nothing in the heart', 'A generator on the left chest wall, one lead beside the sternum, and nothing inside the heart. Use the lateral view. Which device is this, and what follows from that?',
+          mcq('sicd-ev', 'Nothing in the heart', 'A generator on the left chest wall, one lead beside the sternum, and nothing inside the heart. On the lateral view find the sternum (the grey vertical band at the front of the chest) and see which side of it the lead lies on. Which device is this, and what follows from that?',
             [NOHEART[ex], NOHEART[ex === 'sicd' ? 'evicd' : 'sicd'], NOHEART.tv, NOHEART.ilr],
-            ex === 'sicd' ? 'On the lateral the coil lies in front of the sternum, under the skin: a subcutaneous ICD. It defibrillates across the chest and can do nothing else except a few seconds of post-shock pacing, so it suits patients who need neither bradycardia pacing nor ATP.'
+            ex === 'sicd' ? 'On the lateral the coil lies in front of the sternum, under the skin: a subcutaneous ICD. It defibrillates across the chest and, apart from brief pacing after a shock, can do nothing else, so it suits patients who need neither bradycardia pacing nor ATP.'
               : 'On the lateral the lead lies behind the sternum, between it and the heart: an extravascular ICD. Being that close to the ventricle it can pace as well as shock, which gives it ATP and pause-prevention pacing; it is still not a pacemaker for a patient who needs regular pacing.', { bench: { film: ex } }),
         ].concat(wanted(want, 'film-', Object.keys(XCASE), 2).map(xcase));
       } },
