@@ -82,12 +82,14 @@ Rules that the runner and the walker rely on:
 { kind: 'ecg',
   make: (p, bench) => recording,          // called at load and after every control change
   p: { coupling: 420 },                   // parameter defaults
-  ctl: [ { k: 'coupling', label: 'PAC coupling interval', min: 250, max: 600, step: 10, unit: 'ms' },   // slider
+  ctl: [ { k: 'coupling', label: 'PAC coupling interval', min: 250, max: 600, step: 10, unit: 'ms' },   // slider (fmt: (v) => text to show a name instead of a number)
          { k: 'ap', label: 'Pathway', opts: [['leftLateral', 'Left lateral'], …] },                      // select
          { k: 'lbbb', label: 'Left bundle branch block', toggle: true },                                 // checkbox
          { k: 'aden', label: 'Give adenosine', button: true } ],                                        // counter
   layout: 'strip' | '12',  strips: [1],   // lead indices: 0 I, 1 II, 2 III, 3 aVR, 4 aVL, 5 aVF, 6–11 V1–V6, 12 V4R, 13–15 V7–V9
-  ladder: true, markers: false, rowMm: 34, title: '…', cap: 'one line under the tracing',
+  ladder: true, markers: false, rowMm: 34, gain: 10,       // gain in mm/mV: lower it when tall complexes overlap
+  title: '…', cap: 'one line under the tracing',           // or cap: (p, m, rec) => '…', re-evaluated after every change
+  wide: true,                             // force the full-width layout (default: 12-leads wide, strips beside the steps)
   measure: (rec, p) => m,                 // default EP.Rhythms.measure(rec): vRate, aRate, pr, qrs, qt, qtc, axis, regular
   read: (rec, p, m) => [['PR', m.pr, 'ms'], …] }   // read-out, hidden until the step is answered
 ```
@@ -133,6 +135,18 @@ live               (live benches only) an EP.Live instance; the walker fast-forw
 ```
 
 A canvas view (`EP.ECGView`, `EP.LiveStrip`) must be created after its canvas has a parent element.
+
+### Things the first six tracks learned
+
+- A course `mcq` can be re-tested from the Assessment tab **without its bench**, so its stem must stand
+  on its own (put the finding in words as well as on the tracing) and its `why` must be a plain string.
+- `describe()` and the review schedule call `steps()` often. If a step's text quotes numbers taken from a
+  simulation, run that simulation once and memoise it.
+- Where the model cannot show something (a small terminal R wave, a U wave, acceleration of pre-excited
+  AF by nodal blockers), say so in the `look` text or the `why`, and score something it does show.
+- If a behaviour is scripted by a rule in your track rather than emerging from the simulator (torsades
+  triggers, the vulnerable period), state the rule on screen.
+- Two sites or patterns that look alike in the model are never offered against each other.
 
 ## Designing a unit
 

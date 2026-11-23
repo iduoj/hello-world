@@ -41,9 +41,10 @@
 
   // ---- static ECG bench -----------------------------------------------------------------------------
   /* spec: { kind:'ecg', make(p, bench) → recording, p: {defaults}, ctl: [control], layout:'12'|'strip',
-   *         strips:[lead index], ladder, markers, rowMm, title, cap, measure(rec, p) → m,
+   *         strips:[lead index], ladder, markers, rowMm, gain (mm/mV, default 10), title,
+   *         cap (string, or (p, m, rec) → string re-evaluated after every change), wide, measure(rec, p) → m,
    *         read(rec, p, m) → [[label, value, unit]] (shown only after the step is answered) }
-   * control: { k, label, min, max, step, unit } slider · { k, label, opts:[[value, text]] } select ·
+   * control: { k, label, min, max, step, unit, fmt?(v) → text } slider · { k, label, opts:[[value, text]] } select ·
    *          { k, label, toggle:true } checkbox · { k, label, button:true } counter button
    * ctx() → { p, base, rec, m, ev, changes } */
   class EcgBench {
@@ -61,8 +62,8 @@
     controls(spec) {
       this.spec = spec; this.p = Object.assign({}, spec.p || {}, this.p);
       const strip = spec.layout === 'strip';
-      this.view.set({ layout: strip ? 'strip' : '12', strips: spec.strips || [1], ladder: !!spec.ladder, markers: !!spec.markers, rowMm: spec.rowMm || (strip ? 34 : 27) });
-      this.title.textContent = spec.title || (strip ? 'Rhythm strip' : '12-lead ECG'); this.cap.textContent = spec.cap || '';
+      this.view.set({ layout: strip ? 'strip' : '12', strips: spec.strips || [1], ladder: !!spec.ladder, markers: !!spec.markers, rowMm: spec.rowMm || (strip ? 34 : 27), gain: spec.gain || 10 });
+      this.title.textContent = spec.title || (strip ? 'Rhythm strip' : '12-lead ECG'); this.cap.textContent = typeof spec.cap === 'string' ? spec.cap : '';
       this.ctl.innerHTML = ''; this.tog.innerHTML = ''; this.setters = {};
       for (const c of spec.ctl || []) {
         const cur = this.p[c.k];
@@ -70,7 +71,7 @@
         else if (c.toggle) { const chk = UI.check(c.label, !!cur, (v) => this.set(c.k, v)); this.setters[c.k] = (v) => { chk.input.checked = !!v; }; this.tog.append(chk); }
         else if (c.button) this.tog.append(h('button.btn.sm', { type: 'button', onclick: () => this.set(c.k, (this.p[c.k] || 0) + 1) }, c.label));
         else {
-          const show = (v) => v + (c.unit ? ' ' + c.unit : ''), val = h('span.val', show(cur));
+          const show = (v) => (c.fmt ? c.fmt(v) : v + (c.unit ? ' ' + c.unit : '')), val = h('span.val', show(cur));
           const inp = h('input', { type: 'range', min: c.min, max: c.max, step: c.step || 1, value: cur, 'aria-label': c.label, oninput: () => { val.textContent = show(+inp.value); }, onchange: () => this.set(c.k, +inp.value) });
           this.setters[c.k] = (v) => { inp.value = v; val.textContent = show(v); };
           this.ctl.append(h('label', c.label), val, inp);
@@ -83,6 +84,7 @@
       const sp = this.spec;
       try { this.rec = sp.make(this.p, this); this.m = sp.measure ? sp.measure(this.rec, this.p) : EP.Rhythms.measure(this.rec); } catch (e) { console.error(e); this.m = this.m || {}; }
       if (this.rec) this.view.setRecording(this.rec);
+      if (typeof sp.cap === 'function') { try { this.cap.textContent = sp.cap(this.p, this.m, this.rec) || ''; } catch (e) { console.error(e); } }
       this._read();
     }
     _read() {
@@ -215,7 +217,7 @@
           h('button.btn.sm', { type: 'button', onclick: () => { helped = true; status.textContent = 'Settings applied for you. Look at what changed.'; s.solve(bench); if (poll) poll(); } }, 'Show me'));
         poll = () => {
           const x = bench.ctx(), m = s.live && !helped ? s.live(x, st) : null;
-          if (m) status.textContent = m;
+          if (!helped) status.textContent = m || 'Watching the bench…';
           if (!s.check(x, st)) return;
           poll = null; row.remove(); hintEl.remove(); status.remove(); settle(s, i, !helped, fb, val(s.why));
         };
