@@ -207,3 +207,7 @@ table.tbl td { padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-
 @media (max-width: 980px) { .sim.course { grid-template-columns: minmax(0, 1fr); } }
 .step details > summary { font-weight: 500; }
 .step input[type="number"] { border: 1px solid var(--line); border-radius: 5px; padding: 6px 8px; background: var(--surface); color: inherit; font: 500 15px/1.2 var(--mono); min-height: 36px; }
+.sim.course.stack { grid-template-columns: minmax(0, 1fr); }
+.sim.course.stack > .sim-main:first-child { position: static; }
+.opts.chips { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
+.opts.chips .opt { min-height: 34px; padding: 6px 8px; font-size: 13px; }

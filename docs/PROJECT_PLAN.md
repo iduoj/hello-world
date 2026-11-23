@@ -167,6 +167,38 @@ the simulator is a simplified model and its tracings are cleaner than real ones;
 generic, not manufacturer-specific; no external benchmark yet. Suggested check: an outside set of real
 tracings / board-style device questions before and after.
 
+### Round 5 (user: "build the same course format for those other areas … expand it to the high yield
+areas that we have covered") — IN PROGRESS
+Context: the Assessment covers ten domains, but only devices had teach → predict → calculate → do →
+diagnose with spaced review. Everything else was recognition MCQ from small pools.
+
+Plan (tick as done):
+- [x] 1. Split the course into an engine and content. `js/course-kit.js` = runner, step types, bench
+      registry (`pacer` live bench, `ecg` static parameter-driven bench), progress store, home, tab
+      module. One content file per track, registered with `EP.Course.addTrack`.
+      `js/course-dev.js` = the existing eight device units (ids 1–8 unchanged, stored answers stay valid).
+- [x] 2. `tools/course_walk.mjs` = headless walker (answers every step correctly, proves each `do` step
+      fails before and passes after its `solve`, lints options). `docs/COURSE_AUTHORING.md` = how to
+      write a track.
+- [ ] 3. New tracks (unit-id prefix → Assessment domain):
+      - `js/course-arr.js`  `a*` arrhythmia mechanisms → mech (AV node and block, AVNRT, AVRT/WPW,
+        AF and flutter, wide-complex tachycardia / VT, polymorphic VT / torsades / VF)
+      - `js/course-loc.js`  `l*` localisation from the 12-lead → local (bundle branch and axis rules,
+        PVC/VT origin, accessory pathway, paced QRS ↔ lead position)
+      - `js/course-isch.js` `s*` ischaemia → isch (ST vector and territories, culprit artery, posterior /
+        RV, subtle OMI incl. de Winter, Wellens, swirl, LBBB / paced + modified Sgarbossa, mimics)
+      - `js/course-tox.js`  `t*` tox and electrolytes → tox (potassium, calcium / QT, sodium-channel
+        blockade, digoxin, beta-blocker / CCB, acquired long QT)
+      - `js/course-mgmt.js` `m*` acute management → mgmt (stable vs unstable, narrow regular, AF and
+        pre-excited AF, wide-complex, polymorphic VT / storm, bradycardia)
+      - `js/course-dev2.js` `d*` more devices → temp / icd / hardware (temporary pacing, ICD detection and
+        therapy, inappropriate shocks, devices and leads on the film)
+- [ ] 4. Independent content review of every track; fix what it finds.
+- [ ] 5. Assessment links (course button per domain), docs, bundle, publish, push.
+
+File ownership while tracks are being written in parallel: each track file has one author; shared
+files (kit, index.html, app.js, css, docs) are edited only by the coordinating session.
+
 ### Ideas not done yet (candidates for the next round)
 - Rate response (R) and AV-search / minimised-ventricular-pacing algorithms in the pacemaker sim
 - Course follow-ons: a matching course for ICDs (zones, discriminators, inappropriate shocks) and for

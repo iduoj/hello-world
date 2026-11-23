@@ -1,26 +1,13 @@
-/* EP Simulator — Device course: pacing taught from first principles.
- *
- * Eight units. Each = a short teaching text + a live bench (strip, marker channel, a few controls)
- * + scored steps. Step types:
- *   look   unscored: what to notice on the strip
- *   mcq    choice (changeable until "Check answer")
- *   num    free numeric answer, numbers regenerated on every run
- *   do     performed on the bench and verified from simulator state (b.ctx())
- *   case   unknown fault: what is wrong → cause → fix, all three needed
- * Only the first attempt is scored. Results go to EP.Assess.Store (domain 'device', ids
- * c-<unit>-<key>) and to a spaced review schedule (localStorage 'ep.course', db doc course/progress).
+/* EP Simulator — course track: pacing and device troubleshooting (units 1–8).
+ * Uses the live 'pacer' bench defined here: a simulated patient, a programmable pacemaker and a strip
+ * with the marker channel. Bench spec: { patient, pm, fault, force, show:[control keys], tog:[toggles],
+ * inter (interrogation button), fixedProg }. ctx() = what the strip has shown since the last change.
  */
 (function (EP) {
   'use strict';
-  const h = EP.h, UI = EP.UI, D = EP.PacerData, DEF = EP.Pacemaker.DEF;
-  const DAY = 864e5, GAP = [2, 7, 21, 60], PASS = 0.8;
-  const pick = (a) => a[Math.floor(Math.random() * a.length)];
-  const shuffle = (a) => a.map((x) => [Math.random(), x]).sort((p, q) => p[0] - q[0]).map((x) => x[1]);
-  const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-  const fmt = (s) => esc(s).replace(/\*\*(.+?)\*\*/g, '<b>$1</b>');
-  const para = (s) => h('p', { html: fmt(s) });
-  const list = (a) => h('ul', a.map((s) => h('li', { html: fmt(s) })));
-  const table = (head, rows) => h('div.scroll-x', { style: { marginTop: '8px' } }, h('table.tbl', h('thead', h('tr', head.map((x) => h('th', x)))), h('tbody', rows.map((r) => h('tr', r.map((x, i) => h('td', i ? x : h('b', x))))))));
+  const h = EP.h, UI = EP.UI, D = EP.PacerData, DEF = EP.Pacemaker.DEF, C = EP.Course, S = C.S;
+  const { para, list, table, fmt } = C.T, { pick, shuffle } = C.util;
+  const look = S.look, mcq = S.mcq, num = S.num, act = S.act;
 
   // ---- patients and controls ------------------------------------------------------------------------
   const P = Object.assign({}, D.PATIENTS, {
@@ -48,10 +35,10 @@
       this.el = h('section.card', h('div.card-h', h('h3', 'Bench — lead II and the marker channel'), h('span.grow'), this.interBtn, this.freeze),
         h('div.live', this.canvas), h('div.card-b', this.pat, this.ctl, this.tog, this.inter, this.find));
       this.strip = new EP.LiveStrip(this.canvas, { channels: [{ lead: 1 }], windowMs: 8000, markers: true, timers: true, rowMm: 24 });
-      this.showFind = false; this.setters = {}; this.el.style.display = 'none';
+      this.showFind = false; this.setters = {};
     }
     load(spec) {
-      this.spec = spec; this.el.style.display = ''; if (this.onShow) this.onShow();
+      this.spec = spec;
       const f = D.FAULTS[spec.fault || 'none'];
       this.nominal = Object.assign({}, DEF, spec.pm || {});
       const c = Object.assign({}, this.nominal, f.set, spec.force || {}); if (f.set.forceMode) c.mode = f.set.forceMode;
@@ -127,13 +114,6 @@
   }
   const pmt = (x) => /(AS VP ){4}/.test(x.seq) && x.retro >= 4;
 
-  // ---- step constructors ----------------------------------------------------------------------------
-  const look = (t, q, bench) => ({ type: 'look', t, q, bench });
-  const mcq = (k, t, q, a, why, o) => Object.assign({ type: 'mcq', k, t, q, a, why }, o);
-  const num = (k, t, q, ans, tol, unit, why, o) => Object.assign({ type: 'num', k, t, q, ans, tol, unit, why }, o);
-  const act = (k, t, q, o) => Object.assign({ type: 'do', k, t, q }, o);
-  const cas = (qz) => ({ type: 'case', k: 'case-' + qz.fault, t: 'Unknown fault', qz });
-
   /* Unknown-fault answers: what the device is doing, and the one best action. */
   const FN = {
     cap: 'Failure to capture: stimuli are delivered into excitable tissue and nothing follows',
@@ -162,6 +142,16 @@
     battery: ['mode', 'gen'], myo: ['pause', 'bip', [], ['less']],
   };
   const caseBench = (qz) => ({ patient: qz.patientOverride || qz.patient, pm: qz.pm, force: qz.force, fault: qz.fault, show: [], tog: ['magnet'], inter: true, fixedProg: true });
+  /* Unknown fault: what is the device doing → cause → fix. */
+  const cas = (qz) => {
+    const f = D.FAULTS[qz.fault], cs = CASE[qz.fault];
+    const same = Object.keys(CASE).filter((k) => k !== qz.fault).sort((p, q) => (CASE[q][0] === cs[0]) - (CASE[p][0] === cs[0]) || Math.random() - 0.5).slice(0, 5);
+    return S.multi('case-' + qz.fault, 'Unknown fault', 'A fault has been applied. Read the strip and markers, interrogate, use the magnet if it helps.', [
+      ['What is the device doing wrong?', FN[cs[0]], Object.keys(FN).filter((k) => k !== cs[0] && (cs[2] || []).indexOf(k) < 0).map((k) => FN[k]), f.dx + '.'],
+      ['What is the cause?', f.name, same.map((k) => D.FAULTS[k].name), f.why],
+      ['What do you do?', FIX[cs[1]], shuffle(Object.keys(FIX).filter((k) => k !== cs[1] && (cs[3] || []).indexOf(k) < 0)).slice(0, 4).map((k) => FIX[k]), f.fix],
+    ], { bench: caseBench(qz), tDone: 'Unknown fault: ' + f.name, why: f.why, qz });
+  };
   const HW = ['fracture', 'insulation', 'vDislodge', 'exit'].map((fault) => ({ patient: 'chb', pm: { mode: 'VVI', lrl: 70 }, fault }));
   const wanted = (want, pool, n) => { const w = (want || []).filter((k) => k.indexOf('case-') === 0).map((k) => pool.find((q) => q.fault === k.slice(5))).filter(Boolean); return w.length ? w : shuffle(pool).slice(0, n); };
 
@@ -441,242 +431,9 @@
         para('Each case below applies one hidden fault. The automatic read-out is off. You may interrogate and use the magnet. All three answers must be right for the case to count.')],
       steps: (want) => wanted(want, D.QUIZ, 5).map(cas) },
   ];
-  const unitById = (id) => UNITS.find((u) => String(u.id) === String(id));
-  const label = (id) => { const u = unitById(id); return 'Course ' + id + (u ? ' · ' + u.short : ''); };
 
-  // ---- progress and review schedule -----------------------------------------------------------------
-  const Prog = {
-    data: UI.store.get('course', { units: {}, steps: {} }), db: null,
-    mark(u, k, ok, t) { const id = u + '-' + k, e = this.data.steps[id] || { s: 0, n: 0 }; e.n++; e.s = ok ? e.s + 1 : 0; e.t = t; this.data.steps[id] = e; },
-    unit(id, score, t) { const e = this.data.units[id] || { best: 0, runs: 0 }; e.runs++; e.last = score; e.best = Math.max(e.best, score); e.t = t; this.data.units[id] = e; },
-    /* Step ids due again: missed last time, or right n times and older than 2 / 7 / 21 / 60 days. */
-    due(now) { return Object.keys(this.data.steps).filter((id) => { const e = this.data.steps[id]; return e.s === 0 || now - e.t > GAP[Math.min(e.s, GAP.length) - 1] * DAY; }); },
-    nextDue(now) { let best = Infinity; for (const id in this.data.steps) { const e = this.data.steps[id]; if (e.s > 0) best = Math.min(best, e.t + GAP[Math.min(e.s, GAP.length) - 1] * DAY - now); } return best; },
-    save() { this.data.t = Date.now(); UI.store.set('course', this.data); if (this.db) this.db.doc('course/progress').set(this.data).catch(() => {}); },
-    init(cb) {
-      if (!this._p) this._p = (async () => {
-        try {
-          const c = globalThis.claude; if (!c || !c.use) return;
-          const db = await c.use('db'); if (!db) return;
-          this.db = db;
-          const snap = await Promise.race([db.doc('course/progress').get(), new Promise((r) => setTimeout(() => r(null), 10000))]);
-          const x = snap && snap.exists && snap.data(); if (!x) return;
-          for (const part of ['units', 'steps']) for (const k in x[part] || {}) { const mine = this.data[part][k]; if (!mine || (x[part][k].t || 0) > (mine.t || 0)) this.data[part][k] = x[part][k]; }
-          UI.store.set('course', this.data);
-        } catch (e) { /* database unavailable: the browser copy is used */ }
-      })();
-      return this._p.then(() => { if (cb) cb(); });
-    },
-  };
-
-  /* What a stored course answer refers to (used by the Assessment study plan). */
-  function describe(q) {
-    const m = /^c-(\d+)-(.+)$/.exec(q), u = m && unitById(m[1]); if (!u) return null;
-    const s = u.steps([m[2]]).find((x) => x.k === m[2]); if (!s) return null;
-    const f = s.type === 'case' ? D.FAULTS[s.qz.fault] : null;
-    return { text: 'Device course ' + u.id + ' · ' + (f ? 'Unknown fault: ' + f.name : s.t), key: f ? f.dx + '.' : typeof s.why === 'string' ? s.why : u.goal, tab: 'course', focus: { unit: u.id, step: m[2] },
-      todo: 'Re-read unit ' + u.id + ' ("' + u.title + '"), then redo this step. The numbers and the strip are generated afresh.',
-      make: () => (s.type === 'mcq' ? { id: q, domain: 'device', topic: label(u.id), stem: s.q, right: s.a[0], wrong: s.a.slice(1), explain: s.why } : null) };
-  }
-  EP.Course = { UNITS, Prog, describe, _dbg: { CASE, FN, FIX }, note(q, ok) { const m = /^c-(\d+)-(.+)$/.exec(q); if (m) { Prog.mark(m[1], m[2], ok, Date.now()); Prog.save(); } } };
-
-  // ---- runner ---------------------------------------------------------------------------------------
-  /* unit: { id, title, goal, teach(), steps(keys) }; opt.keys limits the run to those step keys. */
-  function runUnit(root, unit, opt, exit) {
-    opt = opt || {};
-    const inst = unit.steps(opt.keys).filter((s) => !opt.keys || opt.keys.indexOf(s.k) >= 0);
-    inst.forEach((s) => { if (s.u == null) s.u = unit.id; });
-    const bench = inst.some((s) => s.bench || s.type === 'case') ? new Bench() : null;
-    let cur = -1, st = {}, poll = null, lastPoll = -1e9, saved = false;
-    const res = [], stepsEl = h('div.steps'), progEl = h('span.muted.mono');
-    if (bench) bench.onTick = (t) => { if (Math.abs(t - lastPoll) < 400) return; lastPoll = t; if (poll) poll(); };
-    const stem = (t) => h('p', { style: { fontWeight: '500', marginBottom: '8px' } }, t);
-
-    function settle(s, i, ok, fb, why) {
-      if (s.type !== 'look') res.push({ i, k: s.k, u: s.u, ok, t: s.t, why });
-      if (why) fb.append(h('div.note' + (s.type === 'look' ? '' : ok ? '.good' : '.bad'), s.type === 'look' ? null : h('b', ok ? 'Right. ' : 'Not this time. '), why));
-      fb.append(h('div', { style: { marginTop: '8px' } }, h('button.btn.primary', { type: 'button', onclick: () => activate(i + 1) }, i + 1 < inst.length ? 'Continue' : 'Finish')));
-      if (bench) bench.findings(true);
-    }
-    function choice(q, right, wrong, onDone) {
-      const optEl = h('div.opts'); let chosen = null;
-      const btn = h('button.btn.primary', { type: 'button', disabled: true, onclick: () => {
-        for (const b of optEl.children) { b.disabled = true; if (b.textContent === right) b.classList.add('right'); else if (b.textContent === chosen) b.classList.add('wrong'); }
-        btn.remove(); onDone(chosen === right);
-      } }, 'Check answer');
-      for (const o of shuffle([right].concat(wrong))) optEl.append(h('button.opt', { type: 'button', 'aria-pressed': 'false', onclick: (ev) => { chosen = o; btn.disabled = false; for (const b of optEl.children) b.setAttribute('aria-pressed', String(b === ev.currentTarget)); } }, o));
-      return h('div', stem(q), optEl, h('div', { style: { marginTop: '8px' } }, btn));
-    }
-    function body(s, i) {
-      const fb = h('div', { style: { marginTop: '8px' } });
-      if (s.type === 'look') { const el = h('div', h('p', s.q), fb); settle(s, i, true, fb, null); return el; }
-      if (s.type === 'mcq') return h('div', choice(s.q, s.a[0], s.a.slice(1), (ok) => settle(s, i, ok, fb, s.why)), fb);
-      if (s.type === 'num') {
-        const val = (f) => (typeof f === 'function' ? f(bench) : f);
-        const inp = h('input', { type: 'number', step: 'any', inputmode: 'decimal', 'aria-label': 'Your answer', onkeydown: (ev) => { if (ev.key === 'Enter') check(); } });
-        const msg = h('div.muted', { style: { fontSize: '13px', marginTop: '6px' } });
-        let first = null, over = false;
-        const end = (ok) => { over = true; inp.disabled = true; row.remove(); msg.remove(); settle(s, i, ok, fb, val(s.why)); };
-        const show = h('button.btn.sm', { type: 'button', style: { display: 'none' }, onclick: () => end(false) }, 'Show the working');
-        function check() {
-          if (over || inp.value === '') return;
-          const ok = Math.abs(+inp.value - val(s.ans)) <= s.tol + 1e-9;
-          if (first == null) first = ok;
-          if (ok) return end(first);
-          msg.textContent = 'Not that. You can try again; only the first answer is scored.'; show.style.display = '';
-        }
-        const row = h('div.row', { style: { marginTop: '8px' } }, h('button.btn.primary', { type: 'button', onclick: check }, 'Check answer'), show);
-        return h('div', stem(s.q), h('div.row', inp, h('span.mono', s.unit)), row, msg, fb);
-      }
-      if (s.type === 'do') {
-        const status = h('div.note', { style: { margin: '6px 0' } }, 'Watching the strip…'), hintEl = h('div', { style: { marginTop: '6px' } });
-        let helped = false;
-        const row = h('div.row', s.hint ? h('button.btn.sm', { type: 'button', onclick: () => { hintEl.innerHTML = ''; hintEl.append(h('div.muted', { style: { fontSize: '13px' } }, s.hint)); } }, 'Hint') : null,
-          h('button.btn.sm', { type: 'button', onclick: () => { helped = true; s.solve(bench); status.textContent = 'Settings applied for you. Watch what changes.'; } }, 'Show me'));
-        poll = () => {
-          const x = bench.ctx(), m = s.live && !helped ? s.live(x, st) : null;
-          if (m) status.textContent = m;
-          if (!s.check(x, st)) return;
-          poll = null; row.remove(); hintEl.remove(); status.remove(); settle(s, i, !helped, fb, s.why);
-        };
-        return h('div', stem(s.q), status, row, hintEl, fb);
-      }
-      // case: three linked questions
-      const qz = s.qz, f = D.FAULTS[qz.fault], cs = CASE[qz.fault], box = h('div');
-      const sameFn = Object.keys(CASE).filter((k) => k !== qz.fault).sort((a, b) => (CASE[b][0] === cs[0]) - (CASE[a][0] === cs[0]) || Math.random() - 0.5).slice(0, 5);
-      const parts = [
-        ['1 of 3 · What is the device doing wrong?', FN[cs[0]], Object.keys(FN).filter((k) => k !== cs[0] && (cs[2] || []).indexOf(k) < 0).map((k) => FN[k]), f.dx + '.'],
-        ['2 of 3 · What is the cause?', f.name, sameFn.map((k) => D.FAULTS[k].name), f.why],
-        ['3 of 3 · What do you do?', FIX[cs[1]], shuffle(Object.keys(FIX).filter((k) => k !== cs[1] && (cs[3] || []).indexOf(k) < 0)).slice(0, 4).map((k) => FIX[k]), f.fix]];
-      let all = true;
-      const part = (j) => {
-        const p = parts[j], note = h('div');
-        box.append(h('div', { style: { marginTop: j ? '12px' : '0' } }, choice(p[0], p[1], p[2], (ok) => {
-          all = all && ok; note.append(h('div.note' + (ok ? '.good' : '.bad'), { style: { marginTop: '6px' } }, h('b', ok ? 'Yes. ' : 'No: ' + p[1] + '. '), p[3]));
-          if (j < 2) part(j + 1); else settle(s, i, all, fb, null);
-        }), note));
-      };
-      part(0);
-      return h('div', h('p.muted', { style: { fontSize: '13px', marginBottom: '8px' } }, 'A fault has been applied. Read the strip and markers, interrogate, use the magnet if it helps.'), box, fb);
-    }
-    function render() {
-      stepsEl.innerHTML = ''; poll = null;
-      inst.forEach((s, i) => {
-        if (i < cur) {
-          const r = res.find((x) => x.i === i);
-          stepsEl.append(h('div.step' + (r ? (r.ok ? '.ok' : '.miss') : ''), h('span.n', r ? (r.ok ? '✓' : '✗') : '·'), h('details', h('summary', { style: { cursor: 'pointer' } }, s.type === 'case' ? 'Unknown fault: ' + D.FAULTS[s.qz.fault].name : s.t),
-            h('div.muted', { style: { fontSize: '13px', marginTop: '4px' } }, (r && r.why) || (s.type === 'case' ? D.FAULTS[s.qz.fault].why : s.q)))));
-        } else if (i === cur) stepsEl.append(h('div.step.now', h('span.n', String(i + 1)), body(s, i)));
-      });
-      if (cur >= inst.length) stepsEl.append(summary());
-      else if (inst.length - cur - 1 > 0) stepsEl.append(h('div.muted', { style: { fontSize: '12px' } }, (inst.length - cur - 1) + ' more to come.'));
-      progEl.textContent = cur >= inst.length ? 'done' : 'step ' + (cur + 1) + ' of ' + inst.length;
-    }
-    function activate(i) {
-      const s = inst[i]; cur = i; st = {};
-      if (s && bench) {
-        const spec = s.type === 'case' ? caseBench(s.qz) : s.bench;
-        if (spec) { if (s.keep && i > 0 && !opt.keys && unit.id !== 'review') bench.controls(spec); else bench.load(spec); }
-        bench.findings(s.type === 'look');
-      }
-      if (!s) finish();
-      render();
-      if (i > 0 && stepsEl.lastElementChild && stepsEl.scrollIntoView && !bench) stepsEl.lastElementChild.scrollIntoView({ block: 'nearest' });
-    }
-    function finish() {
-      if (saved || !res.length) return; saved = true;
-      const now = Date.now(), right = res.filter((r) => r.ok).length;
-      for (const r of res) Prog.mark(r.u, r.k, r.ok, now);
-      if (!opt.keys && unit.id !== 'review') Prog.unit(unit.id, right / res.length, now);
-      Prog.save();
-      if (EP.Assess) EP.Assess.Store.save({ t: now, n: res.length, right, src: 'course', items: res.map((r) => ({ d: 'device', s: label(r.u), q: 'c-' + r.u + '-' + r.k, ok: r.ok, c: 1 })) });
-    }
-    function summary() {
-      const right = res.filter((r) => r.ok).length, n = res.length, miss = res.filter((r) => !r.ok), full = !opt.keys && unit.id !== 'review', pass = n && right / n >= PASS;
-      const next = full ? UNITS[UNITS.indexOf(unit) + 1] : null;
-      return h('div.step.now', h('span.n', '∑'), h('div',
-        h('p', { style: { fontWeight: '600' } }, n ? right + ' of ' + n + ' right at the first attempt' + (full ? pass ? ' — unit passed.' : ' — below the 80 % pass mark.' : '.') : 'Nothing was scored.'),
-        miss.length ? h('p.muted', { style: { fontSize: '13px', margin: '6px 0' } }, 'Missed: ' + miss.map((r) => r.t).join(' · ') + '. These are now in the review schedule and in the Assessment study plan, and stay due until you get them right.') : n ? h('p.muted', { style: { fontSize: '13px', margin: '6px 0' } }, 'These items come back for review in two days, then at longer gaps.') : null,
-        h('div.row', { style: { marginTop: '8px' } },
-          miss.length && unit.id !== 'review' ? h('button.btn.primary', { type: 'button', onclick: () => exit({ unit, keys: miss.map((r) => r.k) }) }, 'Repeat the ' + miss.length + ' I missed') : null,
-          next && pass ? h('button.btn' + (miss.length ? '' : '.primary'), { type: 'button', onclick: () => exit({ unit: next }) }, 'Next: ' + next.title) : null,
-          full && !pass ? h('button.btn', { type: 'button', onclick: () => exit({ unit }) }, 'Run the whole unit again') : null,
-          h('button.btn', { type: 'button', onclick: () => exit() }, 'Back to the course'))));
-    }
-    const seen = unit.id !== 'review' && Prog.data.units[unit.id];
-    const teach = unit.teach ? h('details.card', { open: !opt.keys && !seen }, h('summary', { style: { padding: '9px 12px', cursor: 'pointer', fontWeight: '600' } }, 'Read first: the ideas this unit tests'), h('div.card-b.prose', { style: { maxWidth: '82ch' } }, unit.teach())) : null;
-    const stepsCard = h('section.card', h('div.card-h', h('h3', opt.keys ? 'Re-test' : 'Steps'), h('span.grow'), progEl), h('div.card-b', stepsEl));
-    const ph = bench ? h('section.card', h('div.card-b.muted', 'The bench opens at the first hands-on step. These first questions are answered from the programmed values alone.')) : null;
-    if (bench) bench.onShow = () => ph.remove();
-    root.append(h('div.row', { style: { marginBottom: '12px' } }, h('button.btn.sm', { type: 'button', onclick: () => exit() }, '← Course'), h('h2', { style: { fontSize: '17px' } }, (unit.id === 'review' ? '' : 'Unit ' + unit.id + ' · ') + unit.title), h('span.muted', { style: { fontSize: '13px' } }, unit.goal || '')),
-      teach ? h('div', { style: { marginBottom: '14px' } }, teach) : null,
-      bench ? h('div.sim.course', h('div.sim-main', bench.el, ph), h('div.sim-main', stepsCard)) : h('div', { style: { maxWidth: '760px' } }, stepsCard));
-    activate(0);
-    return { destroy() { if (bench) bench.destroy(); }, bench, inst, state: () => ({ cur, res, st }), poll: () => poll && poll(), next: () => activate(cur + 1) };
-  }
-
-  /* A mixed set from what is due: written items first, at most three bench items. */
-  function reviewUnit(ids) {
-    return { id: 'review', title: 'Review', goal: 'Items that are due again, drawn from the units you have done.', steps: () => {
-      const out = []; let benchN = 0;
-      for (const id of shuffle(ids)) {
-        const m = /^(\d+)-(.+)$/.exec(id), u = m && unitById(m[1]), s = u && u.steps([m[2]]).find((x) => x.k === m[2]);
-        if (!s) continue;
-        const hands = s.type === 'do' || s.type === 'case' || s.nb;
-        if (hands && ++benchN > 3) continue;
-        s.u = u.id; s.keep = false; if (!hands) delete s.bench;
-        out.push(s); if (out.length >= 8) break;
-      }
-      return out;
-    } };
-  }
-
-  EP.Modules = EP.Modules || [];
-  EP.Modules.push({
-    id: 'course', title: 'Device course',
-    mount(root) {
-      const main = h('div'); let run = null;
-      function open(o) {
-        if (run) { run.destroy(); run = null; }
-        main.innerHTML = ''; window.scrollTo(0, 0);
-        if (!o || !o.unit) return home();
-        run = runUnit(main, o.unit, o.keys ? { keys: o.keys } : null, open); EP.Course._run = run;
-      }
-      function home() {
-        const now = Date.now(), pd = Prog.data, due = Prog.due(now), nd = Prog.nextDue(now);
-        const done = UNITS.filter((u) => pd.units[u.id] && pd.units[u.id].best >= PASS).length;
-        const nextU = UNITS.find((u) => !pd.units[u.id] || pd.units[u.id].best < PASS);
-        const rows = UNITS.map((u) => {
-          const e = pd.units[u.id], pass = e && e.best >= PASS;
-          return h('div.finding', { style: { alignItems: 'center' } }, h('span.pill' + (pass ? '.good' : e ? '.warn' : ''), pass ? 'passed' : e ? Math.round(e.best * 100) + ' %' : 'unit ' + u.id),
-            h('div.row', { style: { justifyContent: 'space-between' } }, h('div', { style: { flex: '1 1 260px' } }, h('b', u.id + ' · ' + u.title), h('div.muted', u.goal)),
-              h('button.btn.sm' + (u === nextU ? '.primary' : ''), { type: 'button', onclick: () => open({ unit: u }) }, e ? 'Repeat' : 'Start')));
-        });
-        main.append(h('div.two',
-          h('section.card', h('div.card-h', h('h2', 'Pacing from first principles')), h('div.card-b.prose',
-            h('p', 'Eight short units that build device troubleshooting from one clock upwards. Each starts with the ideas, then makes you use them on a live strip: predict what a change will do, calculate the interval, make the device misbehave, and put it right.'),
-            h('p', 'Nothing is recognised from memory: the numbers are regenerated on every run and the bench tasks are checked against what the simulated device actually does. Only your first attempt at each step is scored.'),
-            h('div.row', { style: { marginTop: '12px' } }, nextU ? h('button.btn.primary', { type: 'button', onclick: () => open({ unit: nextU }) }, (pd.units[nextU.id] ? 'Continue with unit ' : 'Start with unit ') + nextU.id) : h('span.pill.good', 'all eight passed'),
-              h('span.muted.mono', done + ' / ' + UNITS.length + ' passed')))),
-          h('section.card', h('div.card-h', h('h3', 'Review'), h('span.grow'), h('span.muted.mono', due.length + ' due')), h('div.card-b.prose',
-            due.length ? h('p', due.length + ' item' + (due.length > 1 ? 's are' : ' is') + ' due: anything missed last time, and anything answered correctly long enough ago that it is worth checking it is still there (after 2, 7, 21 and 60 days).')
-              : h('p', Object.keys(pd.steps).length ? 'Nothing is due. ' + (isFinite(nd) ? 'The next items come back in ' + Math.max(1, Math.ceil(nd / DAY)) + ' day' + (Math.ceil(nd / DAY) > 1 ? 's' : '') + '.' : '') : 'Review starts after your first unit. Missed steps return the next time you open the course; correct ones return after 2, 7, 21 and 60 days.'),
-            due.length ? h('div.row', { style: { marginTop: '10px' } }, h('button.btn.primary', { type: 'button', onclick: () => open({ unit: reviewUnit(due) }) }, 'Review ' + Math.min(8, due.length) + ' now')) : null,
-            h('p.muted', { style: { fontSize: '12px', marginTop: '10px' } }, 'Course answers also count in the Assessment gap map under pacemaker troubleshooting. ' + (Prog.db ? 'Progress is saved with this page.' : 'Progress is saved in this browser.'))))),
-          h('section.card', { style: { marginTop: '14px' } }, h('div.card-h', h('h3', 'Units')), h('div.card-b', h('div.findings', { style: { gap: '12px' } }, rows))),
-          h('section.card', { style: { marginTop: '14px' } }, h('div.card-h', h('h3', 'How the testing gets harder')), h('div.card-b.prose', { style: { maxWidth: '82ch' } }, list([
-            '**Predict** before you touch a control, then watch whether the strip agrees with you.',
-            '**Calculate** intervals from the programmed values, with numbers that change every run.',
-            '**Do**: make the device show the behaviour, or correct it, on the bench. There are no options to choose from, and the step passes only when the strip shows it.',
-            '**Diagnose** an unknown fault from the strip and the interrogation: what it is doing, why, and the fix. All three must be right.',
-            '**Come back**: every item returns after a gap. Getting it right after you have had time to forget is the test that matters.']))));
-      }
-      root.append(main);
-      const pd = EP.pending, u0 = pd && pd.unit && unitById(pd.unit);
-      if (u0) open({ unit: u0, keys: pd.step ? [pd.step] : null }); else home();
-      Prog.init(() => { if (!run) { main.innerHTML = ''; home(); } });
-      if (EP.Assess && EP.Assess.Store.init) EP.Assess.Store.init();
-      return { unmount() { if (run) run.destroy(); } };
-    },
-  });
+  C.benches.pacer = () => new Bench();
+  C.PacerBench = Bench; C.pacerPatients = P; C._dbg = { CASE, FN, FIX };
+  C.addTrack({ id: 'dev', title: 'Pacing and device troubleshooting', short: 'Devices', dom: 'device', bench: 'pacer',
+    blurb: 'From one clock in a single-chamber device to diagnosing an unknown fault from the strip and the interrogation.', units: UNITS });
 })(globalThis.EP = globalThis.EP || {});

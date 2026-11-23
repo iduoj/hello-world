@@ -72,26 +72,26 @@ QRS events are emitted `FW` (100 ms) after onset so late contributors can fuse.
 Engine hooks: `M.territory`, `M.injury`, scar mask in `M.dipole`, `cfg.vent.scar`, `cfg.atria.prDep`,
 `mods.stShape` may be a function, leads 12–15 = V4R, V7, V8, V9, `Heart3D.setTint(voxelWeights)`.
 ### devices3d.js — `EP.Hardware.build(parts)`, `EP.Hardware.add3D(heart, hw)`, `new EP.XRay(el)`.
-### ui-*.js — one module per tab: rhythms, localise, devices (`EP.Devices` catalogue), course, pacer, temp, icd,
+### ui-*.js — one module per tab: rhythms, localise, devices (`EP.Devices` catalogue), pacer, temp, icd,
 tox (`EP.Tox`), stemi (`EP.Stemi`), cases, assess (`EP.Assess`: written bank `W`, generators, `Store`).
 Assessment history: localStorage key `ep.assess` and, in the artifact, db collection `assessment`
 (one doc per finished set: `{t, n, right, rev?, src?, items:[{d domain, s topic, q id, ok, c confidence 0–2, void?}]}`).
 `void` strikes an answer (mis-tap); `rev` counts edits — when the db and browser copies of a set differ,
 the higher `rev` wins. `src: 'course'` marks sets written by the device course.
-### ui-course.js — `EP.Course` (tab `course`): `UNITS[{id, title, short, goal, teach(), steps(keys)}]`,
-`Bench` (HeartSim + Pacemaker + LiveStrip; `load(spec)`, `controls(spec)`, `set(key, v)`, `ctx()` = what
-the strip has shown since the last change: marker sequence, counts, non-capture, ghost senses, PVC /
-retrograde-P bookkeeping), `runUnit(root, unit, {keys}, exit)`, `Prog` (spaced schedule; localStorage
-`ep.course`, db doc `course/progress` = `{units:{id:{best,last,runs,t}}, steps:{'<unit>-<key>':{s streak,
-n, t}}}`), `describe('c-<unit>-<key>')` for the Assessment study plan. Step shapes: `look{t,q,bench}`,
-`mcq{k,t,q,a[right,...wrong],why}`, `num{k,t,q,ans,tol,unit,why}`, `do{k,t,q,bench,keep,check(x,st),
-solve(bench),live(x,st),hint,why}`, `case{k:'case-<fault>',qz}` (answers in `CASE`/`FN`/`FIX`).
-A step with `bench` reloads the patient unless `keep` is set (then only the controls change).
+### course-kit.js — `EP.Course` (tab `course`, "Courses"): track registry (`addTrack`, `tracks`, `unitById`,
+`trackFor(dom)`), step constructors `S.{look,mcq,num,act,multi}`, text helpers `T`, bench registry
+`benches` (`ecg` = `EcgBench`, static parameter-driven tracing), `runUnit`, `Prog` (spaced schedule;
+localStorage `ep.course`, db doc `course/progress` = `{units:{id:{best,last,runs,t}}, steps:{'<unit>-<key>':
+{s streak, n, t}}}`), `describe('c-<unit>-<key>')` for the Assessment study plan, `_run` (live runner,
+used by `tools/course_walk.mjs`). Full authoring guide: `docs/COURSE_AUTHORING.md`.
+### course-<track>.js — one file per track: `dev` (units 1–8, also defines the live `pacer` bench), `arr`
+(a*), `loc` (l*), `isch` (s*), `tox` (t*), `mgmt` (m*), `dev2` (d*). A track with no units is hidden.
 ### app.js — modules register in `EP.Modules = [{id,title,mount(root)→{unmount}}]`; tabs + hash routing.
 
 ## Dev tools
     node tools/dev_lib.js [id]          run library rhythms, print rates/labels
     node tools/shot.mjs <url> <png> [w] [h] [waitMs] [--dark] [--full] [--eval js]
+    node tools/course_walk.mjs [--track id] [--unit id]   walk course units headlessly (must print WALK OK)
     node tools/build.mjs                bundle → dist/ep-simulator.html (artifact) + standalone
     NODE_PATH=/opt/node-tools/node_modules node tools/dev_plot.js out.png conduction|pacing|pvc
 
