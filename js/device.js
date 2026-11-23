@@ -100,7 +100,7 @@
       if (!cap.sa || amp < c.aSens) return;
       if (t < this.aBlank) return;
       // atrial-rate monitor (uses refractory senses too)
-      this.aaInt.push(t - this.lastA); if (this.aaInt.length > 8) this.aaInt.shift(); this.lastA = t;
+      this.aaInt.push(t - this.lastA); if (this.aaInt.length > 7) this.aaInt.shift(); this.lastA = t;
       this._modeSwitch(t);
       if (m === 'AAI') { if (t - this._aRef < c.arp) { this.mark(t, 'A', 'AR'); return; } this._aRef = t; this.mark(t, 'A', 'AS'); this.stats.as++; this._armA(t + (c.hyst ? 60000 / c.hyst : this.lri)); return; }
       if (t < this.pvarpEnd) { this.mark(t, 'A', 'AR'); return; }
@@ -130,10 +130,12 @@
     }
     _modeSwitch(t) {
       const c = this.c;
-      if (!c.modeSwitch || !(c.mode === 'DDD' || c.mode === 'VDD') || this.aaInt.length < 6) return;
+      if (!c.modeSwitch || !(c.mode === 'DDD' || c.mode === 'VDD') || this.aaInt.length < 7) return;
+      // "4 of the last 7" atrial intervals shorter than the detection interval (so a far-field R wave counted
+      // once per cycle, giving alternating short and long intervals, is enough to switch)
       const lim = 60000 / c.msRate, fast = this.aaInt.filter((x) => x < lim).length;
-      if (!this.switched && fast >= 5) { this.switched = true; this.mark(t, 'V', 'MS'); this.inAVD = false; this.tok.v++; this._cycle(Math.max(this.lastV, t - this.lri * 0.5), 'ms'); }
-      else if (this.switched && fast === 0 && this.aaInt.length >= 8) { this.switched = false; this.mark(t, 'V', 'MS'); }
+      if (!this.switched && fast >= 4) { this.switched = true; this.mark(t, 'V', 'MS'); this.inAVD = false; this.tok.v++; this._cycle(Math.max(this.lastV, t - this.lri * 0.5), 'ms'); }
+      else if (this.switched && fast === 0) { this.switched = false; this.mark(t, 'V', 'MS'); }
     }
 
     // ---- outputs ----
@@ -142,7 +144,7 @@
       this._apAt = t; this.stats.ap++;
       if (!c.noOutput) { this._ownA = t; this.sim.pace(t, 'A', { site: c.aSite, captured: c.aOut >= c.aThr, kind: c.kind }); }
       this.mark(t, 'A', 'AP');
-      this.lastA = t; this.aaInt.push(999); if (this.aaInt.length > 8) this.aaInt.shift();
+      this.lastA = t; this.aaInt.push(999); if (this.aaInt.length > 7) this.aaInt.shift();
       this.vBlankEnd = t + c.vBlank;
       if (c.crosstalk) this.sim.schedule(t + c.vBlank + 12, (tt) => this._senseV(tt, 99, 'xtalk'));
       if (async) return;
@@ -172,7 +174,7 @@
       const c = this.c, m = this.mode;
       this.lastV = t; this.inAVD = false; this._apAt = null;
       this.vrpEnd = t + c.vrp; this.timer('VRP', t, t + c.vrp);
-      if (m === 'VVI') { this._armV(t + (kind === 'VS' && c.hyst ? 60000 / c.hyst : this.lri)); return; }
+      if (m === 'VVI') { this._armV(t + (kind !== 'VP' && kind !== 'init' && c.hyst ? Math.max(this.lri, 60000 / c.hyst) : this.lri)); return; }   // hysteresis: a longer escape interval after any sensed beat
       const pv = c.pvarp + (kind === 'PVC' && c.pvcExt ? 150 : 0);
       this.pvarpEnd = t + pv; this.aBlank = t + c.pvab; this.timer('PVARP', t, t + pv);
       if (m === 'VDD') { this._armV(t + this.lri); return; }

@@ -125,8 +125,52 @@ See docs/ARCHITECTURE.md for module APIs.
   Strong = acute management, ICD, temporary pacing. Next content should deepen device troubleshooting
   and paced-QRS ↔ lead position.
 
+### Round 4 (user feedback after the baseline) — done
+User said: (a) could not change an answer after tapping an option, so the VT / AV-dissociation item was
+a mis-tap, not a miss; (b) the AF item was a fair miss; (c) devices are weak "because I just don't know
+enough" — wants teaching, re-testing and progressively harder testing there; (d) asked how confident I
+am that using this builds knowledge.
+- [x] Assessment: an option stays changeable until a confidence button locks it in; "Mis-tap — don't
+      count this" after the reveal; "Not a real miss — remove" on Study-plan rows. Sessions carry `rev`
+      and items carry `void`; `Store.amend(q)` writes the edit back to the db doc (`_id`); `Store.init`
+      is idempotent, merges db and browser copies by `t` (higher `rev` wins) and uploads sets that were
+      answered while the db was unreachable. Voided items are ignored by stats and ledger.
+- [x] The user's baseline doc (`assessment/c1ngb7p3wtrqz6i4mb45`) was edited by hand: `w7` is `void`,
+      `rev: 1`.
+- [x] Device course tab (`js/ui-course.js`, id `course`, after `devices`): eight units, 56 scored steps.
+      1 VVI timing · 2 capture/threshold · 3 sensing · 4 DDD states and AV delay · 5 PVARP/TARP/upper
+      rate · 6 PMT, mode switch, magnet · 7 hardware signatures · 8 unknown faults (4 of 5 to pass).
+      Step types: `look` (unscored), `mcq`, `num` (numbers regenerated each run), `do` (performed on
+      the bench, verified from simulator state via `Bench.ctx()`), `case` (what is wrong → cause → fix).
+      First-attempt scoring, pass mark 80 %. Spaced review: missed = due at once; right n times = due
+      after 2 / 7 / 21 / 60 days (`Prog`, localStorage `ep.course`, db doc `course/progress`).
+      Results are also saved as Assessment sessions (`src: 'course'`, domain `device`, ids
+      `c-<unit>-<key>`), so they feed the gap map and the Study plan; `EP.Course.describe(q)` gives the
+      deep link `{unit, step}` and "Re-test this" opens that single step.
+- [x] Engine fixes found while building the course: rate hysteresis now applies after any sensed beat
+      (it was skipped after escape/PVC beats); mode switch uses "4 of the last 7" atrial intervals, so
+      far-field R-wave over-sensing really does cause a false mode switch; the strip analyser recognises
+      PMT that runs below the upper tracking rate (VA time + AV delay > upper rate interval).
+- Verified headlessly: every unit walked start to finish with correct answers; every `do` step fails
+  before the action and passes 3–8 s after its `solve`; all 13 unknown-fault cases load, show on the
+  strip and can be answered. Test scripts were ad hoc (scratchpad), see "Testing the course" below.
+
+#### Testing the course
+`EP.Course._run` exposes the live runner: `.inst` (step instances), `.bench`, `.state()`, `.poll()`.
+A walker can answer `mcq` with `s.a[0]`, `num` with `s.ans`, call `s.solve(run.bench)` for `do` steps
+and fast-forward with `run.bench.live.advance(500)`; `EP.Course._dbg` has the case answer tables.
+
+#### What I told the user about how much this helps (keep the claims honest)
+Good evidence for the method (retrieval practice with feedback, spacing, generated items, doing rather
+than recognising). Limits: content written by one author and not reviewed by an electrophysiologist;
+the simulator is a simplified model and its tracings are cleaner than real ones; device behaviour is
+generic, not manufacturer-specific; no external benchmark yet. Suggested check: an outside set of real
+tracings / board-style device questions before and after.
+
 ### Ideas not done yet (candidates for the next round)
 - Rate response (R) and AV-search / minimised-ventricular-pacing algorithms in the pacemaker sim
+- Course follow-ons: a matching course for ICDs (zones, discriminators, inappropriate shocks) and for
+  paced-QRS ↔ lead position; calipers on the live strip; pulse-width control (strength–duration curve)
 - Intracardiac electrogram channels (A/V EGM) beside the marker channel
 - Scar-based VT circuit drawn on the 3D map (isthmus, exit) and entrainment concepts
 - LVH with strain, takotsubo, PE patterns as further STEMI mimics; Smith 4-variable formula calculator

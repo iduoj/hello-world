@@ -164,6 +164,7 @@ table.tbl td { padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-
 .opts { display: grid; gap: 6px; }
 .opt { text-align: left; border: 1px solid var(--line); background: var(--surface); border-radius: 5px; padding: 8px 10px; cursor: pointer; min-height: 40px; }
 .opt:hover { border-color: var(--accent); }
+.opt[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); }
 .opt.right { border-color: var(--good); background: color-mix(in srgb, var(--good) 12%, transparent); }
 .opt.wrong { border-color: var(--bad); background: color-mix(in srgb, var(--bad) 10%, transparent); }
 .opt:disabled { cursor: default; opacity: 0.85; }
@@ -189,3 +190,20 @@ table.tbl td { padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-
 .signs { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1px; background: var(--line); border-top: 1px solid var(--line); }
 .signs > div { background: var(--surface); padding: 10px 12px; font-size: 13px; }
 .signs h4 { font: 600 10.5px/1.2 var(--cond); letter-spacing: 0.09em; text-transform: uppercase; color: var(--muted); margin-bottom: 4px; }
+
+/* ---- pacing course ---- */
+.steps { display: grid; gap: 10px; }
+.step { display: grid; grid-template-columns: 26px minmax(0, 1fr); gap: 10px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); }
+.step.now { border-color: var(--accent); }
+.step.todo { opacity: 0.55; }
+.step .n { width: 24px; height: 24px; border-radius: 12px; display: grid; place-items: center; font: 600 12px/1 var(--mono); background: var(--surface-2); color: var(--muted); }
+.step.ok .n { background: color-mix(in srgb, var(--good) 22%, transparent); color: var(--good); }
+.step.miss .n { background: color-mix(in srgb, var(--bad) 18%, transparent); color: var(--bad); }
+.step input[type="number"] { width: 110px; }
+.unit-i { display: flex; gap: 8px; align-items: baseline; }
+.unit-i .tick { font: 600 11px/1 var(--mono); color: var(--good); min-width: 30px; }
+.sim.course { grid-template-columns: minmax(0, 1.15fr) minmax(320px, 1fr); }
+@media (min-width: 981px) { .sim.course > .sim-main:first-child { position: sticky; top: 8px; } }
+@media (max-width: 980px) { .sim.course { grid-template-columns: minmax(0, 1fr); } }
+.step details > summary { font-weight: 500; }
+.step input[type="number"] { border: 1px solid var(--line); border-radius: 5px; padding: 6px 8px; background: var(--surface); color: inherit; font: 500 15px/1.2 var(--mono); min-height: 36px; }

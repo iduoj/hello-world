@@ -6,7 +6,7 @@
   const h = EP.h, UI = EP.UI, R = EP.Rhythms, Mo = EP.Morph;
   const DOM = {
     rhythm: ['Rhythm recognition', 'rhythms'], mech: ['Mechanisms & EP concepts', 'rhythms'], local: ['Localisation from the 12-lead', 'localise'], isch: ['Ischaemia / STEMI', 'stemi'],
-    device: ['Pacemaker function & troubleshooting', 'pacemaker'], hardware: ['Devices, leads & imaging', 'devices'], temp: ['Temporary pacing', 'temp'], icd: ['ICD', 'icd'],
+    device: ['Pacemaker function & troubleshooting', 'course'], hardware: ['Devices, leads & imaging', 'devices'], temp: ['Temporary pacing', 'temp'], icd: ['ICD', 'icd'],
     tox: ['Tox & electrolytes', 'tox'], mgmt: ['Acute management', 'cases'],
   };
   const QUOTA = { rhythm: 4, mech: 3, local: 3, isch: 4, device: 4, hardware: 2, temp: 2, icd: 2, tox: 3, mgmt: 3 };
@@ -191,7 +191,9 @@
   };
   /* What a stored answer refers to, where to practise it, and a fresh copy of the question. */
   function describe(it) {
-    const q = it.q || '', m = q.match(/^g-(rh|pvc|ap|pace|is|pm|tx)-(.+)$/);
+    const q = it.q || '';
+    if (q.indexOf('c-') === 0) return EP.Course ? EP.Course.describe(q) : null;
+    const m = q.match(/^g-(rh|pvc|ap|pace|is|pm|tx)-(.+)$/);
     if (!m) { const w = W[+q.slice(1)]; if (!w) return null; const pr = PR[w[0] + '|' + w[1]] || [DOM[w[0]][1], {}, 'Open the tab and work through the related material.']; return { text: w[2], key: w[3][0] + ' — ' + w[4], tab: pr[0], focus: pr[1], todo: pr[2], make: () => ({ id: q, domain: w[0], topic: w[1], stem: w[2], right: w[3][0], wrong: w[3].slice(1), explain: w[4] }) }; }
     const k = m[1], id = m[2], L = EP.LocData, D = EP.PacerData;
     if (k === 'rh') { const r = R.byId[id]; return r && { text: 'Rhythm strip: ' + r.name, key: r.teach.ecg[0], tab: 'rhythms', focus: { id }, todo: 'Study the 12-lead with the ladder diagram on, then measure the intervals yourself with the calipers.', make: () => GEN.rhythm(id) }; }
@@ -234,7 +236,11 @@
   const Store = {
     sessions: UI.store.get('assess', []),
     db: null,
-    async init(onChange) {
+    init(onChange) {
+      if (!this._p) this._p = this._load();
+      return this._p.then(() => { if (onChange) onChange(); });
+    },
+    async _load() {
       try {
         const c = globalThis.claude;
         if (!c || !c.use) return;
@@ -243,23 +249,44 @@
         this.db = db;
         const snap = await Promise.race([db.collection('assessment').orderBy('t', 'desc').limit(40).get(), new Promise((r) => setTimeout(() => r(null), 10000))]);
         if (!snap) return;
-        const seen = new Set(this.sessions.map((s) => s.t));
-        for (const d of snap.docs) { const x = d.data(); if (x && x.t && !seen.has(x.t)) this.sessions.push(x); }
+        let oldest = Infinity;
+        for (const d of snap.docs) {
+          const x = d.data(); if (!x || !x.t) continue;
+          x._id = d.id; oldest = Math.min(oldest, x.t);
+          const i = this.sessions.findIndex((s) => s.t === x.t);
+          if (i < 0) this.sessions.push(x); else if ((x.rev || 0) >= (this.sessions[i].rev || 0)) this.sessions[i] = x;   // the saved copy wins unless this browser has a newer edit
+          else this.sessions[i]._id = d.id;
+        }
         this.sessions.sort((a, b) => a.t - b.t);
         UI.store.set('assess', this.sessions.slice(-40));
-        if (onChange) onChange();
+        // sets answered before the database was reachable are uploaded now
+        for (const s of this.sessions) if (!s._id && (snap.size < 40 || s.t > oldest)) this._put(s);
       } catch (e) { /* database unavailable: the browser copy is still used */ }
     },
+    _put(s) { const copy = Object.assign({}, s); delete copy._id; return this.db.collection('assessment').add(copy).then((ref) => { s._id = ref && ref.id; }).catch(() => {}); },
     save(s) {
       this.sessions.push(s); UI.store.set('assess', this.sessions.slice(-40));
-      if (this.db) this.db.collection('assessment').add(s).catch(() => {});
+      if (this.db) this._put(s);
+    },
+    /* Strike an answer from the record (a mis-tap, or an item the learner does not want in the plan). */
+    amend(q) {
+      for (let i = this.sessions.length - 1; i >= 0; i--) {
+        const s = this.sessions[i], it = (s.items || []).filter((x) => x.q === q && !x.void).pop();
+        if (!it) continue;
+        it.void = true; s.rev = (s.rev || 0) + 1;
+        const live = s.items.filter((x) => !x.void); s.n = live.length; s.right = live.filter((x) => x.ok).length;
+        UI.store.set('assess', this.sessions.slice(-40));
+        if (this.db && s._id) { const copy = Object.assign({}, s); delete copy._id; this.db.doc('assessment/' + s._id).set(copy).catch(() => {}); }
+        return true;
+      }
+      return false;
     },
     clear() { this.sessions = []; UI.store.set('assess', []); },
     /* One row per distinct question: its latest state.
      * status: 'misc' confident but wrong · 'gap' wrong · 'fragile' right by guessing · 'confirm' right once after a miss · 'known' */
     ledger() {
       const by = {};
-      for (const s of this.sessions) for (const it of s.items || []) (by[it.q] = by[it.q] || []).push(Object.assign({ t: s.t }, it));
+      for (const s of this.sessions) for (const it of s.items || []) if (!it.void) (by[it.q] = by[it.q] || []).push(Object.assign({ t: s.t }, it));
       const rows = [];
       for (const q in by) {
         const h0 = by[q], last = h0[h0.length - 1], prev = h0[h0.length - 2];
@@ -277,6 +304,7 @@
     stats() {
       const st = {};
       for (const s of this.sessions) for (const it of s.items || []) {
+        if (it.void) continue;
         const d = (st[it.d] = st[it.d] || { n: 0, right: 0, sureWrong: 0, guessRight: 0, topics: {} });
         d.n++; if (it.ok) d.right++; if (!it.ok && it.c === 2) d.sureWrong++; if (it.ok && it.c === 0) d.guessRight++;
         const tp = (d.topics[it.s] = d.topics[it.s] || [0, 0]); tp[0]++; if (it.ok) tp[1]++;
@@ -317,13 +345,13 @@
         for (const r of due.slice(0, 14)) {
           const d = describe(r); if (!d) continue;
           plan.append(h('div.finding', h('span.pill.' + LBL[r.status][1], LBL[r.status][0]), h('div', h('b', d.text), h('div.muted', { style: { fontSize: '13px' } }, d.key), h('div', { style: { fontSize: '13px', marginTop: '3px' } }, h('b', 'Do this: '), d.todo),
-            h('div.row', { style: { marginTop: '6px' } }, h('button.btn.sm', { type: 'button', onclick: () => EP.open(d.tab, d.focus) }, 'Practise in ' + (EP.Modules.find((m) => m.id === d.tab) || {}).title), h('button.btn.sm', { type: 'button', onclick: () => start({ items: [r] }) }, 'Re-test this')))));
+            h('div.row', { style: { marginTop: '6px' } }, h('button.btn.sm', { type: 'button', onclick: () => EP.open(d.tab, d.focus) }, 'Practise in ' + (EP.Modules.find((m) => m.id === d.tab) || {}).title), h('button.btn.sm', { type: 'button', onclick: () => start({ items: [r] }) }, 'Re-test this'), h('button.btn.sm', { type: 'button', title: 'A mis-tap, or something you already know', onclick: () => { Store.amend(r.q); home(); } }, 'Not a real miss — remove')))));
         }
         const planCard = due.length ? h('section.card', { style: { marginTop: '14px' } }, h('div.card-h', h('h3', 'Study plan — ' + due.length + ' item' + (due.length > 1 ? 's' : '') + ' to close'), h('span.grow'), h('button.btn.primary', { type: 'button', onclick: () => start({ items: shuffle(due).slice(0, 12) }) }, 'Re-test what I missed')),
           h('div.card-b', h('p.muted', { style: { fontSize: '13px', marginBottom: '10px' } }, 'Each miss becomes one exercise. Do the exercise in its tab, then re-test. An item leaves this list after you get it right twice on separate sets without guessing. Misconceptions are listed first: being sure and wrong is more dangerous than not knowing.'), plan,
             due.length > 14 ? h('p.muted', { style: { fontSize: '12px', marginTop: '8px' } }, (due.length - 14) + ' more — they appear as you clear these.') : null)) : null;
         const hist = Store.sessions.slice(-6).reverse();
-        const histCard = hist.length ? h('section.card', { style: { marginTop: '14px' } }, h('div.card-h', h('h3', 'Sets so far')), h('div.card-b.scroll-x', h('table.tbl', h('tbody', hist.map((x) => h('tr', h('td.mono', new Date(x.t).toLocaleDateString()), h('td.mono', x.right + ' / ' + x.n), h('td.mono', Math.round((100 * x.right) / Math.max(1, x.n)) + '%'), h('td.muted', x.n >= 25 ? 'baseline' : x.n <= 3 ? 're-test' : 'practice set'))))))) : null;
+        const histCard = hist.length ? h('section.card', { style: { marginTop: '14px' } }, h('div.card-h', h('h3', 'Sets so far')), h('div.card-b.scroll-x', h('table.tbl', h('tbody', hist.map((x) => h('tr', h('td.mono', new Date(x.t).toLocaleDateString()), h('td.mono', x.right + ' / ' + x.n), h('td.mono', Math.round((100 * x.right) / Math.max(1, x.n)) + '%'), h('td.muted', x.src === 'course' ? 'device course' : x.n >= 25 ? 'baseline' : x.n <= 3 ? 're-test' : 'practice set'))))))) : null;
         const domBtns = h('div.variants', Object.keys(DOM).map((d) => h('button.btn.sm', { type: 'button', onclick: () => start({ n: 8, domain: d }) }, DOM[d][0])));
         main.append(h('div.two',
           h('section.card', h('div.card-h', h('h2', 'Find your gaps')), h('div.card-b.prose',
@@ -341,7 +369,11 @@
             h('li', h('b', 'Come back in a few days. '), 'Re-test what you missed again. Getting it right after a gap is what makes it stick; right twice on separate sets clears the item.'),
             h('li', h('b', 'Re-baseline every week or two. '), 'Compare the gap map with the last one.')))));
       }
-      function start(spec) { qs = build(spec); qi = 0; items = []; review = []; ask(); }
+      function start(spec) {
+        qs = build(spec); qi = 0; items = []; review = [];
+        if (!qs.length) { const d = spec.items && spec.items[0] && describe(spec.items[0]); if (d) EP.open(d.tab, d.focus); return; }   // hands-on items are re-tested in their own tab
+        ask();
+      }
       function ask() {
         destroyView(); main.innerHTML = ''; chosen = null;
         const q = qs[qi], opts = shuffle([q.right].concat(q.wrong));
@@ -361,14 +393,16 @@
           fb.innerHTML = '';
           fb.append(h('div.note' + (ok ? '.good' : '.bad'), h('b', ok ? 'Correct. ' : 'Answer: ' + q.right + '. '), q.explain),
             h('div.row', { style: { marginTop: '10px' } }, h('button.btn.primary', { type: 'button', onclick: () => { qi++; if (qi < qs.length) ask(); else finish(); } }, qi + 1 < qs.length ? 'Next question' : 'See results'),
-              h('span.pill', DOM[q.domain][0]), h('span.muted', { style: { fontSize: '12px' } }, q.topic || '')));
+              h('span.pill', DOM[q.domain][0]), h('span.muted', { style: { fontSize: '12px' } }, q.topic || ''), h('span.grow'),
+              h('button.btn.sm', { type: 'button', onclick: (ev) => { const it = items[items.length - 1]; if (it && it.q === q.id) it.void = true; review = review.filter((r) => r.q !== q); ev.currentTarget.replaceWith(h('span.muted', { style: { fontSize: '12px' } }, 'Not counted.')); } }, 'Mis-tap — don\'t count this')));
         };
-        for (const o of opts) optEl.append(h('button.opt', { type: 'button', onclick: (ev) => {
-          if (chosen) return; chosen = o;
-          for (const b of optEl.children) b.disabled = true;
-          ev.currentTarget.style.borderColor = 'var(--accent)';
+        let locked = false;
+        for (const o of opts) optEl.append(h('button.opt', { type: 'button', 'aria-pressed': 'false', onclick: (ev) => {
+          if (locked) return; chosen = o;
+          for (const b of optEl.children) b.setAttribute('aria-pressed', String(b === ev.currentTarget));
           fb.innerHTML = '';
-          fb.append(h('div.eyebrow', { style: { marginBottom: '6px' } }, 'How sure were you?'), h('div.row', [['Guessing', 0], ['Fairly sure', 1], ['Certain', 2]].map(([t, c]) => h('button.btn', { type: 'button', onclick: () => reveal(c) }, t))));
+          fb.append(h('div.eyebrow', { style: { marginBottom: '6px' } }, 'You can still change your choice. Lock it in by saying how sure you are:'),
+            h('div.row', [['Guessing', 0], ['Fairly sure', 1], ['Certain', 2]].map(([t, c]) => h('button.btn', { type: 'button', onclick: () => { locked = true; reveal(c); } }, t))));
         } }, o));
         const qCard = h('section.card', h('div.card-h', h('h3', 'Question ' + (qi + 1) + ' of ' + qs.length), h('span.grow'), h('button.btn.sm', { type: 'button', onclick: () => (items.length ? finish() : home()) }, 'End')),
           h('div.card-b', h('p', { style: { fontWeight: '500', marginBottom: '10px' } }, q.stem), optEl, fb));
@@ -376,13 +410,14 @@
       }
       function finish() {
         destroyView(); main.innerHTML = '';
-        const right = items.filter((i) => i.ok).length, sess = { t: Date.now(), n: items.length, right, items };
-        if (items.length) Store.save(sess);
-        const st = {}; for (const it of items) { const d = (st[it.d] = st[it.d] || { n: 0, right: 0, sureWrong: 0, guessRight: 0, topics: {} }); d.n++; if (it.ok) d.right++; if (!it.ok && it.c === 2) d.sureWrong++; if (it.ok && it.c === 0) d.guessRight++; const tp = (d.topics[it.s] = d.topics[it.s] || [0, 0]); tp[0]++; if (it.ok) tp[1]++; }
+        const liveItems = items.filter((i) => !i.void), right = liveItems.filter((i) => i.ok).length, sess = { t: Date.now(), n: liveItems.length, right, items };
+        if (liveItems.length) Store.save(sess);
+        if (EP.Course) for (const it of liveItems) if (it.q.indexOf('c-') === 0) EP.Course.note(it.q, it.ok);
+        const st = {}; for (const it of liveItems) { const d = (st[it.d] = st[it.d] || { n: 0, right: 0, sureWrong: 0, guessRight: 0, topics: {} }); d.n++; if (it.ok) d.right++; if (!it.ok && it.c === 2) d.sureWrong++; if (it.ok && it.c === 0) d.guessRight++; const tp = (d.topics[it.s] = d.topics[it.s] || [0, 0]); tp[0]++; if (it.ok) tp[1]++; }
         const sure = review.filter((r) => !r.ok && r.conf === 2), wrong = review.filter((r) => !r.ok && r.conf !== 2), lucky = review.filter((r) => r.ok);
         const block = (title, note, arr) => (arr.length ? [h('h4', title), h('p.muted', { style: { fontSize: '12px' } }, note), h('div.findings', { style: { marginTop: '6px' } }, arr.map((r) => h('div.finding', h('span.pill', DOM[r.q.domain][0].split(' ')[0]), h('div', h('b', r.q.stem), r.ok ? null : h('div', { style: { color: 'var(--bad)' } }, 'You chose: ' + r.chosen), h('div', 'Answer: ' + r.q.right), h('div.muted', r.q.explain), (() => { const d = describe({ q: r.q.id }); return d ? h('div.row', { style: { marginTop: '6px' } }, h('button.btn.sm', { type: 'button', onclick: () => EP.open(d.tab, d.focus) }, 'Practise this'), h('span.muted', { style: { fontSize: '12px' } }, d.todo)) : null; })()))))] : null);
         main.append(h('div.two',
-          h('section.card', h('div.card-h', h('h2', 'This set: ' + right + ' / ' + items.length)), h('div.card-b', gapMap(st), h('div.row', { style: { marginTop: '12px' } }, h('button.btn.primary', { type: 'button', onclick: home }, 'Back to overview'), h('button.btn', { type: 'button', onclick: () => start({ n: 10 }) }, 'Another 10')))),
+          h('section.card', h('div.card-h', h('h2', 'This set: ' + right + ' / ' + liveItems.length)), h('div.card-b', gapMap(st), h('div.row', { style: { marginTop: '12px' } }, h('button.btn.primary', { type: 'button', onclick: home }, 'Back to overview'), h('button.btn', { type: 'button', onclick: () => start({ n: 10 }) }, 'Another 10')))),
           h('section.card', h('div.card-h', h('h3', 'All sessions')), h('div.card-b', gapMap(Store.stats(), true)))),
           h('section.card', { style: { marginTop: '14px' } }, h('div.card-h', h('h3', 'Review')), h('div.card-b.prose', { style: { maxWidth: 'none' } },
             block('Confident but wrong', 'These are misconceptions rather than gaps — the highest-value items to revisit.', sure),
@@ -392,8 +427,9 @@
       }
       root.append(main);
       home();
-      Store.init(() => { if (!qs.length) home(); });
-      return { unmount() { destroyView(); } };
+      let alive = true;
+      Store.init(() => { if (alive && !qs.length) home(); });
+      return { unmount() { alive = false; destroyView(); } };
     },
   });
 })(globalThis.EP = globalThis.EP || {});

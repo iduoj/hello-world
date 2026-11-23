@@ -72,10 +72,21 @@ QRS events are emitted `FW` (100 ms) after onset so late contributors can fuse.
 Engine hooks: `M.territory`, `M.injury`, scar mask in `M.dipole`, `cfg.vent.scar`, `cfg.atria.prDep`,
 `mods.stShape` may be a function, leads 12–15 = V4R, V7, V8, V9, `Heart3D.setTint(voxelWeights)`.
 ### devices3d.js — `EP.Hardware.build(parts)`, `EP.Hardware.add3D(heart, hw)`, `new EP.XRay(el)`.
-### ui-*.js — one module per tab: rhythms, localise, devices (`EP.Devices` catalogue), pacer, temp, icd,
+### ui-*.js — one module per tab: rhythms, localise, devices (`EP.Devices` catalogue), course, pacer, temp, icd,
 tox (`EP.Tox`), stemi (`EP.Stemi`), cases, assess (`EP.Assess`: written bank `W`, generators, `Store`).
 Assessment history: localStorage key `ep.assess` and, in the artifact, db collection `assessment`
-(one doc per finished set: `{t, n, right, items:[{d domain, s topic, q id, ok, c confidence 0–2}]}`).
+(one doc per finished set: `{t, n, right, rev?, src?, items:[{d domain, s topic, q id, ok, c confidence 0–2, void?}]}`).
+`void` strikes an answer (mis-tap); `rev` counts edits — when the db and browser copies of a set differ,
+the higher `rev` wins. `src: 'course'` marks sets written by the device course.
+### ui-course.js — `EP.Course` (tab `course`): `UNITS[{id, title, short, goal, teach(), steps(keys)}]`,
+`Bench` (HeartSim + Pacemaker + LiveStrip; `load(spec)`, `controls(spec)`, `set(key, v)`, `ctx()` = what
+the strip has shown since the last change: marker sequence, counts, non-capture, ghost senses, PVC /
+retrograde-P bookkeeping), `runUnit(root, unit, {keys}, exit)`, `Prog` (spaced schedule; localStorage
+`ep.course`, db doc `course/progress` = `{units:{id:{best,last,runs,t}}, steps:{'<unit>-<key>':{s streak,
+n, t}}}`), `describe('c-<unit>-<key>')` for the Assessment study plan. Step shapes: `look{t,q,bench}`,
+`mcq{k,t,q,a[right,...wrong],why}`, `num{k,t,q,ans,tol,unit,why}`, `do{k,t,q,bench,keep,check(x,st),
+solve(bench),live(x,st),hint,why}`, `case{k:'case-<fault>',qz}` (answers in `CASE`/`FN`/`FIX`).
+A step with `bench` reloads the patient unless `keep` is set (then only the controls change).
 ### app.js — modules register in `EP.Modules = [{id,title,mount(root)→{unmount}}]`; tabs + hash routing.
 
 ## Dev tools

@@ -168,6 +168,7 @@ table.tbl td { padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-
 .opts { display: grid; gap: 6px; }
 .opt { text-align: left; border: 1px solid var(--line); background: var(--surface); border-radius: 5px; padding: 8px 10px; cursor: pointer; min-height: 40px; }
 .opt:hover { border-color: var(--accent); }
+.opt[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); }
 .opt.right { border-color: var(--good); background: color-mix(in srgb, var(--good) 12%, transparent); }
 .opt.wrong { border-color: var(--bad); background: color-mix(in srgb, var(--bad) 10%, transparent); }
 .opt:disabled { cursor: default; opacity: 0.85; }
@@ -193,6 +194,23 @@ table.tbl td { padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-
 .signs { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1px; background: var(--line); border-top: 1px solid var(--line); }
 .signs > div { background: var(--surface); padding: 10px 12px; font-size: 13px; }
 .signs h4 { font: 600 10.5px/1.2 var(--cond); letter-spacing: 0.09em; text-transform: uppercase; color: var(--muted); margin-bottom: 4px; }
+
+/* ---- pacing course ---- */
+.steps { display: grid; gap: 10px; }
+.step { display: grid; grid-template-columns: 26px minmax(0, 1fr); gap: 10px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); }
+.step.now { border-color: var(--accent); }
+.step.todo { opacity: 0.55; }
+.step .n { width: 24px; height: 24px; border-radius: 12px; display: grid; place-items: center; font: 600 12px/1 var(--mono); background: var(--surface-2); color: var(--muted); }
+.step.ok .n { background: color-mix(in srgb, var(--good) 22%, transparent); color: var(--good); }
+.step.miss .n { background: color-mix(in srgb, var(--bad) 18%, transparent); color: var(--bad); }
+.step input[type="number"] { width: 110px; }
+.unit-i { display: flex; gap: 8px; align-items: baseline; }
+.unit-i .tick { font: 600 11px/1 var(--mono); color: var(--good); min-width: 30px; }
+.sim.course { grid-template-columns: minmax(0, 1.15fr) minmax(320px, 1fr); }
+@media (min-width: 981px) { .sim.course > .sim-main:first-child { position: sticky; top: 8px; } }
+@media (max-width: 980px) { .sim.course { grid-template-columns: minmax(0, 1fr); } }
+.step details > summary { font-weight: 500; }
+.step input[type="number"] { border: 1px solid var(--line); border-radius: 5px; padding: 6px 8px; background: var(--surface); color: inherit; font: 500 15px/1.2 var(--mono); min-height: 36px; }
 
 </style>
 <header class="top">
@@ -2521,7 +2539,7 @@ table.tbl td { padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-
       if (!cap.sa || amp < c.aSens) return;
       if (t < this.aBlank) return;
       // atrial-rate monitor (uses refractory senses too)
-      this.aaInt.push(t - this.lastA); if (this.aaInt.length > 8) this.aaInt.shift(); this.lastA = t;
+      this.aaInt.push(t - this.lastA); if (this.aaInt.length > 7) this.aaInt.shift(); this.lastA = t;
       this._modeSwitch(t);
       if (m === 'AAI') { if (t - this._aRef < c.arp) { this.mark(t, 'A', 'AR'); return; } this._aRef = t; this.mark(t, 'A', 'AS'); this.stats.as++; this._armA(t + (c.hyst ? 60000 / c.hyst : this.lri)); return; }
       if (t < this.pvarpEnd) { this.mark(t, 'A', 'AR'); return; }
@@ -2551,10 +2569,12 @@ table.tbl td { padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-
     }
     _modeSwitch(t) {
       const c = this.c;
-      if (!c.modeSwitch || !(c.mode === 'DDD' || c.mode === 'VDD') || this.aaInt.length < 6) return;
+      if (!c.modeSwitch || !(c.mode === 'DDD' || c.mode === 'VDD') || this.aaInt.length < 7) return;
+      // "4 of the last 7" atrial intervals shorter than the detection interval (so a far-field R wave counted
+      // once per cycle, giving alternating short and long intervals, is enough to switch)
       const lim = 60000 / c.msRate, fast = this.aaInt.filter((x) => x < lim).length;
-      if (!this.switched && fast >= 5) { this.switched = true; this.mark(t, 'V', 'MS'); this.inAVD = false; this.tok.v++; this._cycle(Math.max(this.lastV, t - this.lri * 0.5), 'ms'); }
-      else if (this.switched && fast === 0 && this.aaInt.length >= 8) { this.switched = false; this.mark(t, 'V', 'MS'); }
+      if (!this.switched && fast >= 4) { this.switched = true; this.mark(t, 'V', 'MS'); this.inAVD = false; this.tok.v++; this._cycle(Math.max(this.lastV, t - this.lri * 0.5), 'ms'); }
+      else if (this.switched && fast === 0) { this.switched = false; this.mark(t, 'V', 'MS'); }
     }
 
     // ---- outputs ----
@@ -2563,7 +2583,7 @@ table.tbl td { padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-
       this._apAt = t; this.stats.ap++;
       if (!c.noOutput) { this._ownA = t; this.sim.pace(t, 'A', { site: c.aSite, captured: c.aOut >= c.aThr, kind: c.kind }); }
       this.mark(t, 'A', 'AP');
-      this.lastA = t; this.aaInt.push(999); if (this.aaInt.length > 8) this.aaInt.shift();
+      this.lastA = t; this.aaInt.push(999); if (this.aaInt.length > 7) this.aaInt.shift();
       this.vBlankEnd = t + c.vBlank;
       if (c.crosstalk) this.sim.schedule(t + c.vBlank + 12, (tt) => this._senseV(tt, 99, 'xtalk'));
       if (async) return;
@@ -2593,7 +2613,7 @@ table.tbl td { padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-
       const c = this.c, m = this.mode;
       this.lastV = t; this.inAVD = false; this._apAt = null;
       this.vrpEnd = t + c.vrp; this.timer('VRP', t, t + c.vrp);
-      if (m === 'VVI') { this._armV(t + (kind === 'VS' && c.hyst ? 60000 / c.hyst : this.lri)); return; }
+      if (m === 'VVI') { this._armV(t + (kind !== 'VP' && kind !== 'init' && c.hyst ? Math.max(this.lri, 60000 / c.hyst) : this.lri)); return; }   // hysteresis: a longer escape interval after any sensed beat
       const pv = c.pvarp + (kind === 'PVC' && c.pvcExt ? 150 : 0);
       this.pvarpEnd = t + pv; this.aBlank = t + c.pvab; this.timer('PVARP', t, t + pv);
       if (m === 'VDD') { this._armV(t + this.lri); return; }
@@ -4621,8 +4641,9 @@ table.tbl td { padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-
   PATIENTS.asys2 = { name: 'Complete heart block, sinus bradycardia 45/min, no escape', hidden: true, cfg: () => ({ sinus: { cl: 1330 }, avn: CHB() }) };
 
   /* Read the last few seconds of the strip the way a clinician would. → [[level, title, text]] */
-  function analyze(sim, dev, t) {
-    const W = 9000, ev = sim.out.filter((e) => e.t > t - W && e.t <= t - 160), f = [];
+  function analyze(sim, dev, t, W) {
+    W = W || 9000;
+    const ev = sim.out.filter((e) => e.t > t - W && e.t <= t - 160), f = [];
     const q = ev.filter((e) => e.type === 'QRS'), sp = ev.filter((e) => e.type === 'spike'), mk = ev.filter((e) => e.type === 'mark'), P = ev.filter((e) => e.type === 'P');
     const cap = EP.Pacemaker.MODES[dev.mode] || {}, lri = dev.lri;
     const vS = sp.filter((s) => s.ch === 'V'), aS = sp.filter((s) => s.ch === 'A');
@@ -4674,7 +4695,8 @@ table.tbl td { padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-
       const vv = []; const vpm = mk.filter((m) => m.text === 'VP'); for (let i = 1; i < vpm.length; i++) vv.push(vpm[i].t - vpm[i - 1].t);
       const atUrl = vv.length > 3 && vv.filter((x) => Math.abs(x - dev.uri) < 25).length >= vv.length * 0.6;
       const retro = P.filter((x) => x.kind === 'retro').length;
-      if (atUrl && retro >= 3) f.push(['bad', 'Pacemaker-mediated tachycardia', 'Ventricular pacing at the upper rate, each paced beat conducting backwards to the atrium; the retrograde P is sensed after PVARP and triggers the next paced beat. The device is the antegrade limb of a re-entry circuit. A magnet, a longer PVARP, or PVARP extension after a PVC breaks it.']);
+      const loop = retro >= 4 && /(AS VP ){4}/.test(txt + ' ') && vv.length > 3 && Math.max.apply(null, vv.slice(-4)) - Math.min.apply(null, vv.slice(-4)) < 40;
+      if ((atUrl && retro >= 3) || loop) f.push(['bad', 'Pacemaker-mediated tachycardia', 'Each paced beat conducts backwards to the atrium; the retrograde P is sensed after PVARP and triggers the next paced beat. The device is the antegrade limb of a re-entry circuit, running at the upper rate or — if retrograde conduction time + AV delay is longer than the upper rate interval — a little below it. A magnet, a longer PVARP, or PVARP extension after a PVC breaks it.']);
       else if (atUrl && ars >= 1) f.push(['warn', 'Upper rate behaviour — pacemaker Wenckebach', 'The sinus rate exceeds the maximum tracking rate. The device delays each ventricular pace to respect the upper rate, so the AS–VP interval lengthens until a P wave falls in PVARP and is not tracked.']);
       else if (ars >= 2 && ars >= vps * 0.6) f.push(['warn', 'Upper rate behaviour — 2:1 block', 'The atrial cycle is shorter than the total atrial refractory period (AV delay + PVARP): every other P wave falls in PVARP and is ignored. The paced rate suddenly halves.']);
       else f.push(['good', 'P-synchronous ventricular pacing', 'Each native P wave (AS) starts the sensed AV delay and is followed by a ventricular pace (VP): AV synchrony is preserved.']);
@@ -5652,7 +5674,7 @@ table.tbl td { padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-
   const h = EP.h, UI = EP.UI, R = EP.Rhythms, Mo = EP.Morph;
   const DOM = {
     rhythm: ['Rhythm recognition', 'rhythms'], mech: ['Mechanisms & EP concepts', 'rhythms'], local: ['Localisation from the 12-lead', 'localise'], isch: ['Ischaemia / STEMI', 'stemi'],
-    device: ['Pacemaker function & troubleshooting', 'pacemaker'], hardware: ['Devices, leads & imaging', 'devices'], temp: ['Temporary pacing', 'temp'], icd: ['ICD', 'icd'],
+    device: ['Pacemaker function & troubleshooting', 'course'], hardware: ['Devices, leads & imaging', 'devices'], temp: ['Temporary pacing', 'temp'], icd: ['ICD', 'icd'],
     tox: ['Tox & electrolytes', 'tox'], mgmt: ['Acute management', 'cases'],
   };
   const QUOTA = { rhythm: 4, mech: 3, local: 3, isch: 4, device: 4, hardware: 2, temp: 2, icd: 2, tox: 3, mgmt: 3 };
@@ -5837,7 +5859,9 @@ table.tbl td { padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-
   };
   /* What a stored answer refers to, where to practise it, and a fresh copy of the question. */
   function describe(it) {
-    const q = it.q || '', m = q.match(/^g-(rh|pvc|ap|pace|is|pm|tx)-(.+)$/);
+    const q = it.q || '';
+    if (q.indexOf('c-') === 0) return EP.Course ? EP.Course.describe(q) : null;
+    const m = q.match(/^g-(rh|pvc|ap|pace|is|pm|tx)-(.+)$/);
     if (!m) { const w = W[+q.slice(1)]; if (!w) return null; const pr = PR[w[0] + '|' + w[1]] || [DOM[w[0]][1], {}, 'Open the tab and work through the related material.']; return { text: w[2], key: w[3][0] + ' — ' + w[4], tab: pr[0], focus: pr[1], todo: pr[2], make: () => ({ id: q, domain: w[0], topic: w[1], stem: w[2], right: w[3][0], wrong: w[3].slice(1), explain: w[4] }) }; }
     const k = m[1], id = m[2], L = EP.LocData, D = EP.PacerData;
     if (k === 'rh') { const r = R.byId[id]; return r && { text: 'Rhythm strip: ' + r.name, key: r.teach.ecg[0], tab: 'rhythms', focus: { id }, todo: 'Study the 12-lead with the ladder diagram on, then measure the intervals yourself with the calipers.', make: () => GEN.rhythm(id) }; }
@@ -5880,7 +5904,11 @@ table.tbl td { padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-
   const Store = {
     sessions: UI.store.get('assess', []),
     db: null,
-    async init(onChange) {
+    init(onChange) {
+      if (!this._p) this._p = this._load();
+      return this._p.then(() => { if (onChange) onChange(); });
+    },
+    async _load() {
       try {
         const c = globalThis.claude;
         if (!c || !c.use) return;
@@ -5889,23 +5917,44 @@ table.tbl td { padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-
         this.db = db;
         const snap = await Promise.race([db.collection('assessment').orderBy('t', 'desc').limit(40).get(), new Promise((r) => setTimeout(() => r(null), 10000))]);
         if (!snap) return;
-        const seen = new Set(this.sessions.map((s) => s.t));
-        for (const d of snap.docs) { const x = d.data(); if (x && x.t && !seen.has(x.t)) this.sessions.push(x); }
+        let oldest = Infinity;
+        for (const d of snap.docs) {
+          const x = d.data(); if (!x || !x.t) continue;
+          x._id = d.id; oldest = Math.min(oldest, x.t);
+          const i = this.sessions.findIndex((s) => s.t === x.t);
+          if (i < 0) this.sessions.push(x); else if ((x.rev || 0) >= (this.sessions[i].rev || 0)) this.sessions[i] = x;   // the saved copy wins unless this browser has a newer edit
+          else this.sessions[i]._id = d.id;
+        }
         this.sessions.sort((a, b) => a.t - b.t);
         UI.store.set('assess', this.sessions.slice(-40));
-        if (onChange) onChange();
+        // sets answered before the database was reachable are uploaded now
+        for (const s of this.sessions) if (!s._id && (snap.size < 40 || s.t > oldest)) this._put(s);
       } catch (e) { /* database unavailable: the browser copy is still used */ }
     },
+    _put(s) { const copy = Object.assign({}, s); delete copy._id; return this.db.collection('assessment').add(copy).then((ref) => { s._id = ref && ref.id; }).catch(() => {}); },
     save(s) {
       this.sessions.push(s); UI.store.set('assess', this.sessions.slice(-40));
-      if (this.db) this.db.collection('assessment').add(s).catch(() => {});
+      if (this.db) this._put(s);
+    },
+    /* Strike an answer from the record (a mis-tap, or an item the learner does not want in the plan). */
+    amend(q) {
+      for (let i = this.sessions.length - 1; i >= 0; i--) {
+        const s = this.sessions[i], it = (s.items || []).filter((x) => x.q === q && !x.void).pop();
+        if (!it) continue;
+        it.void = true; s.rev = (s.rev || 0) + 1;
+        const live = s.items.filter((x) => !x.void); s.n = live.length; s.right = live.filter((x) => x.ok).length;
+        UI.store.set('assess', this.sessions.slice(-40));
+        if (this.db && s._id) { const copy = Object.assign({}, s); delete copy._id; this.db.doc('assessment/' + s._id).set(copy).catch(() => {}); }
+        return true;
+      }
+      return false;
     },
     clear() { this.sessions = []; UI.store.set('assess', []); },
     /* One row per distinct question: its latest state.
      * status: 'misc' confident but wrong · 'gap' wrong · 'fragile' right by guessing · 'confirm' right once after a miss · 'known' */
     ledger() {
       const by = {};
-      for (const s of this.sessions) for (const it of s.items || []) (by[it.q] = by[it.q] || []).push(Object.assign({ t: s.t }, it));
+      for (const s of this.sessions) for (const it of s.items || []) if (!it.void) (by[it.q] = by[it.q] || []).push(Object.assign({ t: s.t }, it));
       const rows = [];
       for (const q in by) {
         const h0 = by[q], last = h0[h0.length - 1], prev = h0[h0.length - 2];
@@ -5923,6 +5972,7 @@ table.tbl td { padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-
     stats() {
       const st = {};
       for (const s of this.sessions) for (const it of s.items || []) {
+        if (it.void) continue;
         const d = (st[it.d] = st[it.d] || { n: 0, right: 0, sureWrong: 0, guessRight: 0, topics: {} });
         d.n++; if (it.ok) d.right++; if (!it.ok && it.c === 2) d.sureWrong++; if (it.ok && it.c === 0) d.guessRight++;
         const tp = (d.topics[it.s] = d.topics[it.s] || [0, 0]); tp[0]++; if (it.ok) tp[1]++;
@@ -5963,13 +6013,13 @@ table.tbl td { padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-
         for (const r of due.slice(0, 14)) {
           const d = describe(r); if (!d) continue;
           plan.append(h('div.finding', h('span.pill.' + LBL[r.status][1], LBL[r.status][0]), h('div', h('b', d.text), h('div.muted', { style: { fontSize: '13px' } }, d.key), h('div', { style: { fontSize: '13px', marginTop: '3px' } }, h('b', 'Do this: '), d.todo),
-            h('div.row', { style: { marginTop: '6px' } }, h('button.btn.sm', { type: 'button', onclick: () => EP.open(d.tab, d.focus) }, 'Practise in ' + (EP.Modules.find((m) => m.id === d.tab) || {}).title), h('button.btn.sm', { type: 'button', onclick: () => start({ items: [r] }) }, 'Re-test this')))));
+            h('div.row', { style: { marginTop: '6px' } }, h('button.btn.sm', { type: 'button', onclick: () => EP.open(d.tab, d.focus) }, 'Practise in ' + (EP.Modules.find((m) => m.id === d.tab) || {}).title), h('button.btn.sm', { type: 'button', onclick: () => start({ items: [r] }) }, 'Re-test this'), h('button.btn.sm', { type: 'button', title: 'A mis-tap, or something you already know', onclick: () => { Store.amend(r.q); home(); } }, 'Not a real miss — remove')))));
         }
         const planCard = due.length ? h('section.card', { style: { marginTop: '14px' } }, h('div.card-h', h('h3', 'Study plan — ' + due.length + ' item' + (due.length > 1 ? 's' : '') + ' to close'), h('span.grow'), h('button.btn.primary', { type: 'button', onclick: () => start({ items: shuffle(due).slice(0, 12) }) }, 'Re-test what I missed')),
           h('div.card-b', h('p.muted', { style: { fontSize: '13px', marginBottom: '10px' } }, 'Each miss becomes one exercise. Do the exercise in its tab, then re-test. An item leaves this list after you get it right twice on separate sets without guessing. Misconceptions are listed first: being sure and wrong is more dangerous than not knowing.'), plan,
             due.length > 14 ? h('p.muted', { style: { fontSize: '12px', marginTop: '8px' } }, (due.length - 14) + ' more — they appear as you clear these.') : null)) : null;
         const hist = Store.sessions.slice(-6).reverse();
-        const histCard = hist.length ? h('section.card', { style: { marginTop: '14px' } }, h('div.card-h', h('h3', 'Sets so far')), h('div.card-b.scroll-x', h('table.tbl', h('tbody', hist.map((x) => h('tr', h('td.mono', new Date(x.t).toLocaleDateString()), h('td.mono', x.right + ' / ' + x.n), h('td.mono', Math.round((100 * x.right) / Math.max(1, x.n)) + '%'), h('td.muted', x.n >= 25 ? 'baseline' : x.n <= 3 ? 're-test' : 'practice set'))))))) : null;
+        const histCard = hist.length ? h('section.card', { style: { marginTop: '14px' } }, h('div.card-h', h('h3', 'Sets so far')), h('div.card-b.scroll-x', h('table.tbl', h('tbody', hist.map((x) => h('tr', h('td.mono', new Date(x.t).toLocaleDateString()), h('td.mono', x.right + ' / ' + x.n), h('td.mono', Math.round((100 * x.right) / Math.max(1, x.n)) + '%'), h('td.muted', x.src === 'course' ? 'device course' : x.n >= 25 ? 'baseline' : x.n <= 3 ? 're-test' : 'practice set'))))))) : null;
         const domBtns = h('div.variants', Object.keys(DOM).map((d) => h('button.btn.sm', { type: 'button', onclick: () => start({ n: 8, domain: d }) }, DOM[d][0])));
         main.append(h('div.two',
           h('section.card', h('div.card-h', h('h2', 'Find your gaps')), h('div.card-b.prose',
@@ -5987,7 +6037,11 @@ table.tbl td { padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-
             h('li', h('b', 'Come back in a few days. '), 'Re-test what you missed again. Getting it right after a gap is what makes it stick; right twice on separate sets clears the item.'),
             h('li', h('b', 'Re-baseline every week or two. '), 'Compare the gap map with the last one.')))));
       }
-      function start(spec) { qs = build(spec); qi = 0; items = []; review = []; ask(); }
+      function start(spec) {
+        qs = build(spec); qi = 0; items = []; review = [];
+        if (!qs.length) { const d = spec.items && spec.items[0] && describe(spec.items[0]); if (d) EP.open(d.tab, d.focus); return; }   // hands-on items are re-tested in their own tab
+        ask();
+      }
       function ask() {
         destroyView(); main.innerHTML = ''; chosen = null;
         const q = qs[qi], opts = shuffle([q.right].concat(q.wrong));
@@ -6007,14 +6061,16 @@ table.tbl td { padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-
           fb.innerHTML = '';
           fb.append(h('div.note' + (ok ? '.good' : '.bad'), h('b', ok ? 'Correct. ' : 'Answer: ' + q.right + '. '), q.explain),
             h('div.row', { style: { marginTop: '10px' } }, h('button.btn.primary', { type: 'button', onclick: () => { qi++; if (qi < qs.length) ask(); else finish(); } }, qi + 1 < qs.length ? 'Next question' : 'See results'),
-              h('span.pill', DOM[q.domain][0]), h('span.muted', { style: { fontSize: '12px' } }, q.topic || '')));
+              h('span.pill', DOM[q.domain][0]), h('span.muted', { style: { fontSize: '12px' } }, q.topic || ''), h('span.grow'),
+              h('button.btn.sm', { type: 'button', onclick: (ev) => { const it = items[items.length - 1]; if (it && it.q === q.id) it.void = true; review = review.filter((r) => r.q !== q); ev.currentTarget.replaceWith(h('span.muted', { style: { fontSize: '12px' } }, 'Not counted.')); } }, 'Mis-tap — don\'t count this')));
         };
-        for (const o of opts) optEl.append(h('button.opt', { type: 'button', onclick: (ev) => {
-          if (chosen) return; chosen = o;
-          for (const b of optEl.children) b.disabled = true;
-          ev.currentTarget.style.borderColor = 'var(--accent)';
+        let locked = false;
+        for (const o of opts) optEl.append(h('button.opt', { type: 'button', 'aria-pressed': 'false', onclick: (ev) => {
+          if (locked) return; chosen = o;
+          for (const b of optEl.children) b.setAttribute('aria-pressed', String(b === ev.currentTarget));
           fb.innerHTML = '';
-          fb.append(h('div.eyebrow', { style: { marginBottom: '6px' } }, 'How sure were you?'), h('div.row', [['Guessing', 0], ['Fairly sure', 1], ['Certain', 2]].map(([t, c]) => h('button.btn', { type: 'button', onclick: () => reveal(c) }, t))));
+          fb.append(h('div.eyebrow', { style: { marginBottom: '6px' } }, 'You can still change your choice. Lock it in by saying how sure you are:'),
+            h('div.row', [['Guessing', 0], ['Fairly sure', 1], ['Certain', 2]].map(([t, c]) => h('button.btn', { type: 'button', onclick: () => { locked = true; reveal(c); } }, t))));
         } }, o));
         const qCard = h('section.card', h('div.card-h', h('h3', 'Question ' + (qi + 1) + ' of ' + qs.length), h('span.grow'), h('button.btn.sm', { type: 'button', onclick: () => (items.length ? finish() : home()) }, 'End')),
           h('div.card-b', h('p', { style: { fontWeight: '500', marginBottom: '10px' } }, q.stem), optEl, fb));
@@ -6022,13 +6078,14 @@ table.tbl td { padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-
       }
       function finish() {
         destroyView(); main.innerHTML = '';
-        const right = items.filter((i) => i.ok).length, sess = { t: Date.now(), n: items.length, right, items };
-        if (items.length) Store.save(sess);
-        const st = {}; for (const it of items) { const d = (st[it.d] = st[it.d] || { n: 0, right: 0, sureWrong: 0, guessRight: 0, topics: {} }); d.n++; if (it.ok) d.right++; if (!it.ok && it.c === 2) d.sureWrong++; if (it.ok && it.c === 0) d.guessRight++; const tp = (d.topics[it.s] = d.topics[it.s] || [0, 0]); tp[0]++; if (it.ok) tp[1]++; }
+        const liveItems = items.filter((i) => !i.void), right = liveItems.filter((i) => i.ok).length, sess = { t: Date.now(), n: liveItems.length, right, items };
+        if (liveItems.length) Store.save(sess);
+        if (EP.Course) for (const it of liveItems) if (it.q.indexOf('c-') === 0) EP.Course.note(it.q, it.ok);
+        const st = {}; for (const it of liveItems) { const d = (st[it.d] = st[it.d] || { n: 0, right: 0, sureWrong: 0, guessRight: 0, topics: {} }); d.n++; if (it.ok) d.right++; if (!it.ok && it.c === 2) d.sureWrong++; if (it.ok && it.c === 0) d.guessRight++; const tp = (d.topics[it.s] = d.topics[it.s] || [0, 0]); tp[0]++; if (it.ok) tp[1]++; }
         const sure = review.filter((r) => !r.ok && r.conf === 2), wrong = review.filter((r) => !r.ok && r.conf !== 2), lucky = review.filter((r) => r.ok);
         const block = (title, note, arr) => (arr.length ? [h('h4', title), h('p.muted', { style: { fontSize: '12px' } }, note), h('div.findings', { style: { marginTop: '6px' } }, arr.map((r) => h('div.finding', h('span.pill', DOM[r.q.domain][0].split(' ')[0]), h('div', h('b', r.q.stem), r.ok ? null : h('div', { style: { color: 'var(--bad)' } }, 'You chose: ' + r.chosen), h('div', 'Answer: ' + r.q.right), h('div.muted', r.q.explain), (() => { const d = describe({ q: r.q.id }); return d ? h('div.row', { style: { marginTop: '6px' } }, h('button.btn.sm', { type: 'button', onclick: () => EP.open(d.tab, d.focus) }, 'Practise this'), h('span.muted', { style: { fontSize: '12px' } }, d.todo)) : null; })()))))] : null);
         main.append(h('div.two',
-          h('section.card', h('div.card-h', h('h2', 'This set: ' + right + ' / ' + items.length)), h('div.card-b', gapMap(st), h('div.row', { style: { marginTop: '12px' } }, h('button.btn.primary', { type: 'button', onclick: home }, 'Back to overview'), h('button.btn', { type: 'button', onclick: () => start({ n: 10 }) }, 'Another 10')))),
+          h('section.card', h('div.card-h', h('h2', 'This set: ' + right + ' / ' + liveItems.length)), h('div.card-b', gapMap(st), h('div.row', { style: { marginTop: '12px' } }, h('button.btn.primary', { type: 'button', onclick: home }, 'Back to overview'), h('button.btn', { type: 'button', onclick: () => start({ n: 10 }) }, 'Another 10')))),
           h('section.card', h('div.card-h', h('h3', 'All sessions')), h('div.card-b', gapMap(Store.stats(), true)))),
           h('section.card', { style: { marginTop: '14px' } }, h('div.card-h', h('h3', 'Review')), h('div.card-b.prose', { style: { maxWidth: 'none' } },
             block('Confident but wrong', 'These are misconceptions rather than gaps — the highest-value items to revisit.', sure),
@@ -6038,8 +6095,694 @@ table.tbl td { padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-
       }
       root.append(main);
       home();
-      Store.init(() => { if (!qs.length) home(); });
-      return { unmount() { destroyView(); } };
+      let alive = true;
+      Store.init(() => { if (alive && !qs.length) home(); });
+      return { unmount() { alive = false; destroyView(); } };
+    },
+  });
+})(globalThis.EP = globalThis.EP || {});
+
+
+/* ---- js/ui-course.js ---- */
+/* EP Simulator — Device course: pacing taught from first principles.
+ *
+ * Eight units. Each = a short teaching text + a live bench (strip, marker channel, a few controls)
+ * + scored steps. Step types:
+ *   look   unscored: what to notice on the strip
+ *   mcq    choice (changeable until "Check answer")
+ *   num    free numeric answer, numbers regenerated on every run
+ *   do     performed on the bench and verified from simulator state (b.ctx())
+ *   case   unknown fault: what is wrong → cause → fix, all three needed
+ * Only the first attempt is scored. Results go to EP.Assess.Store (domain 'device', ids
+ * c-<unit>-<key>) and to a spaced review schedule (localStorage 'ep.course', db doc course/progress).
+ */
+(function (EP) {
+  'use strict';
+  const h = EP.h, UI = EP.UI, D = EP.PacerData, DEF = EP.Pacemaker.DEF;
+  const DAY = 864e5, GAP = [2, 7, 21, 60], PASS = 0.8;
+  const pick = (a) => a[Math.floor(Math.random() * a.length)];
+  const shuffle = (a) => a.map((x) => [Math.random(), x]).sort((p, q) => p[0] - q[0]).map((x) => x[1]);
+  const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const fmt = (s) => esc(s).replace(/\*\*(.+?)\*\*/g, '<b>$1</b>');
+  const para = (s) => h('p', { html: fmt(s) });
+  const list = (a) => h('ul', a.map((s) => h('li', { html: fmt(s) })));
+  const table = (head, rows) => h('div.scroll-x', { style: { marginTop: '8px' } }, h('table.tbl', h('thead', h('tr', head.map((x) => h('th', x)))), h('tbody', rows.map((r) => h('tr', r.map((x, i) => h('td', i ? x : h('b', x))))))));
+
+  // ---- patients and controls ------------------------------------------------------------------------
+  const P = Object.assign({}, D.PATIENTS, {
+    brady45: { name: 'Sinus bradycardia 45/min, normal AV conduction', cfg: () => ({ sinus: { cl: 1330, resp: 0.02 } }) },
+    retro4: { name: 'Sinus node disease, intact retrograde (VA) conduction, frequent PVCs', cfg: () => ({ sinus: { cl: 1500, resp: 0 }, avn: { fast: { retro: { delay: 210, erp: 240, block: false } } }, foci: [{ id: 'pvc', node: 'V', kind: 'coupled', coupling: 640, every: 4, site: 'rvotSeptal', label: 'PVC' }] }) },
+  });
+  const CTL = {
+    lrl: ['Lower rate', 30, 120, 5, '/min'], url: ['Upper tracking rate', 90, 180, 5, '/min'],
+    avdP: ['Paced AV delay', 80, 400, 10, 'ms'], avdS: ['Sensed AV delay', 60, 400, 10, 'ms'],
+    pvarp: ['PVARP', 150, 500, 10, 'ms'], vrp: ['Ventricular refractory period', 150, 500, 10, 'ms'],
+    vOut: ['Ventricular output', 0.25, 7.5, 0.25, 'V'], vSens: ['Ventricular sensitivity', 0.5, 12, 0.5, 'mV'],
+    hyst: ['Hysteresis rate (0 = off)', 0, 55, 5, '/min'], sinus: ['Sinus rate (the patient, not the device)', 90, 180, 2, '/min'],
+  };
+  const TOG = { magnet: 'Magnet on the generator', pvcExt: 'PVARP extension after a PVC', safetyPace: 'Ventricular safety pacing' };
+
+  // ---- bench: a patient, a device, a live strip -----------------------------------------------------
+  class Bench {
+    constructor() {
+      this.canvas = h('canvas', { 'aria-label': 'Live rhythm strip, lead II, with the device marker channel' });
+      this.prog = h('span.muted'); this.pat = h('div', { style: { fontSize: '13px', marginBottom: '8px' } });
+      this.ctl = h('div.ctl'); this.tog = h('div.row', { style: { marginTop: '4px' } });
+      this.inter = h('div', { style: { marginTop: '8px' } }); this.find = h('div.findings', { style: { marginTop: '10px' } });
+      this.interBtn = h('button.btn.sm', { type: 'button', onclick: () => this.interrogate() }, 'Interrogate');
+      this.freeze = h('button.btn.sm', { type: 'button', onclick: () => { if (this.live.running) { this.live.stop(); this.freeze.textContent = 'Resume'; } else { this.live.start(); this.freeze.textContent = 'Freeze'; } } }, 'Freeze');
+      this.el = h('section.card', h('div.card-h', h('h3', 'Bench — lead II and the marker channel'), h('span.grow'), this.interBtn, this.freeze),
+        h('div.live', this.canvas), h('div.card-b', this.pat, this.ctl, this.tog, this.inter, this.find));
+      this.strip = new EP.LiveStrip(this.canvas, { channels: [{ lead: 1 }], windowMs: 8000, markers: true, timers: true, rowMm: 24 });
+      this.showFind = false; this.setters = {}; this.el.style.display = 'none';
+    }
+    load(spec) {
+      this.spec = spec; this.el.style.display = ''; if (this.onShow) this.onShow();
+      const f = D.FAULTS[spec.fault || 'none'];
+      this.nominal = Object.assign({}, DEF, spec.pm || {});
+      const c = Object.assign({}, this.nominal, f.set, spec.force || {}); if (f.set.forceMode) c.mode = f.set.forceMode;
+      const sim = (this.sim = new EP.HeartSim(P[spec.patient].cfg())), dev = (this.dev = new EP.Pacemaker(sim, c));
+      if (f.set.intermittent) { const flip = (t) => { dev.c.noOutput = sim.rng() < f.set.intermittent; sim.schedule(t + 900 + 1500 * sim.rng(), flip); }; sim.schedule(600, flip); }
+      if (this.live) this.live.setSim(sim); else this.live = new EP.Live({ sim, strips: [this.strip], onTick: (t) => this._tick(t) });
+      this.live.start(); this.freeze.textContent = 'Freeze';
+      this.changed = sim.t; this.base = Object.assign({}, dev.c); this._lastFind = -1e9;
+      this.controls(spec);
+    }
+    /* Rebuild the visible controls without restarting the patient. */
+    controls(spec) {
+      this.spec = Object.assign({}, this.spec, { show: spec.show, tog: spec.tog, inter: spec.inter });
+      this.ctl.innerHTML = ''; this.tog.innerHTML = ''; this.inter.innerHTML = ''; this.setters = {};
+      this.pat.innerHTML = ''; this.pat.append(h('b', 'Patient: '), P[this.spec.patient].name + '. ', this.prog);
+      for (const k of spec.show || []) {
+        const [label, min, max, step, unit] = CTL[k], cur = k === 'sinus' ? Math.round(60000 / this.sim.sinus.cl) : this.dev.c[k];
+        const val = h('span.val', cur + ' ' + unit), inp = h('input', { type: 'range', min, max, step, value: cur, 'aria-label': label, oninput: () => this.set(k, +inp.value) });
+        this.setters[k] = (v) => { inp.value = v; val.textContent = v + ' ' + unit; };
+        this.ctl.append(h('label', label), val, inp);
+      }
+      for (const k of spec.tog || []) { const chk = UI.check(TOG[k], !!this.dev.c[k], (v) => this.set(k, v)); this.setters[k] = (v) => { chk.input.checked = v; }; this.tog.append(chk); }
+      this.interBtn.style.display = spec.inter ? '' : 'none';
+      this.describe();
+    }
+    set(k, v) {
+      if (k === 'sinus') this.sim.sinus.cl = 60000 / v; else this.dev.set({ [k]: v });
+      if (this.setters[k]) this.setters[k](v);
+      this.changed = this.live.t; this.describe();
+    }
+    describe() {
+      const c = this.spec.fixedProg ? this.nominal : this.dev.c, dual = /^(DDD|DDI|VDD)$/.test(c.mode);
+      this.prog.textContent = 'Programmed ' + c.mode + ' ' + c.lrl + (dual ? '–' + c.url : '') + '/min' + (dual ? ' · AV delay ' + c.avdS + ' sensed / ' + c.avdP + ' paced ms · PVARP ' + c.pvarp + ' ms' : '') + (c.hyst ? ' · hysteresis ' + c.hyst + '/min' : '') + '.';
+    }
+    interrogate() {
+      const c = this.dev.c, f = D.FAULTS[this.spec.fault || 'none'], dual = this.nominal.mode !== 'VVI';
+      const row = (name, a, v) => h('tr', h('td', name), dual ? h('td.mono', a) : null, h('td.mono', v));
+      this.inter.innerHTML = '';
+      this.inter.append(h('div.scroll-x', h('table.tbl', h('thead', h('tr', h('th', ''), dual ? h('th', 'Atrial lead') : null, h('th', 'Ventricular lead'))),
+        h('tbody', row('Capture threshold', c.aThr + ' V', c.vThr + ' V'), row('Programmed output', c.aOut + ' V', c.vOut + ' V'),
+          row('Sensed amplitude', 'P ' + c.pAmp + ' mV', 'R ' + c.rAmp + ' mV'), row('Programmed sensitivity', c.aSens + ' mV', c.vSens + ' mV'),
+          row('Other signals on the electrogram', 'far-field R ' + c.ffr + ' mV', 'T wave ' + c.tAmp + ' mV' + (c.noiseV ? '; intermittent non-physiological noise up to ' + (c.noiseV * 1.4).toFixed(1) + ' mV' : '')),
+          row('Lead impedance', f.imp[0] + ' Ω', f.imp[1] + ' Ω'), row('Blanking / refractory', 'PVAB ' + c.pvab + ' ms', 'blanking ' + c.vBlank + ' ms · VRP ' + c.vrp + ' ms'),
+          h('tr', h('td', 'Sensing polarity · safety pacing'), h('td.mono', { colSpan: dual ? 2 : 1 }, c.kind + ' · ' + (dual ? (c.safetyPace ? 'on' : 'OFF') : 'n/a'))),
+          h('tr', h('td', 'Operating mode now'), h('td.mono', { colSpan: dual ? 2 : 1 }, this.dev.mode + ' ' + c.lrl + '/min' + (this.dev.switched ? ' (mode-switched)' : ''))),
+          h('tr', h('td', 'Battery'), h('td.mono', { colSpan: dual ? 2 : 1 }, f.batt))))),
+        h('p.muted', { style: { fontSize: '12px', marginTop: '6px' } }, 'Margins: output ≥ 2 × threshold; sensitivity setting ≤ half the sensed amplitude. Usual impedance ≈ 300–1200 Ω.'));
+    }
+    findings(on) { this.showFind = on; this._lastFind = -1e9; if (!on) { this.find.innerHTML = ''; this.find.append(h('div.muted', { style: { fontSize: '12px' } }, 'The automatic strip read-out is hidden until you have answered.')); } }
+    _tick(t) {
+      if (this.onTick) this.onTick(t);
+      if (!this.showFind || Math.abs(t - this._lastFind) < 700) return;
+      this._lastFind = t; this.find.innerHTML = '';
+      for (const [lv, title, text] of EP.pacerAnalyze(this.sim, this.dev, t)) this.find.append(h('div.finding', h('span.pill' + (lv ? '.' + lv : ''), lv === 'good' ? 'ok' : lv === 'bad' ? 'fault' : lv === 'warn' ? 'note' : 'info'), h('div', h('b', title), h('div.muted', text))));
+    }
+    /* What has happened on the strip since the last change of settings (first cycle ignored, 9 s at most). */
+    ctx() {
+      const sim = this.sim, dev = this.dev, t = this.live.t, from = Math.max(this.changed + 1500, t - 9000);
+      const ev = sim.out.filter((e) => e.t > from && e.t <= t - 160);
+      const q = ev.filter((e) => e.type === 'QRS'), mk = ev.filter((e) => e.type === 'mark'), Pw = ev.filter((e) => e.type === 'P');
+      const vS = ev.filter((e) => e.type === 'spike' && e.ch === 'V');
+      const paced = (x) => x.label === 'paced' || (x.parts && x.parts.some((p) => p.cap && p.c.type === 'pace'));
+      const intr = q.filter((x) => !paced(x)), vsM = mk.filter((m) => m.text === 'VS');
+      const cnt = (k) => mk.filter((m) => m.text === k).length;
+      const pv = q.filter((x) => x.label === 'PVC'), lastPvc = pv.length ? pv[pv.length - 1].t : 0;
+      return { t, since: t - this.changed, c: dev.c, base: this.base, dev, seq: mk.filter((m) => m.text !== 'MS').map((m) => m.text).join(' ') + ' ',
+        vSp: vS.length, nc: vS.filter((s) => !s.captured && !q.some((x) => s.t - x.t > -20 && s.t - x.t < 340)).length,
+        ghost: vsM.filter((m) => !q.some((x) => m.t - x.t > -40 && m.t - x.t < 200)).length, intr: intr.length, paced: q.length - intr.length,
+        n: { AS: cnt('AS'), AP: cnt('AP'), AR: cnt('AR'), VS: cnt('VS'), VP: cnt('VP') },
+        retro: Pw.filter((x) => x.kind === 'retro').length, lastPvc, retroAfter: Pw.filter((x) => x.kind === 'retro' && x.t > lastPvc).length };
+    }
+    destroy() { if (this.live) this.live.destroy(); if (this.strip.ro) this.strip.ro.disconnect(); }
+  }
+  const pmt = (x) => /(AS VP ){4}/.test(x.seq) && x.retro >= 4;
+
+  // ---- step constructors ----------------------------------------------------------------------------
+  const look = (t, q, bench) => ({ type: 'look', t, q, bench });
+  const mcq = (k, t, q, a, why, o) => Object.assign({ type: 'mcq', k, t, q, a, why }, o);
+  const num = (k, t, q, ans, tol, unit, why, o) => Object.assign({ type: 'num', k, t, q, ans, tol, unit, why }, o);
+  const act = (k, t, q, o) => Object.assign({ type: 'do', k, t, q }, o);
+  const cas = (qz) => ({ type: 'case', k: 'case-' + qz.fault, t: 'Unknown fault', qz });
+
+  /* Unknown-fault answers: what the device is doing, and the one best action. */
+  const FN = {
+    cap: 'Failure to capture: stimuli are delivered into excitable tissue and nothing follows',
+    under: 'Under-sensing: stimuli appear where an intrinsic beat should have inhibited them',
+    pause: 'Output withheld or delayed: pauses, or a rate below the programmed lower rate',
+    atrial: 'Atrial sensing error: P waves are missed, or extra atrial events are counted (the atrial markers do not match the P waves)',
+    mode: 'No lead problem: every marker matches the ECG, but the device is not behaving as programmed',
+  };
+  const FIX = {
+    repos: 'Chest film and lead repositioning; temporary pacing back-up if pacing-dependent',
+    out: 'Raise the output and treat the reversible cause (K⁺, pH, drug); no lead revision needed',
+    moreV: 'Make the ventricular channel more sensitive (lower the mV setting)',
+    moreA: 'Make the atrial channel more sensitive (lower the mV setting) and check the lead position',
+    less: 'Make the ventricular channel less sensitive (raise the mV setting) or lengthen the ventricular refractory period',
+    lead: 'Replace the lead; asynchronous pacing as a bridge if pacing-dependent',
+    pvab: 'Lengthen post-ventricular atrial blanking or reduce atrial sensitivity',
+    safety: 'Turn ventricular safety pacing on; lengthen ventricular blanking or lower the atrial output',
+    gen: 'Replace the generator',
+    pvarp: 'Lengthen PVARP',
+    bip: 'Reprogram sensing from unipolar to bipolar',
+  };
+  // fault → [what it does, fix, functional options not offered (also true), fixes not offered (arguable)]
+  const CASE = {
+    vDislodge: ['cap', 'repos', ['under'], ['lead']], exit: ['cap', 'out', ['under']], vUnder: ['under', 'moreV'], tOver: ['pause', 'less'], xtalk: ['pause', 'safety', [], ['less']],
+    fracture: ['pause', 'lead', ['under'], ['less', 'repos']], insulation: ['pause', 'lead', ['under'], ['less', 'repos', 'bip']], aUnder: ['atrial', 'moreA'], ffr: ['atrial', 'pvab'],
+    battery: ['mode', 'gen'], myo: ['pause', 'bip', [], ['less']],
+  };
+  const caseBench = (qz) => ({ patient: qz.patientOverride || qz.patient, pm: qz.pm, force: qz.force, fault: qz.fault, show: [], tog: ['magnet'], inter: true, fixedProg: true });
+  const HW = ['fracture', 'insulation', 'vDislodge', 'exit'].map((fault) => ({ patient: 'chb', pm: { mode: 'VVI', lrl: 70 }, fault }));
+  const wanted = (want, pool, n) => { const w = (want || []).filter((k) => k.indexOf('case-') === 0).map((k) => pool.find((q) => q.fault === k.slice(5))).filter(Boolean); return w.length ? w : shuffle(pool).slice(0, n); };
+
+  // ---- the eight units ------------------------------------------------------------------------------
+  const UNITS = [
+    { id: 1, title: 'One lead, one clock', short: 'VVI timing', goal: 'Explain every spike, and every missing spike, on a single-chamber strip.',
+      teach: () => [
+        para('A single-chamber pacemaker runs one clock: the **lower rate interval** (LRI = 60 000 ÷ the programmed rate; 60/min is 1000 ms).'),
+        list(['Every ventricular event the device recognises, paced (**VP**) or sensed (**VS**), resets the clock to zero. If the clock runs out, the device paces.',
+          'So the device does not pace "at a rate". It guarantees that no gap is longer than the LRI. A patient whose own beats arrive sooner keeps resetting the clock, and there are no spikes at all. **Inhibition is normal function.**',
+          'Keep three words apart. **Output**: a stimulus was delivered (a spike). **Capture**: the stimulus depolarised the chamber (a wide QRS and T wave follow at once). **Sensing**: the device saw an intrinsic beat (a VS marker, and the clock restarts).',
+          'The marker channel is the device\'s opinion; the ECG is what happened. Troubleshooting is the search for places where the two disagree.'])],
+      steps: () => {
+        const r1 = pick([50, 70, 75, 80, 90]), r2 = pick([60, 70, 75]), gap = pick([350, 400, 450]), lri2 = Math.round(60000 / r2);
+        const B = { patient: 'chb', pm: { mode: 'VVI', lrl: 60 }, show: ['lrl'] };
+        return [
+          look('Read the strip', 'Complete heart block with a ventricular escape of 32/min; the device is VVI 60. Every beat is paced: a spike, a wide QRS, and a VP marker under it. The P waves march through at 75/min, unrelated to anything, because a VVI device does not know the atria exist. The bar after each marker is the ventricular refractory period.', B),
+          num('lri', 'Lower rate interval', `A device is programmed VVI ${r1}/min. What is its lower rate interval?`, 60000 / r1, 12, 'ms', `60 000 ms in a minute ÷ ${r1} = ${Math.round(60000 / r1)} ms. Work in intervals, not rates: every timer in the device is an interval.`),
+          mcq('inhibit-predict', 'Predict: a rate below the escape rhythm', 'The escape rhythm is 32/min, about 1850 ms between beats. You are about to turn the lower rate down to 30/min (2000 ms). What will the strip show?',
+            ['No spikes: each escape beat arrives before the 2000 ms clock runs out and resets it', 'Pacing at 30/min alternating with escape beats', 'Spikes that fail to capture because the rate is too low', 'Pacing at 32/min, matched to the escape rhythm'],
+            'The clock only reaches zero if 2000 ms pass with no ventricular event. The escape beat comes at about 1850 ms, is sensed (VS) and restarts the clock, every time.', { bench: B }),
+          act('inhibit', 'Inhibit the device', 'Do it on the bench: lower the rate until the device is completely inhibited.', { bench: B, keep: true,
+            check: (x) => x.c.lrl <= 30 && x.vSp === 0 && x.intr >= 2 && x.since >= 5500, solve: (b) => b.set('lrl', 30), hint: 'The clock must be longer than the patient\'s own cycle of about 1850 ms.',
+            live: (x) => (x.c.lrl <= 30 ? 'Rate set. Watching several beats to confirm there are no spikes…' : null),
+            why: 'A strip with no spikes and a VS marker on every QRS is a working pacemaker. "No pacing seen" is only a fault if a gap longer than the lower rate interval went unanswered.' }),
+          num('reset', 'A sensed beat resets the clock', `VVI ${r2}/min. A paced beat is followed ${gap} ms later by a PVC, which the device senses. How long after the PVC is the next stimulus delivered?`, lri2, 12, 'ms',
+            `${lri2} ms: the full lower rate interval, counted from the PVC. A sensed event restarts the clock from zero; it does not subtract what had already elapsed. The gap between the two paced beats is therefore ${gap} + ${lri2} = ${gap + lri2} ms, longer than the LRI, with nothing wrong.`),
+          mcq('hyst', 'Slower than programmed, no spikes', 'Pacemaker clinic. Programmed VVI 60/min. The strip shows sinus rhythm at 45/min, no spikes, and a VS marker on every QRS and nowhere else. Capture and sensing tests were normal last month. What explains it?',
+            ['Rate hysteresis: after a sensed beat the device waits a longer interval (here 1500 ms, i.e. 40/min) before it paces', 'Over-sensing: a false signal is inhibiting the output', 'Battery depletion with a fall in the pacing rate', 'Failure to output from a lead fracture'],
+            'Every marker sits on a QRS, so nothing false is being sensed. Hysteresis deliberately lets the patient\'s own rhythm run below the pacing rate, to avoid unnecessary pacing. Set the hysteresis rate to 0 on the bench and pacing at 60/min starts at once.',
+            { bench: { patient: 'brady45', pm: { mode: 'VVI', lrl: 60, hyst: 40 }, show: ['hyst'] } }),
+        ];
+      } },
+
+    { id: 2, title: 'Capture: threshold and safety margin', short: 'Capture', goal: 'Measure a threshold, program a margin, and say why capture was lost.',
+      teach: () => [
+        para('The **capture threshold** is the lowest output that depolarises the chamber every time. Output has two dials: amplitude (V) and pulse width (ms).'),
+        list(['**Strength–duration curve.** Short pulses need more voltage; beyond about 1 ms a wider pulse buys almost nothing (rheobase). The most efficient pulse width is near chronaxie, typically 0.3–0.5 ms.',
+          '**Energy per pulse ∝ V² × pulse width ÷ impedance.** Doubling the voltage quadruples the drain; doubling the pulse width only doubles it.',
+          '**Safety margin.** Program the amplitude to at least twice the voltage threshold (or the pulse width to three times the pulse-width threshold). Thresholds move with sleep, meals, illness and drugs.',
+          '**Time course.** The threshold rises over the first weeks after implant (inflammation at the tip), then settles; steroid-eluting leads blunt the peak. Early high outputs are deliberate.',
+          '**What raises it:** hyperkalaemia, acidosis, hypoxia, ischaemia or infarction at the tip, class I antiarrhythmics (flecainide above all), fibrosis at the tip (exit block), and a tip that has moved.',
+          '**Loss of capture** is a spike followed by nothing while the tissue was excitable. A spike that lands in the refractory period of an intrinsic beat also does nothing, but that is a sensing or timing problem. Always ask first: could the tissue have responded?'])],
+      steps: () => {
+        const thr = pick([0.75, 1, 1.25, 1.5, 1.75]);
+        const B = { patient: 'chb', pm: { mode: 'VVI', lrl: 70, vThr: thr, vOut: 5 }, show: ['vOut'] };
+        return [
+          num('thr', 'Run a threshold test', 'Complete heart block, VVI 70, output 5.0 V as left at implant. Step the ventricular output down until a spike is no longer followed by a QRS, then back up. What is the capture threshold?', (b) => b.dev.c.vThr, 0.01, 'V',
+            (b) => `${b.dev.c.vThr} V: the lowest output that still captured every stimulus, not the first setting that failed. Note what the strip did below it: spikes at 70/min with nothing after them, and the escape rhythm showing through.`, { bench: B, nb: 1 }),
+          act('margin', 'Program the safety margin', 'Now program the output for long-term use with the standard safety margin. (If you have not measured the threshold yet, do that first.)', { bench: B, keep: true,
+            check: (x) => x.c.vOut >= 2 * x.c.vThr - 1e-9 && x.c.vOut <= 2 * x.c.vThr + 0.25 && x.nc === 0 && x.paced >= 2 && x.since >= 4000, solve: (b) => b.set('vOut', 2 * b.dev.c.vThr),
+            live: (x) => (x.c.vOut > 2 * x.c.vThr + 0.25 ? 'It captures, but with more margin than needed: the drain rises with the square of the voltage.' : x.c.vOut >= x.c.vThr && x.c.vOut < 2 * x.c.vThr ? 'It captures now, but a small rise in threshold would lose it.' : null),
+            hint: 'Twice the voltage threshold: enough to cover day-to-day variation, no more than needed.', why: 'Twice the voltage threshold. Less leaves no room for the threshold to drift; much more wastes battery, since energy rises with V².' }),
+          mcq('energy', 'What costs the battery', 'There are two ways to add margin: double the amplitude (2.5 → 5.0 V at 0.4 ms) or double the pulse width (0.4 → 0.8 ms at 2.5 V). What happens to the energy of each pulse?',
+            ['Doubling the voltage quadruples it; doubling the pulse width doubles it', 'Both double it', 'Doubling the pulse width quadruples it; doubling the voltage doubles it', 'Neither changes it: energy depends only on lead impedance'],
+            'Energy = V² × t ÷ R. That is why a high threshold is managed by finding the cause, not by leaving the device at 5 V for years.'),
+          act('exit', 'Restore capture', 'Six weeks after implant, on flecainide, potassium 6.4 mmol/L. Lead position and impedance are unchanged. Interrogate, then restore reliable capture on the bench with a proper margin.', {
+            bench: { patient: 'chb', pm: { mode: 'VVI', lrl: 70 }, fault: 'exit', show: ['vOut'], inter: true },
+            check: (x) => x.c.vOut >= 2 * x.c.vThr - 1e-9 && x.nc === 0 && x.paced >= 3 && x.since >= 5000, solve: (b) => b.set('vOut', 7),
+            live: (x) => (x.c.vOut >= x.c.vThr && x.c.vOut < 2 * x.c.vThr ? 'Capture is back, but the margin is less than 2:1.' : null), hint: 'The interrogation gives the new threshold. Twice that.',
+            why: 'The threshold has risen to 3.4 V with a normal impedance and a normal R wave: the lead is where it was, the tissue has changed. The high output is a bridge; the treatment is the potassium and the drug.' }),
+          mcq('funcnc', 'A spike with nothing after it', 'DDD pacemaker, ventricular threshold 0.75 V, output 2.5 V. A ventricular spike falls in the ST segment of a PVC and no QRS follows it. What is the fault?',
+            ['Under-sensing of the PVC: the stimulus fell in refractory tissue, so it says nothing about capture', 'Loss of capture: raise the output', 'Exit block at the lead tip', 'Conductor fracture'],
+            'The tissue could not have responded. The real question is why the device paced there at all: it did not see the PVC. This is functional non-capture, and raising the output would treat the wrong problem.'),
+          mcq('hyperk', 'Intermittent non-capture, sick patient', 'A pacing-dependent patient with renal failure is dizzy. Ventricular spikes intermittently fail to capture. Potassium 7.1 mmol/L. Lead impedance 540 Ω, unchanged. Best immediate action?',
+            ['Treat the hyperkalaemia, raise the output as a bridge, and have transcutaneous pacing ready', 'Arrange urgent lead replacement', 'Apply a magnet', 'Reduce the ventricular sensitivity'],
+            'Normal impedance and a metabolic cause: the hardware is intact and the threshold has risen. A magnet changes sensing, not capture. Hyperkalaemia also widens the paced QRS and can cause latency between spike and QRS.'),
+        ];
+      } },
+
+    { id: 3, title: 'Sensing: the height of the fence', short: 'Sensing', goal: 'Predict what under- and over-sensing do to a strip, and move the setting the right way.',
+      teach: () => [
+        para('The lead records the local electrogram: typically 5–20 mV for an R wave on a ventricular lead, 1.5–5 mV for a P wave on an atrial lead. The **sensitivity setting** is the smallest signal the device will count.'),
+        list(['Think of a fence. Only signals taller than the fence are seen. **Raising the mV number raises the fence: the device sees less.** Lowering the number lets it see more.',
+          '**Under-sensing:** real beats do not clear the fence. The device believes nothing happened and paces anyway, so there are too many spikes, in the wrong places (ST segments, T waves). Fix: lower the number, or find why the signal shrank.',
+          '**Over-sensing:** something that is not a QRS clears the fence: a T wave, muscle potentials, noise from a damaged lead, the other chamber\'s stimulus (crosstalk), or the far-field R wave on the atrial lead. The device believes a beat occurred and withholds output: pauses, or a rate below the one programmed. Fix: raise the number, lengthen a refractory or blanking period, or repair the cause.',
+          'One line to keep: **over-sensing causes under-pacing; under-sensing causes over-pacing.**',
+          '**Margin:** set the fence no higher than half the measured signal.',
+          '**Magnet test:** a magnet makes a pacemaker pace asynchronously, with sensing off. Pauses that disappear under the magnet were over-sensing. Pauses that persist are a failure to deliver or to capture.'])],
+      steps: () => {
+        const pa = pick([0.8, 1.2, 2]);
+        const B = { patient: 'nsr', pm: { mode: 'VVI', lrl: 60 }, show: ['vSens'], inter: true };
+        const T = { patient: 'chb', pm: { mode: 'VVI', lrl: 70 }, fault: 'tOver', show: ['vSens', 'vrp'], inter: true };
+        return [
+          look('Read the strip', 'Sinus rhythm at 72/min with a VVI 60 pacemaker. There are no spikes, and each QRS carries a VS marker. The R wave measures 10 mV on the lead and the sensitivity is 2.5 mV: the fence is a quarter of the height of the signal.', B),
+          mcq('dir-predict', 'Predict: raise the number', 'You are about to change the ventricular sensitivity from 2.5 mV to 12 mV. What will the strip show?',
+            ['Spikes at 60/min regardless of the patient\'s own beats, some in the ST segment or on the T wave', 'Nothing: a higher number makes the device more sensitive', 'Pauses, because the device is now inhibited by small signals', 'Loss of capture, because output falls as sensitivity rises'],
+            'At 12 mV the fence is taller than the 10 mV R wave. The device no longer sees the patient\'s beats and behaves as a fixed-rate pacemaker.', { bench: B, keep: true }),
+          act('under', 'Produce under-sensing', 'Do it: make the device under-sense the R wave.', { bench: B, keep: true, check: (x) => x.c.vSens > x.c.rAmp && x.vSp >= 2 && x.since >= 3500, solve: (b) => b.set('vSens', 12),
+            hint: 'The R wave is 10 mV. Put the fence above it.', why: 'Look at where the spikes land. Those inside the refractory period do nothing. One that arrives late enough on the T wave captures: that is R-on-T, and it is why under-sensing is not a cosmetic problem.' }),
+          act('restore', 'Restore sensing with a margin', 'Restore sensing, with a 2:1 safety margin on the 10 mV R wave.', { bench: { patient: 'nsr', pm: { mode: 'VVI', lrl: 60, vSens: 12 }, show: ['vSens'], inter: true }, keep: true,
+            check: (x) => x.c.vSens <= x.c.rAmp / 2 && x.vSp === 0 && x.n.VS >= 3 && x.since >= 5000, solve: (b) => b.set('vSens', 5),
+            live: (x) => (x.c.vSens <= x.c.rAmp && x.c.vSens > x.c.rAmp / 2 ? 'It senses now, but the fence is more than half the height of the R wave: no margin.' : null),
+            hint: 'Lower the number until the fence is no higher than half the R wave.', why: '5 mV or lower. The margin matters because electrograms shrink: with respiration, with a new bundle branch block or infarct, and for PVCs, which approach the lead from another direction.' }),
+          num('tover-int', 'T-wave over-sensing: the arithmetic', 'A different patient: complete heart block, VVI 70/min (LRI 857 ms), but the rate on the strip is slower. Count the markers: about 390 ms after every VP there is a VS with no QRS above it. What stimulus-to-stimulus interval does that produce?', 1247, 30, 'ms',
+            '857 + 390 = about 1247 ms (48/min). The false VS restarts the clock, so the full lower rate interval is counted from the T wave. A paced rate below the programmed rate, with an extra marker at a fixed distance after each beat, is T-wave over-sensing.', { bench: T }),
+          act('tover-fix', 'Fix it without losing the R wave', 'Fix it on the bench. On this lead the R wave is 10 mV and the T wave 3.4 mV. Keep a 2:1 margin on the R wave.', { bench: T, keep: true,
+            check: (x) => x.ghost === 0 && x.c.vSens <= x.c.rAmp / 2 && x.n.VP >= 4 && x.since >= 6500, solve: (b) => b.set('vSens', 4),
+            live: (x) => (x.c.vSens > x.c.rAmp / 2 ? 'The T wave is no longer sensed, but there is no longer a 2:1 margin on the R wave either.' : null),
+            hint: 'Two routes: put the fence between the T wave and half the R wave, or make the ventricular refractory period long enough to cover the T wave.',
+            why: 'Either a sensitivity between 3.5 and 5 mV, or a refractory period that outlasts the T wave. Each has a cost: a taller fence may miss small PVCs; a long refractory period ignores early ones. In an ICD the fence cannot be raised freely, because fine VF must still be seen.' }),
+          mcq('dir-atrial', 'Which way to move it', `Atrial lead: the P wave measures ${pa} mV, the atrial sensitivity is programmed at ${(pa * 1.25).toFixed(1)} mV, and the device is not tracking. Which setting restores sensing with a 2:1 margin?`,
+            [(pa / 2).toFixed(1) + ' mV', (pa * 2).toFixed(1) + ' mV', pa.toFixed(1) + ' mV', (pa * 2.5).toFixed(1) + ' mV'],
+            `Half the measured amplitude: ${(pa / 2).toFixed(1)} mV. More sensitive means a lower number. Setting it equal to the P wave senses only on a good day.`),
+          mcq('magnet-test', 'Pauses, then a magnet', 'A pacing-dependent patient has pauses with no spikes. You place a magnet over the generator and regular pacing with capture resumes at once. What have you learned?',
+            ['The pauses were over-sensing: the circuit can deliver and capture, and removing sensing removed the inhibition', 'The battery is depleted', 'The lead is fractured with an open circuit', 'The capture threshold has risen above the output'],
+            'Asynchronous pacing proves the generator, conductor and tissue can do the job. What the magnet removed was sensing, so sensing was the problem. An open circuit or a high threshold would still fail under the magnet.'),
+          mcq('pseudo', 'A spike on the QRS', 'A patient with right bundle branch block has a VVI pacemaker with a right ventricular apical lead. Some spikes fall within the first 60 ms of a native QRS whose shape is unchanged. Sensing tests are normal. Explanation?',
+            ['Pseudofusion: in RBBB activation reaches the RV lead late, so the clock expires before the local electrogram arrives. Normal function', 'Ventricular under-sensing: make the channel more sensitive', 'Loss of capture', 'Over-sensing of the P wave'],
+            'The device senses where its lead is, not at the start of the surface QRS. A spike at the very onset of an unchanged QRS is pseudofusion. A spike well after the QRS, in the ST segment or on the T wave, is under-sensing.'),
+        ];
+      } },
+
+    { id: 4, title: 'Two leads: the AV delay', short: 'DDD states', goal: 'Name the four states of a DDD device, say which one a patient will produce, and change it.',
+      teach: () => [
+        para('DDD means pace both chambers, sense both, and respond in both ways (inhibit and trigger). One clock is added: the **AV delay**, the device\'s own PR interval.'),
+        list(['After every ventricular event the **atrial escape (VA) interval** runs: lower rate interval minus the paced AV delay. If no P wave is sensed before it ends, the device paces the atrium (**AP**).',
+          'Any atrial event, sensed (**AS**) or paced (AP), starts the AV delay. If no R wave is sensed before it ends, the device paces the ventricle (**VP**).',
+          'That gives four states, and **the patient chooses, not the device**. Is the sinus rate above the lower rate? AS, otherwise AP. Does the beat conduct within the AV delay? VS, otherwise VP.',
+          '**AS–VS** fully inhibited · **AS–VP** tracking (P-synchronous pacing) · **AP–VS** atrial pacing with intrinsic conduction · **AP–VP** AV sequential pacing.',
+          'The **sensed AV delay** is programmed 30–50 ms shorter than the paced one, because a sensed P wave is detected only when activation reaches the atrial lead, part-way through atrial depolarisation.',
+          '**Right ventricular pacing is not free.** It desynchronises the ventricle, and a high burden (above roughly 20–40 %) can cause pacing-induced cardiomyopathy. If the patient conducts, program so that they do: a longer AV delay or an algorithm that searches for intrinsic conduction. The cost of a long AV delay comes in the next unit.',
+          '**Fusion** (AV delay about equal to the PR interval, so paced and conducted wavefronts collide) gives an intermediate QRS. It is not a malfunction.'])],
+      steps: () => {
+        const v = pick([
+          ['sinus rhythm at 78/min with complete AV block', 'AS–VP'], ['sinus bradycardia at 44/min with complete AV block', 'AP–VP'],
+          ['sinus bradycardia at 44/min with a PR interval of 150 ms after atrial pacing', 'AP–VS'], ['sinus rhythm at 80/min with a PR interval of 140 ms', 'AS–VS']]);
+        const rate = pick([50, 60, 70]), avd = pick([150, 180, 200]);
+        return [
+          mcq('state', 'Which state?', `DDD 60/min, sensed AV delay 200 ms, paced AV delay 220 ms. The patient has ${v[0]}. Which marker pattern do you expect?`, [v[1]].concat(['AS–VP', 'AP–VP', 'AP–VS', 'AS–VS'].filter((s) => s !== v[1])),
+            'Two questions. Is the sinus rate above the lower rate of 60? Then AS, otherwise AP. Does the impulse reach the ventricle before the AV delay ends? Then VS, otherwise VP.'),
+          look('Unnecessary pacing', 'This patient conducts normally (PR about 160 ms), yet every QRS has a spike in front of it: AS–VP, with fusion. The sensed AV delay (150 ms) is a little shorter than the PR interval, so the device paces a ventricle that was about to activate itself.', { patient: 'nsr', pm: { mode: 'DDD' }, show: ['avdS', 'avdP'] }),
+          act('avs', 'Stop the unnecessary pacing', 'Stop the ventricular pacing without changing the mode or the rate.', { bench: { patient: 'nsr', pm: { mode: 'DDD' }, show: ['avdS', 'avdP'] }, keep: true,
+            check: (x) => x.n.VP === 0 && x.n.AS >= 3 && x.n.VS >= 3 && x.since >= 5000, solve: (b) => { b.set('avdS', 220); b.set('avdP', 250); }, hint: 'The device\'s PR interval must be longer than the patient\'s.',
+            why: 'With the sensed AV delay longer than the PR interval the QRS arrives first, is sensed, and inhibits the ventricular output: AS–VS. Same patient, same mode, 0 % instead of 100 % ventricular pacing.' }),
+          act('apvs', 'Pace the atrium only', 'Sinus node disease: sinus rate 38/min, AV conduction intact. The device is pacing both chambers (AP–VP). Reprogram it so the atrium is paced and the patient\'s own AV node conducts.', { bench: { patient: 'brady', pm: { mode: 'DDD', avdP: 120, avdS: 100 }, show: ['avdP', 'avdS', 'lrl'] },
+            check: (x) => x.n.AP >= 3 && x.n.VS >= 3 && x.n.VP === 0 && x.since >= 5000, solve: (b) => b.set('avdP', 250), hint: 'After an atrial paced beat this patient conducts in about 180 ms.',
+            why: 'AP–VS: the device replaces the sinus node and leaves the ventricle alone. This is the aim in sinus node disease with intact conduction, and what minimised-ventricular-pacing algorithms automate.' }),
+          act('apvp', 'From tracking to AV sequential', 'Complete heart block with a sinus rate of 75/min: the device is tracking (AS–VP). Without touching either AV delay, make it AP–VP.', { bench: { patient: 'chb', pm: { mode: 'DDD' }, show: ['lrl', 'avdP', 'avdS', 'pvarp'] },
+            check: (x) => x.n.AS === 0 && x.n.AP >= 3 && x.n.VP >= 3 && x.c.avdP === x.base.avdP && x.c.avdS === x.base.avdS && x.since >= 5500, solve: (b) => b.set('lrl', 90), hint: 'The atrium is paced only when the VA interval runs out before a P wave arrives.',
+            why: 'Raise the lower rate above the sinus rate: the VA interval now ends before the next sinus P wave, so the device paces the atrium. Whether you see AS or AP is decided by the race between the sinus node and the VA interval.' }),
+          num('va', 'The atrial escape interval', `DDD ${rate}/min, paced AV delay ${avd} ms, ventricular-based timing. After a ventricular paced beat, how long until the next atrial stimulus if no P wave is sensed?`, Math.round(60000 / rate) - avd, 12, 'ms',
+            `Lower rate interval ${Math.round(60000 / rate)} ms minus the paced AV delay ${avd} ms = ${Math.round(60000 / rate) - avd} ms. The VA interval plus the AV delay make up one full cycle at the lower rate.`),
+          mcq('savd', 'Sensed versus paced AV delay', 'Why is the sensed AV delay programmed shorter than the paced AV delay?',
+            ['A sensed P wave is detected only when activation reaches the atrial lead, part-way through atrial depolarisation; a paced P wave is timed from its very start', 'Sensed beats conduct more slowly through the AV node', 'To prevent pacemaker-mediated tachycardia', 'Because PVARP is shorter after sensed beats'],
+            'The offset (30–50 ms) keeps the real interval between atrial and ventricular contraction the same whether the P wave was sensed or paced.'),
+          mcq('rvp', 'Too much ventricular pacing', 'Sinus node disease, PR interval 190 ms, DDD device. At follow-up there is 92 % ventricular pacing and the LVEF has fallen from 55 % to 42 %. Most appropriate programming?',
+            ['Promote intrinsic conduction: lengthen the AV delay or enable an AV-search / minimised-ventricular-pacing algorithm', 'Shorten the AV delay to guarantee full capture', 'Raise the lower rate to 80/min', 'Shorten PVARP'],
+            'The patient conducts; the device is not letting them. Removing unnecessary right ventricular pacing comes first. If pacing cannot be avoided and the LVEF stays low, the next step is an upgrade to biventricular or conduction-system pacing.'),
+        ];
+      } },
+
+    { id: 5, title: 'Refractory periods and the upper rate', short: 'Upper rate', goal: 'Calculate TARP and the 2:1 rate, and predict Wenckebach versus 2:1 block.',
+      teach: () => [
+        para('After every ventricular event the atrial channel is refractory for the **PVARP** (post-ventricular atrial refractory period). A P wave that falls inside it is seen (marker **AR**) but does not start an AV delay. Its job is to keep retrograde P waves and far-field R waves from being tracked.'),
+        list(['The atrial channel is also refractory during the AV delay. Together: **TARP = sensed AV delay + PVARP**.',
+          'The device cannot track an atrial cycle shorter than TARP: every second P wave falls in PVARP. **2:1 block rate = 60 000 ÷ TARP.**',
+          'Programmed separately, the **upper tracking rate** (maximum tracking rate) is the shortest ventricular paced interval the device will allow.',
+          'As the sinus rate climbs there are three zones. Below the upper tracking rate: 1:1 tracking. Between the upper tracking rate and the 2:1 rate: **pacemaker Wenckebach**, where each ventricular pace is held back to respect the upper rate, so the AS–VP interval stretches until a P wave lands in PVARP and is dropped. Above the 2:1 rate: the ventricular rate **suddenly halves**.',
+          'If the upper rate interval is shorter than TARP there is no Wenckebach zone: tracking goes straight from 1:1 to 2:1. The patient\'s story is abrupt breathlessness at a reproducible level of exertion.',
+          'Programming aim: a 2:1 rate above the patient\'s peak sinus rate. Shorten PVARP (the limit comes in the next unit) or use a rate-adaptive AV delay.'])],
+      steps: () => {
+        const a1 = pick([120, 150, 180]), p1 = pick([250, 275, 300, 325]), c2 = pick([[150, 250], [120, 280], [200, 300], [180, 320], [150, 350]]);
+        const B = { patient: 'chbFast', pm: { mode: 'DDD' }, show: ['url', 'avdS', 'pvarp'] };
+        return [
+          num('tarp', 'TARP', `Sensed AV delay ${a1} ms, PVARP ${p1} ms. What is the total atrial refractory period?`, a1 + p1, 2, 'ms', `${a1} + ${p1} = ${a1 + p1} ms. During all of it a P wave cannot start a new AV delay.`),
+          num('2to1', 'The 2:1 block rate', `Sensed AV delay ${c2[0]} ms, PVARP ${c2[1]} ms. Above what atrial rate will the device track only every second P wave?`, 60000 / (c2[0] + c2[1]), 3, '/min',
+            `TARP = ${c2[0] + c2[1]} ms; 60 000 ÷ ${c2[0] + c2[1]} = ${Math.round(60000 / (c2[0] + c2[1]))}/min. Do this sum for every dual-chamber device you see: it is the rate at which the patient will fall off a cliff.`),
+          mcq('zone-predict', 'Predict the upper rate behaviour', 'On the bench: upper tracking rate 130/min, sensed AV delay 150 ms, PVARP 250 ms, so the 2:1 rate is 150/min. Complete heart block, sinus rate 138/min. What do you expect?',
+            ['Pacemaker Wenckebach: the AS–VP interval lengthens until one P wave falls in PVARP and is not tracked', '1:1 tracking at 138/min', '2:1 block with a ventricular rate of 69/min', 'Mode switch to DDI'],
+            '138/min is above the upper tracking rate (so not 1:1) and below the 2:1 rate (so not 2:1). In that window the device Wenckebachs.'),
+          look('Watch it', 'Follow the markers: the gap from AS to VP stretches beat by beat, then an AR appears with no VP after it, and the cycle restarts. The ventricular rate never exceeds 130/min. Now slide the patient\'s sinus rate slowly from 100 to 170/min and find the three zones.', { patient: 'chbFast', pm: { mode: 'DDD' }, show: ['sinus'] }),
+          act('2to1-make', 'Make it block 2:1', 'The sinus rate is 138/min (cycle 435 ms). Reprogram one timer so that the device blocks 2:1.', { bench: B,
+            check: (x) => /(AS VP AR ){3}/.test(x.seq) && x.since >= 5000, solve: (b) => b.set('pvarp', 300), hint: 'TARP must become longer than the sinus cycle of 435 ms.',
+            why: 'With TARP longer than 435 ms every second P wave falls in PVARP. The ventricular rate drops from about 130 to 69/min in one beat: this is what the patient feels on the stairs.' }),
+          act('1to1', 'Make it track 1:1', 'Now make the device track every P wave at 138/min.', { bench: { patient: 'chbFast', pm: { mode: 'DDD', pvarp: 300 }, show: ['url', 'avdS', 'pvarp'] }, keep: true,
+            check: (x) => /(AS VP ){7}/.test(x.seq) && x.n.AR === 0 && x.since >= 6000, solve: (b) => { b.set('pvarp', 250); b.set('url', 150); }, hint: 'Two conditions: TARP shorter than the sinus cycle, and an upper tracking rate above the sinus rate.',
+            live: (x) => (x.c.avdS + x.c.pvarp < 435 && x.c.url < 140 ? 'TARP is short enough now, but the upper tracking rate is still below 138/min: Wenckebach.' : x.c.url >= 140 && x.c.avdS + x.c.pvarp >= 435 ? 'The upper rate allows it, but TARP is still longer than the sinus cycle: 2:1.' : null),
+            why: 'Both limits have to clear the sinus rate: TARP below 435 ms and an upper tracking rate above 138/min. Raising the upper tracking rate alone does nothing if TARP is the limit.' }),
+          mcq('treadmill', 'Breathless at a fixed heart rate', 'An active 58-year-old with complete heart block: at about 125/min on the treadmill the heart rate drops abruptly to 63/min. Sensed AV delay 180 ms, PVARP 300 ms, upper tracking rate 140/min. Best change?',
+            ['Shorten PVARP (and/or use a rate-adaptive AV delay) so TARP is shorter than the cycle at peak sinus rate', 'Raise the upper tracking rate to 160/min', 'Lengthen PVARP to 350 ms', 'Lower the lower rate to 50/min'],
+            'TARP is 480 ms, so 2:1 block begins at 125/min, below the upper tracking rate of 140. The upper rate is not the limit; TARP is. Raising the upper tracking rate changes nothing.'),
+          mcq('window', 'The Wenckebach window', 'Upper tracking rate 120/min (500 ms); TARP 400 ms. Over what range of atrial rates will the device show Wenckebach behaviour?',
+            ['From 120 to 150/min', 'From 100 to 120/min', 'Only above 150/min', 'There is no Wenckebach window'],
+            'From the upper tracking rate (120) up to the 2:1 rate (60 000 ÷ 400 = 150). A window exists only when the upper rate interval is longer than TARP.'),
+        ];
+      } },
+
+    { id: 6, title: 'When the device joins the circuit', short: 'PMT, mode switch, magnet', goal: 'Start, stop and prevent pacemaker-mediated tachycardia; read a mode switch; know what a magnet does.',
+      teach: () => [
+        para('**Pacemaker-mediated tachycardia** (endless-loop tachycardia) needs three things: a tracking mode, retrograde (VA) conduction, and an event that separates the P wave from the QRS so the atrium has recovered when the retrograde impulse arrives. The usual trigger is a PVC; others are loss of atrial capture, atrial under- or over-sensing, a very long AV delay, and taking a magnet off.'),
+        list(['The loop: ventricular pace → retrograde P wave → sensed after PVARP → AV delay → ventricular pace. The device is the antegrade limb.',
+          '**Cycle length = retrograde conduction time + sensed AV delay, but never shorter than the upper rate interval.** So PMT runs at the upper tracking rate or below it.',
+          'A paced tachycardia near the upper rate has three causes to separate: sinus tachycardia being tracked, an atrial arrhythmia being tracked, and PMT.',
+          '**Stop it:** a magnet (no sensing, so the loop breaks), or any single beat that is not tracked. **Prevent it:** a PVARP longer than the retrograde conduction time measured during ventricular pacing, PVARP extension after a PVC, or a PMT-termination algorithm.',
+          'The cost of a long PVARP is a long TARP and a low 2:1 rate. That trade between units 5 and 6 is the central compromise of dual-chamber programming.',
+          '**Mode switch:** when the atrial channel counts a rate above the detection rate (about 170–180/min) the device stops tracking and paces DDI or VVI. Appropriate in AF, flutter and atrial tachycardia. A false mode switch usually means the far-field R wave is being counted as a P wave.',
+          '**Magnet.** Pacemaker: asynchronous pacing at a rate that depends on the manufacturer and the battery, for as long as the magnet is on. ICD: tachyarrhythmia detection and therapy are suspended; in almost all models pacing is unchanged and does not become asynchronous.'])],
+      steps: () => {
+        const r = pick([[400, 150, 130], [250, 150, 120], [320, 180, 130], [380, 160, 125]]), cyc = Math.max(r[0] + r[1], 60000 / r[2]);
+        const B = { patient: 'retro4', pm: { mode: 'DDD', pvarp: 320 }, show: ['pvarp'] };
+        return [
+          look('The retrograde P wave', 'Sinus node disease with intact retrograde conduction. Watch a PVC: about 270 ms after it a retrograde P wave reaches the atrium and gets an AR marker. It fell inside the 320 ms PVARP, so it was seen and ignored.', B),
+          mcq('pmt-predict', 'Predict: shorten PVARP', 'You are about to shorten PVARP to 200 ms. What will the next PVC do?',
+            ['Its retrograde P wave will be sensed and tracked, starting a loop of ventricular pace → retrograde P → ventricular pace', 'Nothing: PVARP only matters at high sinus rates', 'The device will mode-switch', 'The device will block 2:1'],
+            'The retrograde P wave arrives at about 270 ms. With a 200 ms PVARP it is outside the refractory period, is marked AS, and starts an AV delay.', { bench: B, keep: true }),
+          act('pmt-make', 'Start PMT', 'Do it, and wait for a PVC.', { bench: B, keep: true, check: (x) => x.c.pvarp <= 260 && pmt(x), solve: (b) => b.set('pvarp', 200),
+            live: (x) => (x.c.pvarp <= 260 ? 'PVARP is now shorter than the retrograde conduction time. Waiting for a PVC…' : null), hint: 'PVARP must be shorter than the 270 ms it takes the PVC to reach the atrium.',
+            why: 'Every paced beat now conducts back to the atrium, and every retrograde P wave triggers the next paced beat. Nothing is wrong with the hardware: the device is doing exactly what DDD means.' }),
+          mcq('pmt-why', 'Why this rate?', 'The upper tracking rate is 130/min, yet this PMT runs at about 118/min. Why?',
+            ['Its cycle is the retrograde conduction time plus the sensed AV delay (about 360 + 150 ms), which is longer than the upper rate interval', 'PMT always runs 10 % below the upper tracking rate', 'The device is in Wenckebach', 'The lower rate limit is controlling the rate'],
+            'After a paced beat retrograde conduction takes about 360 ms here (longer than after the PVC). 360 + 150 = 510 ms, or 118/min. Only when that sum is shorter than the upper rate interval does PMT sit exactly at the upper tracking rate.', { bench: { patient: 'retro4', pm: { mode: 'DDD', pvarp: 200 }, show: ['pvarp'] }, keep: true }),
+          act('pmt-break', 'Stop it at the bedside', 'Terminate the tachycardia without reprogramming.', { bench: { patient: 'retro4', pm: { mode: 'DDD', pvarp: 200 }, show: [], tog: ['magnet'] }, keep: true,
+            check: (x, st) => { if (!x.c.magnet && pmt(x)) st.seen = 1; return !!st.seen && x.c.magnet && x.since >= 3500; }, solve: (b) => b.set('magnet', true),
+            live: (x, st) => (!st.seen ? 'Waiting for a PVC to start the tachycardia…' : x.c.magnet ? 'Asynchronous pacing: the retrograde P waves are no longer sensed.' : 'PMT is running. Stop it.'),
+            why: 'The magnet removes sensing, so the retrograde P wave cannot trigger anything and the loop ends. But nothing has been fixed: take the magnet off and the next PVC, or the magnet removal itself, restarts it.' }),
+          act('pmt-prevent', 'Prevent it for good', 'Now prevent it permanently, keeping the DDD mode, and take the magnet off. The check waits for the next PVC.', { bench: { patient: 'retro4', pm: { mode: 'DDD', pvarp: 200 }, show: ['pvarp'], tog: ['pvcExt', 'magnet'] }, keep: true,
+            check: (x) => !x.c.magnet && x.lastPvc > 0 && x.t - x.lastPvc > 2800 && x.retroAfter <= 1 && !pmt(x), solve: (b) => { b.set('pvarp', 380); b.set('magnet', false); },
+            live: (x) => (x.c.magnet ? 'The magnet is still on.' : pmt(x) ? 'PMT is running. PVARP extension after a PVC only prevents the next start; this loop needs a PVARP longer than the 360 ms retrograde time, or the magnet again.' : 'Waiting for a PVC to test your programming…'),
+            hint: 'PVARP must outlast retrograde conduction: about 270 ms after a PVC, about 360 ms after a paced beat.',
+            why: 'A PVARP longer than the retrograde conduction time turns every retrograde P wave into an AR. PVARP extension after a PVC covers the commonest trigger without lengthening PVARP on every beat. Measure retrograde conduction during ventricular pacing: it is longer than after a PVC.' }),
+          num('pmt-rate', 'How fast will PMT run?', `Retrograde conduction time ${r[0]} ms, sensed AV delay ${r[1]} ms, upper tracking rate ${r[2]}/min. At what rate will PMT run?`, 60000 / cyc, 3, '/min',
+            `Loop time = ${r[0]} + ${r[1]} = ${r[0] + r[1]} ms; upper rate interval = ${Math.round(60000 / r[2])} ms. The device uses the longer of the two: ${Math.round(cyc)} ms, i.e. ${Math.round(60000 / cyc)}/min.`),
+          mcq('tradeoff', 'The price of a long PVARP', 'Retrograde conduction measures 380 ms, so you lengthen PVARP to 430 ms. The sensed AV delay is 150 ms. What have you given up?',
+            ['The 2:1 block rate has fallen to about 103/min', 'Atrial pacing support', 'The ability to mode-switch', 'Ventricular sensing during PVARP'],
+            'TARP is now 580 ms, and 60 000 ÷ 580 is 103/min. In an active patient that is a poor trade: prefer PVARP extension after PVCs or a PMT algorithm, which act only when needed.'),
+          mcq('ms', 'A sudden fall in paced rate', 'DDD pacemaker, complete heart block. Holter: the paced ventricular rate falls abruptly from about 125/min, irregular, to 60/min, regular, for 40 minutes and then returns. During the episode the atrial markers run irregularly at about 300/min.',
+            ['Appropriate mode switch during atrial fibrillation', '2:1 upper-rate block', 'Battery at elective replacement', 'Ventricular over-sensing'],
+            'A fast, irregular atrial rate, tracked irregularly near the upper rate until the device stops tracking and paces at the lower rate. 2:1 block would halve the rate, not send it to the lower rate, and the atrial rate would be regular.'),
+          mcq('ffr', 'Mode switches with no arrhythmia', 'Frequent brief mode-switch episodes are logged, but the stored electrograms show sinus rhythm with an extra atrial marker 40–80 ms after each ventricular pace. What is it, and what do you do?',
+            ['Far-field R-wave over-sensing: lengthen post-ventricular atrial blanking or reduce atrial sensitivity', 'Atrial fibrillation: start anticoagulation', 'Atrial lead fracture: replace the lead', 'PMT: lengthen PVARP'],
+            'The atrial lead is hearing the ventricle, so the device counts two atrial events per cycle and doubles the atrial rate. Lengthening PVARP would not help, because refractory events are still counted towards mode switch; blanking removes them. Do not anticoagulate on a device diagnosis without looking at the electrograms.'),
+          mcq('icd-magnet', 'A magnet on an ICD', 'A magnet is taped over an ICD for surgery with diathermy. What does it do?',
+            ['It suspends tachyarrhythmia detection and therapy; bradycardia pacing continues unchanged and can still be inhibited by diathermy', 'It makes pacing asynchronous and suspends therapy', 'It has no effect on an ICD', 'It disables the device until it is reprogrammed'],
+            'In almost all ICDs the magnet affects only tachycardia therapy. A pacing-dependent ICD patient therefore still needs reprogramming to an asynchronous mode if diathermy will be used near the device.'),
+        ];
+      } },
+
+    { id: 7, title: 'Reading the hardware', short: 'Lead and battery failure', goal: 'Tell fracture, insulation breach, dislodgement, exit block and battery depletion apart from the numbers.',
+      teach: () => [
+        para('A pacing circuit is a loop: generator → conductor → electrode → tissue → back. **Impedance** summarises its health. The usual range is roughly 300–1200 Ω, and a change from the patient\'s own baseline matters more than the absolute value.'),
+        table(['Problem', 'Impedance', 'Threshold', 'Sensing', 'Clues'], [
+          ['Conductor fracture / loose set-screw', 'very high (> 2000 Ω), often intermittent', 'no output reaches the heart when open', 'make-break noise → over-sensing', 'pauses with posture or arm movement; clavicle–first rib'],
+          ['Insulation breach', 'low (< 200–250 Ω)', 'apparently higher (current leaks away)', 'smaller signal; muscle potentials get in', 'early battery depletion; pocket or pectoral twitching'],
+          ['Dislodgement / perforation', 'near normal', 'much higher', 'much smaller', 'early after implant; the film shows the tip has moved'],
+          ['Exit block, metabolic, drugs', 'normal', 'higher', 'normal', 'weeks after implant, or with K⁺, acidosis, flecainide, infarct'],
+          ['Battery at elective replacement', 'normal', 'normal', 'normal', 'reverts to VVI at a fixed rate; magnet rate falls']]),
+        list(['Order of thought: **is the loop broken, leaking, moved, or intact?** High impedance is a break. Low impedance is a leak. Normal impedance with threshold and sensing both bad is a tip that has moved. Normal impedance with only the threshold up is the tissue.',
+          'A fractured lead does two things at once: its noise inhibits the device, and when the circuit is open nothing reaches the heart. A magnet cures the first and not the second.',
+          'Battery depletion looks like a change of personality, not a lead fault: capture and sensing are fine, but dual-chamber and rate-response functions have been switched off to save energy.'])],
+      steps: (want) => [
+        mcq('imp-high', 'Pauses when reaching overhead', 'Intermittent pauses when the patient reaches overhead. Interrogation: ventricular lead impedance > 2500 Ω (previously 610 Ω), with bursts of non-physiological high-frequency signals on the ventricular electrogram.',
+          ['Conductor fracture or a loose set-screw: an open circuit with make-break noise', 'Insulation breach', 'Lead dislodgement', 'Exit block'], 'High impedance means the loop is broken. The noise is the broken ends touching; it is sensed as R waves and inhibits output.'),
+        mcq('imp-low', 'Everything slightly wrong', 'Impedance 180 Ω (previously 560 Ω). The threshold has risen from 0.75 to 2.0 V, the R wave has fallen from 11 to 3 mV, the battery is draining faster than projected, and the pectoral muscle twitches with each stimulus.',
+          ['Insulation breach', 'Conductor fracture', 'Lead dislodgement', 'Battery at elective replacement'], 'Low impedance means current is leaking out of the loop: less reaches the tip, less signal comes back, the muscle beside the leak is stimulated, and the battery pays for all of it.'),
+        mcq('early', 'Day two', 'Day 2 after implant: no ventricular capture at maximum output, and the R wave is 1.8 mV (12 mV at implant). Impedance 480 Ω (520 Ω at implant).',
+          ['Lead dislodgement: chest film, reposition', 'Conductor fracture', 'Exit block: raise the output and review in six weeks', 'Battery depletion'], 'Threshold and sensing have failed together, early, with an intact loop: the tip is no longer where it was left. Exit block spares sensing and takes weeks.'),
+        mcq('eri', 'A change of personality', 'DDDR device. The patient reports fatigue and neck pulsations. ECG: ventricular pacing at a fixed 65/min with dissociated P waves. Capture, sensing and impedance are normal. The magnet rate was 85/min at implant and is now 65/min.',
+          ['Elective replacement indicator: the device has reverted to VVI. Arrange a generator change', 'Atrial lead dislodgement', 'Mode switch for atrial fibrillation', 'Upper rate behaviour'], 'Nothing is wrong with either lead. The fall in magnet rate is the bedside sign of battery depletion; the neck pulsations are cannon waves from the loss of AV synchrony (pacemaker syndrome).'),
+        mcq('crush', 'Where to look on the film', 'A lead placed by a medial subclavian puncture shows intermittent high impedance four years later. Where on the chest film is the fracture most likely?',
+          ['Between the clavicle and the first rib', 'At the tricuspid valve', 'At the lead tip', 'Inside the generator header'], 'Subclavian crush: the lead is pinched between clavicle and first rib with every arm movement. A header problem (loose set-screw) appears early after an implant or generator change, not years later.'),
+        mcq('magnet-open', 'The magnet does not help', 'A pacing-dependent patient has pauses. Under a magnet the marker channel shows regular paced events at the magnet rate, but several are followed by no spike on the ECG and no QRS. Impedance is > 3000 Ω.',
+          ['Open circuit from a conductor fracture: the device is firing but the stimulus does not reach the heart', 'Over-sensing only: leave the magnet on', 'Threshold rise: increase the output', 'Battery depletion'], 'A marker without a spike means the output never left the lead. Asynchronous pacing cannot rescue an open circuit; this patient needs temporary pacing and a new lead.'),
+      ].concat(wanted(want, HW, 2).map(cas)) },
+
+    { id: 8, title: 'Unknown faults', short: 'Troubleshooting', goal: 'Given a strip and an interrogation, say what the device is doing wrong, why, and what to do. Four of five to pass.',
+      teach: () => [
+        para('Use the same order every time. It stops you from pattern-matching on the first abnormal thing you see.'),
+        h('ol', { style: { margin: '0.4em 0 0', paddingLeft: '1.2em' } }, [
+          '**What is programmed?** Mode, rates, AV delay. Decide what this strip ought to look like before you read it.',
+          '**Output.** Is there a stimulus whenever one is due? No gap may exceed the lower rate (or hysteresis) interval.',
+          '**Capture.** Is each stimulus, delivered into tissue that could respond, followed by depolarisation?',
+          '**Sensing.** Does every intrinsic event get a marker and reset the timers, and does nothing else?',
+          '**Timing.** Is the AV relationship as programmed, and the paced rate within the limits?',
+          '**Numbers.** Threshold, sensed amplitude, impedance, battery: these turn "what" into "why".',
+          '**Magnet,** if there are pauses: it separates over-sensing (pacing returns) from failure to deliver or capture (it does not).'].map((s) => h('li', { html: fmt(s) }))),
+        para('Each case below applies one hidden fault. The automatic read-out is off. You may interrogate and use the magnet. All three answers must be right for the case to count.')],
+      steps: (want) => wanted(want, D.QUIZ, 5).map(cas) },
+  ];
+  const unitById = (id) => UNITS.find((u) => String(u.id) === String(id));
+  const label = (id) => { const u = unitById(id); return 'Course ' + id + (u ? ' · ' + u.short : ''); };
+
+  // ---- progress and review schedule -----------------------------------------------------------------
+  const Prog = {
+    data: UI.store.get('course', { units: {}, steps: {} }), db: null,
+    mark(u, k, ok, t) { const id = u + '-' + k, e = this.data.steps[id] || { s: 0, n: 0 }; e.n++; e.s = ok ? e.s + 1 : 0; e.t = t; this.data.steps[id] = e; },
+    unit(id, score, t) { const e = this.data.units[id] || { best: 0, runs: 0 }; e.runs++; e.last = score; e.best = Math.max(e.best, score); e.t = t; this.data.units[id] = e; },
+    /* Step ids due again: missed last time, or right n times and older than 2 / 7 / 21 / 60 days. */
+    due(now) { return Object.keys(this.data.steps).filter((id) => { const e = this.data.steps[id]; return e.s === 0 || now - e.t > GAP[Math.min(e.s, GAP.length) - 1] * DAY; }); },
+    nextDue(now) { let best = Infinity; for (const id in this.data.steps) { const e = this.data.steps[id]; if (e.s > 0) best = Math.min(best, e.t + GAP[Math.min(e.s, GAP.length) - 1] * DAY - now); } return best; },
+    save() { this.data.t = Date.now(); UI.store.set('course', this.data); if (this.db) this.db.doc('course/progress').set(this.data).catch(() => {}); },
+    init(cb) {
+      if (!this._p) this._p = (async () => {
+        try {
+          const c = globalThis.claude; if (!c || !c.use) return;
+          const db = await c.use('db'); if (!db) return;
+          this.db = db;
+          const snap = await Promise.race([db.doc('course/progress').get(), new Promise((r) => setTimeout(() => r(null), 10000))]);
+          const x = snap && snap.exists && snap.data(); if (!x) return;
+          for (const part of ['units', 'steps']) for (const k in x[part] || {}) { const mine = this.data[part][k]; if (!mine || (x[part][k].t || 0) > (mine.t || 0)) this.data[part][k] = x[part][k]; }
+          UI.store.set('course', this.data);
+        } catch (e) { /* database unavailable: the browser copy is used */ }
+      })();
+      return this._p.then(() => { if (cb) cb(); });
+    },
+  };
+
+  /* What a stored course answer refers to (used by the Assessment study plan). */
+  function describe(q) {
+    const m = /^c-(\d+)-(.+)$/.exec(q), u = m && unitById(m[1]); if (!u) return null;
+    const s = u.steps([m[2]]).find((x) => x.k === m[2]); if (!s) return null;
+    const f = s.type === 'case' ? D.FAULTS[s.qz.fault] : null;
+    return { text: 'Device course ' + u.id + ' · ' + (f ? 'Unknown fault: ' + f.name : s.t), key: f ? f.dx + '.' : typeof s.why === 'string' ? s.why : u.goal, tab: 'course', focus: { unit: u.id, step: m[2] },
+      todo: 'Re-read unit ' + u.id + ' ("' + u.title + '"), then redo this step. The numbers and the strip are generated afresh.',
+      make: () => (s.type === 'mcq' ? { id: q, domain: 'device', topic: label(u.id), stem: s.q, right: s.a[0], wrong: s.a.slice(1), explain: s.why } : null) };
+  }
+  EP.Course = { UNITS, Prog, describe, _dbg: { CASE, FN, FIX }, note(q, ok) { const m = /^c-(\d+)-(.+)$/.exec(q); if (m) { Prog.mark(m[1], m[2], ok, Date.now()); Prog.save(); } } };
+
+  // ---- runner ---------------------------------------------------------------------------------------
+  /* unit: { id, title, goal, teach(), steps(keys) }; opt.keys limits the run to those step keys. */
+  function runUnit(root, unit, opt, exit) {
+    opt = opt || {};
+    const inst = unit.steps(opt.keys).filter((s) => !opt.keys || opt.keys.indexOf(s.k) >= 0);
+    inst.forEach((s) => { if (s.u == null) s.u = unit.id; });
+    const bench = inst.some((s) => s.bench || s.type === 'case') ? new Bench() : null;
+    let cur = -1, st = {}, poll = null, lastPoll = -1e9, saved = false;
+    const res = [], stepsEl = h('div.steps'), progEl = h('span.muted.mono');
+    if (bench) bench.onTick = (t) => { if (Math.abs(t - lastPoll) < 400) return; lastPoll = t; if (poll) poll(); };
+    const stem = (t) => h('p', { style: { fontWeight: '500', marginBottom: '8px' } }, t);
+
+    function settle(s, i, ok, fb, why) {
+      if (s.type !== 'look') res.push({ i, k: s.k, u: s.u, ok, t: s.t, why });
+      if (why) fb.append(h('div.note' + (s.type === 'look' ? '' : ok ? '.good' : '.bad'), s.type === 'look' ? null : h('b', ok ? 'Right. ' : 'Not this time. '), why));
+      fb.append(h('div', { style: { marginTop: '8px' } }, h('button.btn.primary', { type: 'button', onclick: () => activate(i + 1) }, i + 1 < inst.length ? 'Continue' : 'Finish')));
+      if (bench) bench.findings(true);
+    }
+    function choice(q, right, wrong, onDone) {
+      const optEl = h('div.opts'); let chosen = null;
+      const btn = h('button.btn.primary', { type: 'button', disabled: true, onclick: () => {
+        for (const b of optEl.children) { b.disabled = true; if (b.textContent === right) b.classList.add('right'); else if (b.textContent === chosen) b.classList.add('wrong'); }
+        btn.remove(); onDone(chosen === right);
+      } }, 'Check answer');
+      for (const o of shuffle([right].concat(wrong))) optEl.append(h('button.opt', { type: 'button', 'aria-pressed': 'false', onclick: (ev) => { chosen = o; btn.disabled = false; for (const b of optEl.children) b.setAttribute('aria-pressed', String(b === ev.currentTarget)); } }, o));
+      return h('div', stem(q), optEl, h('div', { style: { marginTop: '8px' } }, btn));
+    }
+    function body(s, i) {
+      const fb = h('div', { style: { marginTop: '8px' } });
+      if (s.type === 'look') { const el = h('div', h('p', s.q), fb); settle(s, i, true, fb, null); return el; }
+      if (s.type === 'mcq') return h('div', choice(s.q, s.a[0], s.a.slice(1), (ok) => settle(s, i, ok, fb, s.why)), fb);
+      if (s.type === 'num') {
+        const val = (f) => (typeof f === 'function' ? f(bench) : f);
+        const inp = h('input', { type: 'number', step: 'any', inputmode: 'decimal', 'aria-label': 'Your answer', onkeydown: (ev) => { if (ev.key === 'Enter') check(); } });
+        const msg = h('div.muted', { style: { fontSize: '13px', marginTop: '6px' } });
+        let first = null, over = false;
+        const end = (ok) => { over = true; inp.disabled = true; row.remove(); msg.remove(); settle(s, i, ok, fb, val(s.why)); };
+        const show = h('button.btn.sm', { type: 'button', style: { display: 'none' }, onclick: () => end(false) }, 'Show the working');
+        function check() {
+          if (over || inp.value === '') return;
+          const ok = Math.abs(+inp.value - val(s.ans)) <= s.tol + 1e-9;
+          if (first == null) first = ok;
+          if (ok) return end(first);
+          msg.textContent = 'Not that. You can try again; only the first answer is scored.'; show.style.display = '';
+        }
+        const row = h('div.row', { style: { marginTop: '8px' } }, h('button.btn.primary', { type: 'button', onclick: check }, 'Check answer'), show);
+        return h('div', stem(s.q), h('div.row', inp, h('span.mono', s.unit)), row, msg, fb);
+      }
+      if (s.type === 'do') {
+        const status = h('div.note', { style: { margin: '6px 0' } }, 'Watching the strip…'), hintEl = h('div', { style: { marginTop: '6px' } });
+        let helped = false;
+        const row = h('div.row', s.hint ? h('button.btn.sm', { type: 'button', onclick: () => { hintEl.innerHTML = ''; hintEl.append(h('div.muted', { style: { fontSize: '13px' } }, s.hint)); } }, 'Hint') : null,
+          h('button.btn.sm', { type: 'button', onclick: () => { helped = true; s.solve(bench); status.textContent = 'Settings applied for you. Watch what changes.'; } }, 'Show me'));
+        poll = () => {
+          const x = bench.ctx(), m = s.live && !helped ? s.live(x, st) : null;
+          if (m) status.textContent = m;
+          if (!s.check(x, st)) return;
+          poll = null; row.remove(); hintEl.remove(); status.remove(); settle(s, i, !helped, fb, s.why);
+        };
+        return h('div', stem(s.q), status, row, hintEl, fb);
+      }
+      // case: three linked questions
+      const qz = s.qz, f = D.FAULTS[qz.fault], cs = CASE[qz.fault], box = h('div');
+      const sameFn = Object.keys(CASE).filter((k) => k !== qz.fault).sort((a, b) => (CASE[b][0] === cs[0]) - (CASE[a][0] === cs[0]) || Math.random() - 0.5).slice(0, 5);
+      const parts = [
+        ['1 of 3 · What is the device doing wrong?', FN[cs[0]], Object.keys(FN).filter((k) => k !== cs[0] && (cs[2] || []).indexOf(k) < 0).map((k) => FN[k]), f.dx + '.'],
+        ['2 of 3 · What is the cause?', f.name, sameFn.map((k) => D.FAULTS[k].name), f.why],
+        ['3 of 3 · What do you do?', FIX[cs[1]], shuffle(Object.keys(FIX).filter((k) => k !== cs[1] && (cs[3] || []).indexOf(k) < 0)).slice(0, 4).map((k) => FIX[k]), f.fix]];
+      let all = true;
+      const part = (j) => {
+        const p = parts[j], note = h('div');
+        box.append(h('div', { style: { marginTop: j ? '12px' : '0' } }, choice(p[0], p[1], p[2], (ok) => {
+          all = all && ok; note.append(h('div.note' + (ok ? '.good' : '.bad'), { style: { marginTop: '6px' } }, h('b', ok ? 'Yes. ' : 'No: ' + p[1] + '. '), p[3]));
+          if (j < 2) part(j + 1); else settle(s, i, all, fb, null);
+        }), note));
+      };
+      part(0);
+      return h('div', h('p.muted', { style: { fontSize: '13px', marginBottom: '8px' } }, 'A fault has been applied. Read the strip and markers, interrogate, use the magnet if it helps.'), box, fb);
+    }
+    function render() {
+      stepsEl.innerHTML = ''; poll = null;
+      inst.forEach((s, i) => {
+        if (i < cur) {
+          const r = res.find((x) => x.i === i);
+          stepsEl.append(h('div.step' + (r ? (r.ok ? '.ok' : '.miss') : ''), h('span.n', r ? (r.ok ? '✓' : '✗') : '·'), h('details', h('summary', { style: { cursor: 'pointer' } }, s.type === 'case' ? 'Unknown fault: ' + D.FAULTS[s.qz.fault].name : s.t),
+            h('div.muted', { style: { fontSize: '13px', marginTop: '4px' } }, (r && r.why) || (s.type === 'case' ? D.FAULTS[s.qz.fault].why : s.q)))));
+        } else if (i === cur) stepsEl.append(h('div.step.now', h('span.n', String(i + 1)), body(s, i)));
+      });
+      if (cur >= inst.length) stepsEl.append(summary());
+      else if (inst.length - cur - 1 > 0) stepsEl.append(h('div.muted', { style: { fontSize: '12px' } }, (inst.length - cur - 1) + ' more to come.'));
+      progEl.textContent = cur >= inst.length ? 'done' : 'step ' + (cur + 1) + ' of ' + inst.length;
+    }
+    function activate(i) {
+      const s = inst[i]; cur = i; st = {};
+      if (s && bench) {
+        const spec = s.type === 'case' ? caseBench(s.qz) : s.bench;
+        if (spec) { if (s.keep && i > 0 && !opt.keys && unit.id !== 'review') bench.controls(spec); else bench.load(spec); }
+        bench.findings(s.type === 'look');
+      }
+      if (!s) finish();
+      render();
+      if (i > 0 && stepsEl.lastElementChild && stepsEl.scrollIntoView && !bench) stepsEl.lastElementChild.scrollIntoView({ block: 'nearest' });
+    }
+    function finish() {
+      if (saved || !res.length) return; saved = true;
+      const now = Date.now(), right = res.filter((r) => r.ok).length;
+      for (const r of res) Prog.mark(r.u, r.k, r.ok, now);
+      if (!opt.keys && unit.id !== 'review') Prog.unit(unit.id, right / res.length, now);
+      Prog.save();
+      if (EP.Assess) EP.Assess.Store.save({ t: now, n: res.length, right, src: 'course', items: res.map((r) => ({ d: 'device', s: label(r.u), q: 'c-' + r.u + '-' + r.k, ok: r.ok, c: 1 })) });
+    }
+    function summary() {
+      const right = res.filter((r) => r.ok).length, n = res.length, miss = res.filter((r) => !r.ok), full = !opt.keys && unit.id !== 'review', pass = n && right / n >= PASS;
+      const next = full ? UNITS[UNITS.indexOf(unit) + 1] : null;
+      return h('div.step.now', h('span.n', '∑'), h('div',
+        h('p', { style: { fontWeight: '600' } }, n ? right + ' of ' + n + ' right at the first attempt' + (full ? pass ? ' — unit passed.' : ' — below the 80 % pass mark.' : '.') : 'Nothing was scored.'),
+        miss.length ? h('p.muted', { style: { fontSize: '13px', margin: '6px 0' } }, 'Missed: ' + miss.map((r) => r.t).join(' · ') + '. These are now in the review schedule and in the Assessment study plan, and stay due until you get them right.') : n ? h('p.muted', { style: { fontSize: '13px', margin: '6px 0' } }, 'These items come back for review in two days, then at longer gaps.') : null,
+        h('div.row', { style: { marginTop: '8px' } },
+          miss.length && unit.id !== 'review' ? h('button.btn.primary', { type: 'button', onclick: () => exit({ unit, keys: miss.map((r) => r.k) }) }, 'Repeat the ' + miss.length + ' I missed') : null,
+          next && pass ? h('button.btn' + (miss.length ? '' : '.primary'), { type: 'button', onclick: () => exit({ unit: next }) }, 'Next: ' + next.title) : null,
+          full && !pass ? h('button.btn', { type: 'button', onclick: () => exit({ unit }) }, 'Run the whole unit again') : null,
+          h('button.btn', { type: 'button', onclick: () => exit() }, 'Back to the course'))));
+    }
+    const seen = unit.id !== 'review' && Prog.data.units[unit.id];
+    const teach = unit.teach ? h('details.card', { open: !opt.keys && !seen }, h('summary', { style: { padding: '9px 12px', cursor: 'pointer', fontWeight: '600' } }, 'Read first: the ideas this unit tests'), h('div.card-b.prose', { style: { maxWidth: '82ch' } }, unit.teach())) : null;
+    const stepsCard = h('section.card', h('div.card-h', h('h3', opt.keys ? 'Re-test' : 'Steps'), h('span.grow'), progEl), h('div.card-b', stepsEl));
+    const ph = bench ? h('section.card', h('div.card-b.muted', 'The bench opens at the first hands-on step. These first questions are answered from the programmed values alone.')) : null;
+    if (bench) bench.onShow = () => ph.remove();
+    root.append(h('div.row', { style: { marginBottom: '12px' } }, h('button.btn.sm', { type: 'button', onclick: () => exit() }, '← Course'), h('h2', { style: { fontSize: '17px' } }, (unit.id === 'review' ? '' : 'Unit ' + unit.id + ' · ') + unit.title), h('span.muted', { style: { fontSize: '13px' } }, unit.goal || '')),
+      teach ? h('div', { style: { marginBottom: '14px' } }, teach) : null,
+      bench ? h('div.sim.course', h('div.sim-main', bench.el, ph), h('div.sim-main', stepsCard)) : h('div', { style: { maxWidth: '760px' } }, stepsCard));
+    activate(0);
+    return { destroy() { if (bench) bench.destroy(); }, bench, inst, state: () => ({ cur, res, st }), poll: () => poll && poll(), next: () => activate(cur + 1) };
+  }
+
+  /* A mixed set from what is due: written items first, at most three bench items. */
+  function reviewUnit(ids) {
+    return { id: 'review', title: 'Review', goal: 'Items that are due again, drawn from the units you have done.', steps: () => {
+      const out = []; let benchN = 0;
+      for (const id of shuffle(ids)) {
+        const m = /^(\d+)-(.+)$/.exec(id), u = m && unitById(m[1]), s = u && u.steps([m[2]]).find((x) => x.k === m[2]);
+        if (!s) continue;
+        const hands = s.type === 'do' || s.type === 'case' || s.nb;
+        if (hands && ++benchN > 3) continue;
+        s.u = u.id; s.keep = false; if (!hands) delete s.bench;
+        out.push(s); if (out.length >= 8) break;
+      }
+      return out;
+    } };
+  }
+
+  EP.Modules = EP.Modules || [];
+  EP.Modules.push({
+    id: 'course', title: 'Device course',
+    mount(root) {
+      const main = h('div'); let run = null;
+      function open(o) {
+        if (run) { run.destroy(); run = null; }
+        main.innerHTML = ''; window.scrollTo(0, 0);
+        if (!o || !o.unit) return home();
+        run = runUnit(main, o.unit, o.keys ? { keys: o.keys } : null, open); EP.Course._run = run;
+      }
+      function home() {
+        const now = Date.now(), pd = Prog.data, due = Prog.due(now), nd = Prog.nextDue(now);
+        const done = UNITS.filter((u) => pd.units[u.id] && pd.units[u.id].best >= PASS).length;
+        const nextU = UNITS.find((u) => !pd.units[u.id] || pd.units[u.id].best < PASS);
+        const rows = UNITS.map((u) => {
+          const e = pd.units[u.id], pass = e && e.best >= PASS;
+          return h('div.finding', { style: { alignItems: 'center' } }, h('span.pill' + (pass ? '.good' : e ? '.warn' : ''), pass ? 'passed' : e ? Math.round(e.best * 100) + ' %' : 'unit ' + u.id),
+            h('div.row', { style: { justifyContent: 'space-between' } }, h('div', { style: { flex: '1 1 260px' } }, h('b', u.id + ' · ' + u.title), h('div.muted', u.goal)),
+              h('button.btn.sm' + (u === nextU ? '.primary' : ''), { type: 'button', onclick: () => open({ unit: u }) }, e ? 'Repeat' : 'Start')));
+        });
+        main.append(h('div.two',
+          h('section.card', h('div.card-h', h('h2', 'Pacing from first principles')), h('div.card-b.prose',
+            h('p', 'Eight short units that build device troubleshooting from one clock upwards. Each starts with the ideas, then makes you use them on a live strip: predict what a change will do, calculate the interval, make the device misbehave, and put it right.'),
+            h('p', 'Nothing is recognised from memory: the numbers are regenerated on every run and the bench tasks are checked against what the simulated device actually does. Only your first attempt at each step is scored.'),
+            h('div.row', { style: { marginTop: '12px' } }, nextU ? h('button.btn.primary', { type: 'button', onclick: () => open({ unit: nextU }) }, (pd.units[nextU.id] ? 'Continue with unit ' : 'Start with unit ') + nextU.id) : h('span.pill.good', 'all eight passed'),
+              h('span.muted.mono', done + ' / ' + UNITS.length + ' passed')))),
+          h('section.card', h('div.card-h', h('h3', 'Review'), h('span.grow'), h('span.muted.mono', due.length + ' due')), h('div.card-b.prose',
+            due.length ? h('p', due.length + ' item' + (due.length > 1 ? 's are' : ' is') + ' due: anything missed last time, and anything answered correctly long enough ago that it is worth checking it is still there (after 2, 7, 21 and 60 days).')
+              : h('p', Object.keys(pd.steps).length ? 'Nothing is due. ' + (isFinite(nd) ? 'The next items come back in ' + Math.max(1, Math.ceil(nd / DAY)) + ' day' + (Math.ceil(nd / DAY) > 1 ? 's' : '') + '.' : '') : 'Review starts after your first unit. Missed steps return the next time you open the course; correct ones return after 2, 7, 21 and 60 days.'),
+            due.length ? h('div.row', { style: { marginTop: '10px' } }, h('button.btn.primary', { type: 'button', onclick: () => open({ unit: reviewUnit(due) }) }, 'Review ' + Math.min(8, due.length) + ' now')) : null,
+            h('p.muted', { style: { fontSize: '12px', marginTop: '10px' } }, 'Course answers also count in the Assessment gap map under pacemaker troubleshooting. ' + (Prog.db ? 'Progress is saved with this page.' : 'Progress is saved in this browser.'))))),
+          h('section.card', { style: { marginTop: '14px' } }, h('div.card-h', h('h3', 'Units')), h('div.card-b', h('div.findings', { style: { gap: '12px' } }, rows))),
+          h('section.card', { style: { marginTop: '14px' } }, h('div.card-h', h('h3', 'How the testing gets harder')), h('div.card-b.prose', { style: { maxWidth: '82ch' } }, list([
+            '**Predict** before you touch a control, then watch whether the strip agrees with you.',
+            '**Calculate** intervals from the programmed values, with numbers that change every run.',
+            '**Do**: make the device show the behaviour, or correct it, on the bench. There are no options to choose from, and the step passes only when the strip shows it.',
+            '**Diagnose** an unknown fault from the strip and the interrogation: what it is doing, why, and the fix. All three must be right.',
+            '**Come back**: every item returns after a gap. Getting it right after you have had time to forget is the test that matters.']))));
+      }
+      root.append(main);
+      const pd = EP.pending, u0 = pd && pd.unit && unitById(pd.unit);
+      if (u0) open({ unit: u0, keys: pd.step ? [pd.step] : null }); else home();
+      Prog.init(() => { if (!run) { main.innerHTML = ''; home(); } });
+      if (EP.Assess && EP.Assess.Store.init) EP.Assess.Store.init();
+      return { unmount() { if (run) run.destroy(); } };
     },
   });
 })(globalThis.EP = globalThis.EP || {});
@@ -6054,7 +6797,7 @@ table.tbl td { padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-
     const tabs = document.getElementById('tabs'), page = document.getElementById('page');
     let current = null, handle = null;
     const mods = EP.Modules;
-    const order = ['rhythms', 'localise', 'stemi', 'devices', 'pacemaker', 'temp', 'icd', 'tox', 'cases', 'assess', 'quiz'];
+    const order = ['rhythms', 'localise', 'stemi', 'devices', 'course', 'pacemaker', 'temp', 'icd', 'tox', 'cases', 'assess', 'quiz'];
     mods.sort((a, b) => order.indexOf(a.id) - order.indexOf(b.id));
     for (const m of mods) tabs.appendChild(h('button.tab', { type: 'button', role: 'tab', id: 'tab-' + m.id, 'aria-selected': 'false', onclick: () => go(m.id, true) }, m.title));
     function go(id, push) {

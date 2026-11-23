@@ -69,8 +69,9 @@
   PATIENTS.asys2 = { name: 'Complete heart block, sinus bradycardia 45/min, no escape', hidden: true, cfg: () => ({ sinus: { cl: 1330 }, avn: CHB() }) };
 
   /* Read the last few seconds of the strip the way a clinician would. → [[level, title, text]] */
-  function analyze(sim, dev, t) {
-    const W = 9000, ev = sim.out.filter((e) => e.t > t - W && e.t <= t - 160), f = [];
+  function analyze(sim, dev, t, W) {
+    W = W || 9000;
+    const ev = sim.out.filter((e) => e.t > t - W && e.t <= t - 160), f = [];
     const q = ev.filter((e) => e.type === 'QRS'), sp = ev.filter((e) => e.type === 'spike'), mk = ev.filter((e) => e.type === 'mark'), P = ev.filter((e) => e.type === 'P');
     const cap = EP.Pacemaker.MODES[dev.mode] || {}, lri = dev.lri;
     const vS = sp.filter((s) => s.ch === 'V'), aS = sp.filter((s) => s.ch === 'A');
@@ -122,7 +123,8 @@
       const vv = []; const vpm = mk.filter((m) => m.text === 'VP'); for (let i = 1; i < vpm.length; i++) vv.push(vpm[i].t - vpm[i - 1].t);
       const atUrl = vv.length > 3 && vv.filter((x) => Math.abs(x - dev.uri) < 25).length >= vv.length * 0.6;
       const retro = P.filter((x) => x.kind === 'retro').length;
-      if (atUrl && retro >= 3) f.push(['bad', 'Pacemaker-mediated tachycardia', 'Ventricular pacing at the upper rate, each paced beat conducting backwards to the atrium; the retrograde P is sensed after PVARP and triggers the next paced beat. The device is the antegrade limb of a re-entry circuit. A magnet, a longer PVARP, or PVARP extension after a PVC breaks it.']);
+      const loop = retro >= 4 && /(AS VP ){4}/.test(txt + ' ') && vv.length > 3 && Math.max.apply(null, vv.slice(-4)) - Math.min.apply(null, vv.slice(-4)) < 40;
+      if ((atUrl && retro >= 3) || loop) f.push(['bad', 'Pacemaker-mediated tachycardia', 'Each paced beat conducts backwards to the atrium; the retrograde P is sensed after PVARP and triggers the next paced beat. The device is the antegrade limb of a re-entry circuit, running at the upper rate or — if retrograde conduction time + AV delay is longer than the upper rate interval — a little below it. A magnet, a longer PVARP, or PVARP extension after a PVC breaks it.']);
       else if (atUrl && ars >= 1) f.push(['warn', 'Upper rate behaviour — pacemaker Wenckebach', 'The sinus rate exceeds the maximum tracking rate. The device delays each ventricular pace to respect the upper rate, so the AS–VP interval lengthens until a P wave falls in PVARP and is not tracked.']);
       else if (ars >= 2 && ars >= vps * 0.6) f.push(['warn', 'Upper rate behaviour — 2:1 block', 'The atrial cycle is shorter than the total atrial refractory period (AV delay + PVARP): every other P wave falls in PVARP and is ignored. The paced rate suddenly halves.']);
       else f.push(['good', 'P-synchronous ventricular pacing', 'Each native P wave (AS) starts the sensed AV delay and is followed by a ventricular pace (VP): AV synchrony is preserved.']);
