@@ -83,6 +83,8 @@
     mount(root) {
       const player = new EP.Player({ layout: '12', ladder: false });
       const st = { tool: 'pvc', depth: 'epi', quiz: null, point: null, apRing: 'tricuspid', apDeg: 0, apMax: true, pace: 'rvApex' };
+      const pd = EP.pending;
+      if (pd && pd.tool) { st.tool = pd.tool; if (pd.tool === 'pace' && pd.site) st.pace = pd.site; if (pd.tool === 'ap' && pd.ap && R.AP[pd.ap]) { st.apRing = R.AP[pd.ap].ring; st.apDeg = R.AP[pd.ap].deg; } }
       let marker = null, mlabel = null;
       const panel = h('div.card-b'), sideEl = h('div.stack');
       function setMarker(p, text) {
@@ -233,6 +235,7 @@
         h('div.sim-main', h('section.card', h('div.card-h', h('h2', 'Localisation lab'), h('span.grow'), toolSeg), h('div.card-b', intro), ctl), player.ecgCard, charts),
         h('div.sim-main', player.heartCard || h('div'), h('section.card', panel))));
       setTool();
+      if (pd && pd.tool === 'pvc' && pd.site && Mo.SITES[pd.site]) { const s0 = Mo.SITES[pd.site]; pvcAt(s0.p, s0.kind, pd.site); }
       return { unmount() { player.destroy(); } };
     },
   });

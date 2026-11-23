@@ -113,7 +113,7 @@
       }
       root.append(h('div.lab', rail, h('div.stack', sel, h('section.card', ctl), player.ecgCard, meas, h('section.card', head, teach)),
         h('div.side', player.heartCard || h('div'), h('div.note', 'For any poisoned patient: a 12-lead early and repeated, continuous monitoring, potassium/magnesium/glucose, and a call to the poisons service. Doses here are typical adult figures for teaching — check local guidance.'))));
-      show('hyperk');
+      show((EP.pending && EP.pending.id) || 'hyperk');
       return { unmount() { player.destroy(); } };
     },
   });

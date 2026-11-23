@@ -173,7 +173,9 @@
           h('div.dev-grid', player.heartCard || h('div'), xrCard),
           player.ecgCard,
           h('section.card', head, teach))));
-      show(UI.store.get('device', 'ddd'));
+      const pd = EP.pending;
+      show((pd && pd.id) || UI.store.get('device', 'ddd'));
+      if (pd && pd.variant) { const v = cur.variants.find((x) => x.id === pd.variant); if (v) setVariant(v); }
       return { unmount() { player.destroy(); if (xr) xr.dispose(); } };
     },
   });

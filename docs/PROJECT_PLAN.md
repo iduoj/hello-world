@@ -114,6 +114,17 @@ See docs/ARCHITECTURE.md for module APIs.
       localStorage and in the artifact `db` capability (collection `assessment`) so results can be read
       back to tailor later content
 
+### Round 3 (user took the baseline: 16/30; asked "what do we do with it / how do I improve?")
+- [x] Study plan on the Assessment home: every missed / guessed item → key point, a concrete exercise,
+      a deep link into the right tab (`EP.open(tab, focus)`, consumed via `EP.pending` in each mount), and
+      a re-test. Item clears after two correct, non-guessed answers on separate sets (`Store.ledger()`).
+- [x] Fairness: paced-strip fault questions now include interrogation values; indistinguishable sites are
+      never offered against each other (`CONFUSE`).
+- User's first baseline (2026-11-23): weakest = pacemaker troubleshooting 0/4, mechanisms 0/3 (two
+  confident-wrong: VT specificity, concealed conduction), pacing-site localisation 1/3, tox 1/3.
+  Strong = acute management, ICD, temporary pacing. Next content should deepen device troubleshooting
+  and paced-QRS ↔ lead position.
+
 ### Ideas not done yet (candidates for the next round)
 - Rate response (R) and AV-search / minimised-ventricular-pacing algorithms in the pacemaker sim
 - Intracardiac electrogram channels (A/V EGM) beside the marker channel

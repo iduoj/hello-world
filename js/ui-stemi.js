@@ -222,7 +222,7 @@
         'Arrhythmias by territory: inferior MI → sinus bradycardia and nodal AV block (atropine-responsive, transient). Anterior MI → bundle branch block and infranodal block (abrupt, needs pacing). Any territory → VF in the first hours; accelerated idioventricular rhythm at reperfusion (leave it alone).'])));
       root.append(h('div.lab', rail, h('div.stack', sel, h('section.card', ctl), player.ecgCard, stEl, sgEl, h('section.card', head, teach), rules),
         h('div.side', player.heartCard || h('div'), h('div.note', 'The shaded area is the ischaemic territory; the dark band marks the occlusion. ST vectors are computed from that territory, so reciprocal changes follow from the anatomy. Lower the "Wall" slider to see the septum.'))));
-      show('ladProx');
+      show((EP.pending && EP.pending.id) || 'ladProx');
       return { unmount() { player.destroy(); } };
     },
   });

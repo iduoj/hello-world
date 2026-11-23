@@ -31,6 +31,7 @@
     id: 'icd', title: 'ICD',
     mount(root) {
       const st = { cs: 'vt', vtRate: 170, vfRate: 220, atp: 2, svtDisc: true, shock: true, magnet: false };
+      if (EP.pending && EP.pending.cs) st.cs = EP.pending.cs;
       let sim, icd, live, lastLog = 0;
       const canvas = h('canvas', { 'aria-label': 'Live rhythm with ICD marker channel' }), liveBox = h('div.live', canvas);
       const strip = new EP.LiveStrip(canvas, { channels: [{ lead: 1 }, { key: 'pulse', label: 'Arterial pressure' }], windowMs: 10000, markers: true, rowMm: 22 });

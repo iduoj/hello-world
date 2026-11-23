@@ -48,7 +48,7 @@
       }
       const tips = h('div.note', 'Drag across the ECG to measure an interval. Click the trace to move the cursor; the heart shows that instant. Slow the playback to watch the wavefront.');
       root.append(h('div.lab', rail, h('div.stack', sel, player.ecgCard, meas, ctrl, teachCard), h('div.side', player.heartCard, tips)));
-      show(UI.store.get('rhythm', 'nsr'));
+      show((EP.pending && EP.pending.id) || UI.store.get('rhythm', 'nsr'));
       return { unmount() { player.destroy(); } };
     },
   });

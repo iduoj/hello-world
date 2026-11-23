@@ -16,6 +16,7 @@
     id: 'temp', title: 'Temporary pacing',
     mount(root) {
       const st = { kind: 'tv', patient: 'chb', rate: 70, out: 0, sens: 2, async: false, on: false, thr: 0.9, rAmp: 7, minCap: null, lostAt: null, sawUnder: false, capRun: 0 };
+      if (EP.pending && EP.pending.kind) st.kind = EP.pending.kind;
       let sim, dev, live, lastHandled = 0;
       const canvas = h('canvas', { 'aria-label': 'Monitor: lead II and arterial pressure' });
       const liveBox = h('div.live', canvas);

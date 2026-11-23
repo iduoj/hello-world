@@ -11,7 +11,7 @@
     for (const m of mods) tabs.appendChild(h('button.tab', { type: 'button', role: 'tab', id: 'tab-' + m.id, 'aria-selected': 'false', onclick: () => go(m.id, true) }, m.title));
     function go(id, push) {
       const m = mods.find((x) => x.id === id) || mods[0];
-      if (current === m.id) return;
+      if (current === m.id && !EP.pending) return;
       if (handle && handle.unmount) handle.unmount();
       current = m.id;
       for (const b of tabs.children) b.setAttribute('aria-selected', String(b.id === 'tab-' + m.id));
@@ -22,6 +22,8 @@
       window.scrollTo(0, 0);
     }
     EP.go = go;
+    /* Open a tab focused on one item: modules read EP.pending while mounting. */
+    EP.open = (tab, focus) => { EP.pending = Object.assign({ tab }, focus || {}); go(tab, true); EP.pending = null; };
     window.addEventListener('hashchange', () => go(location.hash.replace('#', ''), false));
     // build the model after first paint so the page shows immediately
     setTimeout(() => {

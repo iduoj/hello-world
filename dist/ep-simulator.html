@@ -4112,7 +4112,7 @@ table.tbl td { padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-
       }
       const tips = h('div.note', 'Drag across the ECG to measure an interval. Click the trace to move the cursor; the heart shows that instant. Slow the playback to watch the wavefront.');
       root.append(h('div.lab', rail, h('div.stack', sel, player.ecgCard, meas, ctrl, teachCard), h('div.side', player.heartCard, tips)));
-      show(UI.store.get('rhythm', 'nsr'));
+      show((EP.pending && EP.pending.id) || UI.store.get('rhythm', 'nsr'));
       return { unmount() { player.destroy(); } };
     },
   });
@@ -4205,6 +4205,8 @@ table.tbl td { padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-
     mount(root) {
       const player = new EP.Player({ layout: '12', ladder: false });
       const st = { tool: 'pvc', depth: 'epi', quiz: null, point: null, apRing: 'tricuspid', apDeg: 0, apMax: true, pace: 'rvApex' };
+      const pd = EP.pending;
+      if (pd && pd.tool) { st.tool = pd.tool; if (pd.tool === 'pace' && pd.site) st.pace = pd.site; if (pd.tool === 'ap' && pd.ap && R.AP[pd.ap]) { st.apRing = R.AP[pd.ap].ring; st.apDeg = R.AP[pd.ap].deg; } }
       let marker = null, mlabel = null;
       const panel = h('div.card-b'), sideEl = h('div.stack');
       function setMarker(p, text) {
@@ -4355,6 +4357,7 @@ table.tbl td { padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-
         h('div.sim-main', h('section.card', h('div.card-h', h('h2', 'Localisation lab'), h('span.grow'), toolSeg), h('div.card-b', intro), ctl), player.ecgCard, charts),
         h('div.sim-main', player.heartCard || h('div'), h('section.card', panel))));
       setTool();
+      if (pd && pd.tool === 'pvc' && pd.site && Mo.SITES[pd.site]) { const s0 = Mo.SITES[pd.site]; pvcAt(s0.p, s0.kind, pd.site); }
       return { unmount() { player.destroy(); } };
     },
   });
@@ -4537,7 +4540,9 @@ table.tbl td { padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-
           h('div.dev-grid', player.heartCard || h('div'), xrCard),
           player.ecgCard,
           h('section.card', head, teach))));
-      show(UI.store.get('device', 'ddd'));
+      const pd = EP.pending;
+      show((pd && pd.id) || UI.store.get('device', 'ddd'));
+      if (pd && pd.variant) { const v = cur.variants.find((x) => x.id === pd.variant); if (v) setVariant(v); }
       return { unmount() { player.destroy(); if (xr) xr.dispose(); } };
     },
   });
@@ -4690,6 +4695,8 @@ table.tbl td { padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-
     id: 'pacemaker', title: 'Pacemaker',
     mount(root) {
       const state = { patient: 'chb', fault: 'none', quiz: null, pm: Object.assign({}, EP.Pacemaker.DEF, { mode: 'DDD' }) };
+      const pd = EP.pending;
+      if (pd) { if (pd.patient) state.patient = pd.patient; if (pd.fault) state.fault = pd.fault; Object.assign(state.pm, pd.pm || {}); }
       let sim, dev, live;
       const canvas = h('canvas', { 'aria-label': 'Live rhythm strip with marker channel' });
       const liveBox = h('div.live', canvas);
@@ -4736,7 +4743,7 @@ table.tbl td { padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-
       const magnet = UI.check('Magnet on the generator', false, (v) => { state.pm.magnet = v; dev.set(devCfg()); });
       const patSel = UI.select(null, Object.keys(PATIENTS).filter((k) => !PATIENTS[k].hidden).map((k) => [k, PATIENTS[k].name]), state.patient, (v) => { state.patient = v; state.quiz = null; quizBox(); rebuild(); });
       patSel.setAttribute('aria-label', 'Patient rhythm'); patSel.style.width = '100%';
-      const faultSel = UI.select(null, Object.keys(FAULTS).map((k) => [k, FAULTS[k].name]), 'none', (v) => { state.fault = v; state.quiz = null; quizBox(); rebuild(); faultNote(); });
+      const faultSel = UI.select(null, Object.keys(FAULTS).map((k) => [k, FAULTS[k].name]), state.fault, (v) => { state.fault = v; state.quiz = null; quizBox(); rebuild(); faultNote(); });
       faultSel.setAttribute('aria-label', 'Fault'); faultSel.style.width = '100%';
       const faultInfo = h('div');
       function faultNote() {
@@ -4816,7 +4823,7 @@ table.tbl td { padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-
           h('section.card', h('div.card-h', h('h3', 'Patient')), h('div.card-b', patSel)),
           h('section.card', h('div.card-h', h('h3', 'Programming')), h('div.card-b', ctl, magnet)),
           h('section.card', h('div.card-h', h('h3', 'Introduce a fault')), h('div.card-b', faultSel, faultInfo)))));
-      rebuild(); quizBox();
+      rebuild(); quizBox(); faultNote();
       return { unmount() { live.destroy(); if (strip.ro) strip.ro.disconnect(); } };
     },
   });
@@ -4842,6 +4849,7 @@ table.tbl td { padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-
     id: 'temp', title: 'Temporary pacing',
     mount(root) {
       const st = { kind: 'tv', patient: 'chb', rate: 70, out: 0, sens: 2, async: false, on: false, thr: 0.9, rAmp: 7, minCap: null, lostAt: null, sawUnder: false, capRun: 0 };
+      if (EP.pending && EP.pending.kind) st.kind = EP.pending.kind;
       let sim, dev, live, lastHandled = 0;
       const canvas = h('canvas', { 'aria-label': 'Monitor: lead II and arterial pressure' });
       const liveBox = h('div.live', canvas);
@@ -5013,6 +5021,7 @@ table.tbl td { padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-
     id: 'icd', title: 'ICD',
     mount(root) {
       const st = { cs: 'vt', vtRate: 170, vfRate: 220, atp: 2, svtDisc: true, shock: true, magnet: false };
+      if (EP.pending && EP.pending.cs) st.cs = EP.pending.cs;
       let sim, icd, live, lastLog = 0;
       const canvas = h('canvas', { 'aria-label': 'Live rhythm with ICD marker channel' }), liveBox = h('div.live', canvas);
       const strip = new EP.LiveStrip(canvas, { channels: [{ lead: 1 }, { key: 'pulse', label: 'Arterial pressure' }], windowMs: 10000, markers: true, rowMm: 22 });
@@ -5192,7 +5201,7 @@ table.tbl td { padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-
       }
       root.append(h('div.lab', rail, h('div.stack', sel, h('section.card', ctl), player.ecgCard, meas, h('section.card', head, teach)),
         h('div.side', player.heartCard || h('div'), h('div.note', 'For any poisoned patient: a 12-lead early and repeated, continuous monitoring, potassium/magnesium/glucose, and a call to the poisons service. Doses here are typical adult figures for teaching — check local guidance.'))));
-      show('hyperk');
+      show((EP.pending && EP.pending.id) || 'hyperk');
       return { unmount() { player.destroy(); } };
     },
   });
@@ -5424,7 +5433,7 @@ table.tbl td { padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-
         'Arrhythmias by territory: inferior MI → sinus bradycardia and nodal AV block (atropine-responsive, transient). Anterior MI → bundle branch block and infranodal block (abrupt, needs pacing). Any territory → VF in the first hours; accelerated idioventricular rhythm at reperfusion (leave it alone).'])));
       root.append(h('div.lab', rail, h('div.stack', sel, h('section.card', ctl), player.ecgCard, stEl, sgEl, h('section.card', head, teach), rules),
         h('div.side', player.heartCard || h('div'), h('div.note', 'The shaded area is the ischaemic territory; the dark band marks the occlusion. ST vectors are computed from that territory, so reciprocal changes follow from the anatomy. Lower the "Wall" slider to see the septum.'))));
-      show('ladProx');
+      show((EP.pending && EP.pending.id) || 'ladProx');
       return { unmount() { player.destroy(); } };
     },
   });
@@ -5626,7 +5635,7 @@ table.tbl td { padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-
           h('section.card', h('div.card-h', h('h3', 'Interventions')), acts)),
           h('div.sim-main', h('section.card', h('div.card-h', h('h3', 'What happened')), h('div.card-b', log)), deb,
             h('div.note', h('b', 'The one rule. '), 'If the patient is unstable because of the rhythm — shock a tachycardia, pace a bradycardia. Drugs are for stable patients and for keeping the rhythm afterwards.'))))));
-      start(cs.id);
+      start((EP.pending && EP.pending.id) || cs.id);
       return { unmount() { live.destroy(); if (strip.ro) strip.ro.disconnect(); } };
     },
   });
@@ -5718,51 +5727,128 @@ table.tbl td { padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-
   const pick = (a) => a[Math.floor(Math.random() * a.length)];
   const shuffle = (a) => a.slice().sort(() => Math.random() - 0.5);
   const others = (all, self, n) => shuffle(all.filter((x) => x !== self)).slice(0, n);
+  // pairs the surface ECG cannot reliably separate: never offer one as a distractor for the other
+  const CONFUSE = [['lvInfApical', 'midCardiacVein'], ['mitralAnt', 'lvSummit'], ['papPM', 'fascPost'], ['papAL', 'fascAnt'], ['lvInfBase', 'mitralPost'], ['rvApex', 'moderator']];
+  const clash = (a, b) => CONFUSE.some((c) => c.includes(a) && c.includes(b));
+  const othersNC = (all, self, n) => shuffle(all.filter((x) => x !== self && !clash(x[0], self[0]))).slice(0, n);
   const GEN = {
-    rhythm() {
-      const pool = R.list.filter((r) => r.id !== 'sinus-arr'), cur = pick(pool);
+    rhythm(id) {
+      const pool = R.list.filter((r) => r.id !== 'sinus-arr'), cur = (id && pool.find((r) => r.id === id)) || pick(pool);
       const opts = shuffle(pool.filter((r) => r.group === cur.group && r !== cur)).slice(0, 2).concat(shuffle(pool.filter((r) => r.group !== cur.group)).slice(0, 2));
       return { id: 'g-rh-' + cur.id, domain: 'rhythm', topic: (R.groups.find((g) => g.id === cur.group) || {}).name, stem: 'What is the rhythm?', ecg: { rec: () => R.record(cur, { params: {} }) }, right: cur.name, wrong: opts.map((o) => o.name), explain: cur.teach.ecg.slice(0, 2).join(' ') };
     },
-    localPvc() {
-      const P = EP.LocData.PRESETS, cur = pick(P);
+    localPvc(id) {
+      const P = EP.LocData.PRESETS, cur = (id && P.find((x) => x[0] === id)) || pick(P);
       return { id: 'g-pvc-' + cur[0], domain: 'local', topic: 'PVC / VT origin', stem: 'Sinus beats alternate with ectopic beats. Where do the wide beats arise?',
         ecg: { rec: () => { const sim = EP.simulate({ sinus: { cl: 900, resp: 0 }, avn: { fast: { retro: { block: true } } }, foci: [{ id: 'x', node: 'V', kind: 'coupled', after: 'hps', coupling: 470, every: 1, spec: Mo.spec(cur[0]), label: 'PVC' }] }, 10000); const r = EP.Synth.build(sim, 0, 10000); r.sim = sim; return r; } },
-        right: cur[1], wrong: others(P, cur, 4).map((x) => x[1]), explain: 'Read V1 (LBBB pattern = right ventricle/septum, RBBB pattern = left ventricle), then the inferior leads (positive = high origin, negative = low), then the precordial transition and lead I. Open the Localise tab to see the map for this site.' };
+        right: cur[1], wrong: othersNC(P, cur, 4).map((x) => x[1]), explain: 'Read V1 (LBBB pattern = right ventricle/septum, RBBB pattern = left ventricle), then the inferior leads (positive = high origin, negative = low), then the precordial transition and lead I. Open the Localise tab to see the map for this site.' };
     },
-    localAp() {
-      const keys = Object.keys(R.AP), k = pick(keys);
+    localAp(id) {
+      const keys = Object.keys(R.AP), k = id && R.AP[id] ? id : pick(keys);
       return { id: 'g-ap-' + k, domain: 'local', topic: 'Accessory pathway', stem: 'Sinus rhythm with maximal pre-excitation. Where is the accessory pathway?',
         ecg: { rec: () => { const sim = EP.simulate({ sinus: { cl: 880, resp: 0 }, avn: { fast: { min: 150 } }, ap: R.apCfg(k) }, 10000); const r = EP.Synth.build(sim, 0, 10000); r.sim = sim; return r; } },
         right: R.AP[k].name, wrong: others(keys, k, 3).map((x) => R.AP[x].name), explain: 'The delta wave is negative in leads facing the insertion: negative in I/aVL with a positive V1 → left lateral; negative in III/aVF → posterior/posteroseptal; negative V1 with a left axis → right free wall; positive inferior leads with a negative V1 → anteroseptal.' };
     },
-    localPace() {
-      const P = EP.LocData.PACE, cur = pick(P);
+    localPace(id) {
+      const P = EP.LocData.PACE, cur = (id && P.find((x) => x[0] === id)) || pick(P);
       return { id: 'g-pace-' + cur[0], domain: 'local', topic: 'Pacing site', stem: 'Complete heart block with P-synchronous ventricular pacing. Where is the ventricle being paced from?',
         ecg: { rec: () => { const sim = new EP.HeartSim({ sinus: { cl: 820, resp: 0 }, avn: { fast: { block: true, retro: { block: true } } } }); new EP.Pacemaker(sim, { mode: 'DDD', lrl: 60, vSpec: cur[2](), vSite: 'rvApex' }); sim.runUntil(12500); const r = EP.Synth.build(sim, 2000, 12000); r.sim = sim; return r; } },
-        right: cur[1], wrong: others(P, cur, 3).map((x) => x[1]), explain: 'LBBB pattern = right ventricular site (superior axis → apex; inferior axis → outflow tract). Terminal R in V1 with a narrow QRS → left bundle area. Dominant R in V1 with negative lead I → left ventricular site. An isoelectric gap then a native QRS → His bundle.' };
+        right: cur[1], wrong: othersNC(P, cur, 3).map((x) => x[1]), explain: 'LBBB pattern = right ventricular site (superior axis → apex; inferior axis → outflow tract). Terminal R in V1 with a narrow QRS → left bundle area. Dominant R in V1 with negative lead I → left ventricular site. An isoelectric gap then a native QRS → His bundle.' };
     },
-    isch() {
-      const S = EP.Stemi.list, cur = pick(S);
+    isch(id) {
+      const S = EP.Stemi.list, cur = (id && S.find((x) => x.id === id)) || pick(S);
       const label = (x) => x.name + (x.sub ? ' — ' + x.sub : '');
       return { id: 'g-is-' + cur.id, domain: 'isch', topic: (EP.Stemi.groups.find((g) => g.id === cur.group) || {}).name, stem: 'Which is the best interpretation of this ECG?', ecg: { rec: () => EP.Stemi.record(cur, 0.36) },
         right: label(cur), wrong: shuffle(S.filter((x) => x.group === cur.group && x !== cur)).slice(0, 2).concat(shuffle(S.filter((x) => x.group !== cur.group)).slice(0, 2)).map(label), explain: cur.teach.ecg.slice(0, 2).join(' ') };
     },
-    fault() {
-      const D = EP.PacerData, q = pick(D.QUIZ), f = D.FAULTS[q.fault], pat = D.PATIENTS[q.patientOverride || q.patient];
+    fault(id) {
+      const D = EP.PacerData, q = (id && D.QUIZ.find((x) => x.fault === id)) || pick(D.QUIZ), f = D.FAULTS[q.fault], pat = D.PATIENTS[q.patientOverride || q.patient];
       const keys = Object.keys(D.FAULTS).filter((k) => k !== 'none');
-      return { id: 'g-pm-' + q.fault, domain: 'device', topic: 'Reading a paced strip', stem: 'Patient: ' + pat.name + '. Programmed ' + q.pm.mode + ' ' + (q.pm.lrl || 60) + '/min. Lead II with the marker channel. What is wrong?',
-        ecg: { layout: 'strip', markers: true, rec: () => { const sim = new EP.HeartSim(pat.cfg()); const c = Object.assign({}, EP.Pacemaker.DEF, q.pm, q.force || {}, f.set); if (f.set.forceMode) c.mode = f.set.forceMode; const pm = new EP.Pacemaker(sim, c); if (f.set.intermittent) { const flip = (t) => { pm.c.noOutput = sim.rng() < f.set.intermittent; sim.schedule(t + 900 + 1500 * sim.rng(), flip); }; sim.schedule(600, flip); } sim.runUntil(13500); const r = EP.Synth.build(sim, 3000, 13000); r.sim = sim; return r; } },
-        right: f.name, wrong: others(keys, q.fault, 3).map((k) => D.FAULTS[k].name), explain: f.dx + '. ' + f.why };
+      const c = Object.assign({}, EP.Pacemaker.DEF, q.pm, q.force || {}, f.set); if (f.set.forceMode) c.mode = f.set.forceMode;
+      // the strip alone cannot separate every cause, so the question includes what an interrogation would show
+      const inter = 'Interrogation — atrial: threshold ' + c.aThr + ' V (output ' + c.aOut + ' V), P wave ' + c.pAmp + ' mV (sensitivity ' + c.aSens + ' mV), impedance ' + f.imp[0] + ' Ω. Ventricular: threshold ' + c.vThr + ' V (output ' + c.vOut + ' V), R wave ' + c.rAmp + ' mV (sensitivity ' + c.vSens + ' mV), impedance ' + f.imp[1] + ' Ω. Battery ' + f.batt + '.';
+      return { id: 'g-pm-' + q.fault, domain: 'device', topic: 'Reading a paced strip', stem: 'Patient: ' + pat.name + '. Programmed ' + q.pm.mode + ' ' + (q.pm.lrl || 60) + '/min. Lead II with the marker channel. ' + inter + ' What is the problem?',
+        ecg: { layout: 'strip', markers: true, rec: () => { const sim = new EP.HeartSim(pat.cfg()); const pm = new EP.Pacemaker(sim, c); if (f.set.intermittent) { const flip = (t) => { pm.c.noOutput = sim.rng() < f.set.intermittent; sim.schedule(t + 900 + 1500 * sim.rng(), flip); }; sim.schedule(600, flip); } sim.runUntil(13500); const r = EP.Synth.build(sim, 3000, 13000); r.sim = sim; return r; } },
+        right: f.name, wrong: others(keys, q.fault, 3).map((k) => D.FAULTS[k].name), explain: f.dx + '. ' + f.why + ' Fix: ' + f.fix };
     },
-    tox() {
-      const T = EP.Tox.list, cur = pick(T), v = cur.variants ? pick(cur.variants) : null, s = cur.fixed || cur.variants ? cur.def : (cur.id === 'ca' ? pick([0.08, 0.95]) : 0.55 + 0.35 * Math.random());
+    tox(id) {
+      const T = EP.Tox.list, fc = id ? T.filter((t) => id.indexOf(t.id) === 0).sort((a, b) => b.id.length - a.id.length)[0] : null, cur = fc || pick(T), v = cur.variants ? ((fc && cur.variants.find((x) => cur.id + x[0] === id)) || pick(cur.variants)) : null, s = cur.fixed || cur.variants ? cur.def : (cur.id === 'ca' ? pick([0.08, 0.95]) : 0.55 + 0.35 * Math.random());
       const label = (t, vv) => t.name + (vv ? ' — ' + vv[1].toLowerCase() : t.id === 'ca' ? '' : '');
       return { id: 'g-tx-' + cur.id + (v ? v[0] : ''), domain: 'tox', topic: cur.group, stem: 'Which best explains this ECG?', ecg: { rec: () => { const sim = EP.simulate(cur.cfg(s, v ? v[0] : null), 10000); const r = EP.Synth.build(sim, 0, 10000); r.sim = sim; return r; } },
         right: label(cur, v) + (cur.id === 'ca' ? (s < 0.5 ? ' — hypocalcaemia' : ' — hypercalcaemia') : ''), wrong: others(T, cur, 4).map((t) => t.name + (t.id === 'ca' ? (s < 0.5 ? ' — hypercalcaemia' : ' — hypocalcaemia') : '')), explain: cur.teach.ecg.slice(0, 2).join(' ') };
     },
   };
   const GEN_BY = { rhythm: ['rhythm'], local: ['localPvc', 'localAp', 'localPace'], isch: ['isch'], device: ['fault'], tox: ['tox'] };
+
+  // ---- where to practise each topic: [tab, focus, what to do there] ---------------------------------
+  const PM = (patient, mode, fault, extra) => ({ patient, fault: fault || 'none', pm: Object.assign({ mode }, extra || {}) });
+  const PR = {
+    'mech|AVNRT': ['rhythms', { id: 'avnrt' }, 'Play at 1/10 speed with the wall translucent: follow the pulse down the slow (orange) pathway and back up the fast (blue) one.'],
+    'mech|AVRT': ['rhythms', { id: 'avrt' }, 'Use the ladder diagram to trace the circuit, then ask yourself what an extra trans-septal detour (ipsilateral bundle branch block) does to its length.'],
+    'mech|AF': ['rhythms', { id: 'afib-rvr' }, 'Switch to rhythm strips with the ladder diagram on and count the atrial impulses that die in the AV node (red bars) before each one that conducts.'],
+    'mech|Aberrancy': ['rhythms', { id: 'pac' }, 'Measure the cycle before each PAC with the calipers: the aberrant one follows the long-short sequence.'],
+    'mech|AV block': ['rhythms', { id: 'wenck' }, 'Measure each PR and each R-R with the calipers: the PR grows by less each beat.'],
+    'mech|Flutter': ['rhythms', { id: 'flutter-21' }, 'Watch the wave circle the tricuspid annulus on the 3D heart.'],
+    'mech|SVT diagnosis': ['rhythms', { id: 'at' }, 'Compare with AVNRT and AVRT: which of them needs the AV node to continue?'],
+    'mech|Wide-complex tachycardia': ['rhythms', { id: 'vt' }, 'Find the dissociated P waves in the ladder diagram, then find the fusion beats on the strip.'],
+    'mech|Torsades': ['rhythms', { id: 'tdp' }, 'Measure the short-long-short sequence before the run.'],
+    'mech|Pre-excitation': ['localise', { tool: 'ap', ap: 'leftLateral' }, 'Toggle "Maximise pre-excitation" on and off for a left lateral pathway, then for a right free wall pathway.'],
+    'device|Upper rate': ['pacemaker', PM('chbFast', 'DDD'), 'Change PVARP and the upper tracking rate and watch Wenckebach become 2:1. Work out the 2:1 rate from AV delay + PVARP first.'],
+    'device|PMT': ['pacemaker', PM('retro', 'DDD', null, { pvarp: 200, url: 120 }), 'Wait for a PVC to start the tachycardia, then lengthen PVARP or apply the magnet.'],
+    'device|Magnet': ['pacemaker', PM('nsr', 'VVI'), 'Tick the magnet and watch sensing disappear; then compare with the magnet in the ICD tab.'],
+    'device|Sensing': ['pacemaker', PM('nsr', 'VVI', 'vUnder'), 'Fix it yourself with the ventricular sensitivity slider. Which direction restores sensing?'],
+    'device|Lead failure': ['pacemaker', PM('chb', 'VVI', 'fracture', { lrl: 70 }), 'Interrogate and read the impedance, then switch to the insulation breach and compare.'],
+    'device|Insulation': ['pacemaker', PM('chb', 'DDD', 'insulation'), 'Interrogate and read the impedance, then switch to the conductor fracture and compare.'],
+    'device|Crosstalk': ['pacemaker', PM('chb', 'DDD', 'xtalk'), 'Watch atrial spikes without ventricular output; read why safety pacing exists.'],
+    'device|Oversensing': ['pacemaker', PM('chb', 'VVI', 'tOver', { lrl: 70 }), 'Find the extra VS marker after each paced beat and measure how much slower than 70/min it paces. Then fix it with the sensitivity slider.'],
+    'device|Threshold': ['pacemaker', PM('chb', 'VVI', 'exit', { lrl: 70 }), 'Raise the ventricular output until capture returns: that is the new threshold.'],
+    'hardware|Lead position': ['devices', { id: 'ddd', variant: 'cs' }, 'Switch the film to Lateral and compare "Correct position" with "Lead in a cardiac vein" and "Lead in the left ventricle"; look at V1 on each paced 12-lead.'],
+    'hardware|LBB area pacing': ['devices', { id: 'lbbap' }, 'Compare the correct position with "Not deep enough" — watch V1 and the QRS width.'],
+    'hardware|Leadless': ['devices', { id: 'micra' }, 'Read Micra and then AVEIR: what does each sense, and what can each pace?'],
+    'hardware|S-ICD': ['devices', { id: 'sicd' }, 'Read what it cannot do, then compare with the extravascular ICD.'],
+    'hardware|CRT': ['devices', { id: 'crt', variant: 'lvloss' }, 'Compare lead I and V1 between the correct position and "LV lead dislodged".'],
+    'temp|Transvenous': ['temp', { kind: 'tv' }, 'Run the full threshold drill, including the sensing threshold on the sinus bradycardia patient.'],
+    'temp|Transcutaneous': ['temp', { kind: 'tc' }, 'Increase the current and decide when capture is real using the arterial trace.'],
+    'icd|Programming': ['icd', { cs: 'st' }, 'Run sinus tachycardia and AF with discriminators on and off, then raise the VT zone.'],
+    'icd|ATP': ['icd', { cs: 'vt' }, 'Watch the burst terminate VT; then try fast VT.'],
+    'icd|Inappropriate therapy': ['icd', { cs: 'noise' }, 'Let it shock, then apply the magnet.'],
+    'icd|Storm': ['icd', { cs: 'storm' }, 'Read the note on what actually treats a storm.'],
+    'mgmt|Pre-excited AF': ['cases', { id: 'wpwaf' }, 'Try the wrong drugs deliberately and read why each one is dangerous.'],
+    'mgmt|VT': ['cases', { id: 'vtst' }, 'Work through every option, including the harmful ones.'],
+    'mgmt|Torsades': ['cases', { id: 'tdp' }, 'Give magnesium, then try overdrive pacing; note which antiarrhythmics make it worse.'],
+    'mgmt|Unstable tachycardia': ['cases', { id: 'afun' }, 'Compare with the stable AF case that follows it.'],
+    'mgmt|Bradycardia': ['cases', { id: 'chb' }, 'Try atropine first and see what changes.'],
+    'mgmt|AF': ['cases', { id: 'afst' }, 'Find the option that is right in the unstable case and harmful here.'],
+    'mgmt|Digoxin': ['tox', { id: 'dig' }, 'Step through all five digoxin patterns.'],
+    'isch|Posterior MI': ['stemi', { id: 'post' }, 'Toggle the posterior leads on and off.'],
+    'isch|RV infarction': ['stemi', { id: 'rcaProx' }, 'Compare proximal with distal RCA: V1, V4R and the II/III ratio.'],
+    'isch|Sgarbossa': ['stemi', { id: 'lbbbLad' }, 'Read the calculator for LBBB with and without occlusion, lead by lead.'],
+    'isch|Swirl': ['stemi', { id: 'swirl' }, 'Lower the wall slider to see the septal territory, then compare with left main ischaemia.'],
+    'isch|Wellens': ['stemi', { id: 'wellensA' }, 'Compare pattern A with pattern B.'],
+    'isch|de Winter': ['stemi', { id: 'dewinter' }, 'Compare with hyperacute T waves and with hyperkalaemia in the Tox tab: what does the ST segment do at the J point in each?'],
+    'isch|Conduction': ['stemi', { id: 'rbbbLad' }, 'Read why this block is infranodal.'],
+    'isch|Reciprocal change': ['stemi', { id: 'rcaDist' }, 'Drag the timeline from onset and watch aVL.'],
+    'tox|Sodium-channel block': ['tox', { id: 'tca' }, 'Drag the severity slider and watch aVR and the QRS width.'],
+    'tox|Hyperkalaemia': ['tox', { id: 'hyperk' }, 'Drag through every stage.'],
+    'tox|Calcium-channel blocker': ['tox', { id: 'bbccb' }, 'Drag the slider to junctional escape and read the treatment ladder.'],
+    'tox|Calcium': ['tox', { id: 'ca' }, 'Slide from hypo- to hypercalcaemia and watch only the ST segment change.'],
+    'tox|Digoxin': ['tox', { id: 'dig' }, 'Step through all five digoxin patterns.'],
+    'tox|QT drugs': ['tox', { id: 'qt' }, 'Slide to the right until torsades starts; read which antiarrhythmics are contraindicated and why.'],
+  };
+  /* What a stored answer refers to, where to practise it, and a fresh copy of the question. */
+  function describe(it) {
+    const q = it.q || '', m = q.match(/^g-(rh|pvc|ap|pace|is|pm|tx)-(.+)$/);
+    if (!m) { const w = W[+q.slice(1)]; if (!w) return null; const pr = PR[w[0] + '|' + w[1]] || [DOM[w[0]][1], {}, 'Open the tab and work through the related material.']; return { text: w[2], key: w[3][0] + ' — ' + w[4], tab: pr[0], focus: pr[1], todo: pr[2], make: () => ({ id: q, domain: w[0], topic: w[1], stem: w[2], right: w[3][0], wrong: w[3].slice(1), explain: w[4] }) }; }
+    const k = m[1], id = m[2], L = EP.LocData, D = EP.PacerData;
+    if (k === 'rh') { const r = R.byId[id]; return r && { text: 'Rhythm strip: ' + r.name, key: r.teach.ecg[0], tab: 'rhythms', focus: { id }, todo: 'Study the 12-lead with the ladder diagram on, then measure the intervals yourself with the calipers.', make: () => GEN.rhythm(id) }; }
+    if (k === 'pvc') { const x = L.PRESETS.find((y) => y[0] === id); return x && { text: 'PVC origin: ' + x[1], key: 'V1 for chamber, inferior leads for height, transition and lead I for the rest.', tab: 'localise', focus: { tool: 'pvc', site: id }, todo: 'Read the step-by-step panel for this site, then click the neighbouring regions and watch which leads change.', make: () => GEN.localPvc(id) }; }
+    if (k === 'ap') { const a = R.AP[id]; return a && { text: 'Accessory pathway: ' + a.name, key: 'The delta wave is negative in the leads that face the insertion.', tab: 'localise', focus: { tool: 'ap', ap: id }, todo: 'Slide the pathway round the ring and watch the delta polarity table.', make: () => GEN.localAp(id) }; }
+    if (k === 'pace') { const x = L.PACE.find((y) => y[0] === id); return x && { text: 'Pacing site: ' + x[1], key: 'V1 tells you which ventricle leads; the inferior leads tell you apex versus base; lead I tells you left versus right.', tab: 'localise', focus: { tool: 'pace', site: id }, todo: 'Step through all nine sites against the signature chart; cover the names and predict V1, lead I and the axis for each before looking.', make: () => GEN.localPace(id) }; }
+    if (k === 'is') { const x = EP.Stemi.byId[id]; return x && { text: 'Ischaemia ECG: ' + x.name, key: x.teach.ecg[0], tab: 'stemi', focus: { id }, todo: 'Use the ST read-out under the ECG, then compare with its nearest look-alike in the list.', make: () => GEN.isch(id) }; }
+    if (k === 'pm') { const f = D.FAULTS[id], qz = D.QUIZ.find((y) => y.fault === id); return f && { text: 'Paced strip: ' + f.name, key: f.dx + '.', tab: 'pacemaker', focus: PM(qz ? qz.patientOverride || qz.patient : 'chb', qz ? qz.pm.mode : 'DDD', id, qz && qz.pm.lrl ? { lrl: qz.pm.lrl } : null), todo: 'Read the automatic strip interpretation, press "Interrogate the device", then try to fix it with the programming sliders.', make: () => GEN.fault(id) }; }
+    const t = EP.Tox.list.filter((y) => id.indexOf(y.id) === 0).sort((a, b) => b.id.length - a.id.length)[0];
+    return t && { text: 'Tox ECG: ' + t.name, key: t.teach.ecg[0], tab: 'tox', focus: { id: t.id }, todo: 'Drag the severity slider through every stage and name what changes first.', make: () => GEN.tox(id) };
+  }
 
   function written(domain, used) {
     const pool = W.map((w, i) => ({ w, i })).filter((x) => x.w[0] === domain && !used.has('w' + x.i));
@@ -5772,6 +5858,7 @@ table.tbl td { padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-
   }
   /* Build a question set. spec: { n, domain (optional focus) } */
   function build(spec) {
+    if (spec.items) return spec.items.map((it) => { const d = describe(it); try { return d ? d.make() : null; } catch (e) { return null; } }).filter(Boolean);
     const out = [], used = new Set();
     const add = (d) => {
       const gens = GEN_BY[d];
@@ -5814,6 +5901,24 @@ table.tbl td { padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-
       if (this.db) this.db.collection('assessment').add(s).catch(() => {});
     },
     clear() { this.sessions = []; UI.store.set('assess', []); },
+    /* One row per distinct question: its latest state.
+     * status: 'misc' confident but wrong · 'gap' wrong · 'fragile' right by guessing · 'confirm' right once after a miss · 'known' */
+    ledger() {
+      const by = {};
+      for (const s of this.sessions) for (const it of s.items || []) (by[it.q] = by[it.q] || []).push(Object.assign({ t: s.t }, it));
+      const rows = [];
+      for (const q in by) {
+        const h0 = by[q], last = h0[h0.length - 1], prev = h0[h0.length - 2];
+        let status = 'known';
+        if (!last.ok) status = last.c === 2 ? 'misc' : 'gap';
+        else if (last.c === 0) status = 'fragile';
+        else if (prev && !prev.ok) status = 'confirm';
+        rows.push({ q, d: last.d, s: last.s, status, tries: h0.length, last });
+      }
+      const rank = { misc: 0, gap: 1, fragile: 2, confirm: 3, known: 4 };
+      return rows.sort((a, b) => rank[a.status] - rank[b.status] || b.last.t - a.last.t);
+    },
+    due() { return this.ledger().filter((r) => r.status !== 'known'); },
     /* → { domain: { n, right, sureWrong, guessRight, topics: {topic: [n, right]} } } */
     stats() {
       const st = {};
@@ -5825,7 +5930,7 @@ table.tbl td { padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-
       return st;
     },
   };
-  EP.Assess = { W, DOM, build, Store };
+  EP.Assess = { W, DOM, build, Store, describe, PR };
 
   function gapMap(st, compact) {
     const rows = Object.keys(DOM).map((d) => ({ d, x: st[d] })).filter((r) => r.x && r.x.n);
@@ -5853,6 +5958,18 @@ table.tbl td { padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-
         destroyView(); main.innerHTML = '';
         const st = Store.stats(), tot = Object.values(st).reduce((a, x) => a + x.n, 0);
         const weakest = Object.keys(st).filter((d) => st[d].n >= 2).sort((a, b) => st[a].right / st[a].n - st[b].right / st[b].n)[0];
+        const due = Store.due(), LBL = { misc: ['confident but wrong', 'bad'], gap: ['gap', 'bad'], fragile: ['guessed right', 'warn'], confirm: ['confirm once more', 'warn'] };
+        const plan = h('div.findings');
+        for (const r of due.slice(0, 14)) {
+          const d = describe(r); if (!d) continue;
+          plan.append(h('div.finding', h('span.pill.' + LBL[r.status][1], LBL[r.status][0]), h('div', h('b', d.text), h('div.muted', { style: { fontSize: '13px' } }, d.key), h('div', { style: { fontSize: '13px', marginTop: '3px' } }, h('b', 'Do this: '), d.todo),
+            h('div.row', { style: { marginTop: '6px' } }, h('button.btn.sm', { type: 'button', onclick: () => EP.open(d.tab, d.focus) }, 'Practise in ' + (EP.Modules.find((m) => m.id === d.tab) || {}).title), h('button.btn.sm', { type: 'button', onclick: () => start({ items: [r] }) }, 'Re-test this')))));
+        }
+        const planCard = due.length ? h('section.card', { style: { marginTop: '14px' } }, h('div.card-h', h('h3', 'Study plan — ' + due.length + ' item' + (due.length > 1 ? 's' : '') + ' to close'), h('span.grow'), h('button.btn.primary', { type: 'button', onclick: () => start({ items: shuffle(due).slice(0, 12) }) }, 'Re-test what I missed')),
+          h('div.card-b', h('p.muted', { style: { fontSize: '13px', marginBottom: '10px' } }, 'Each miss becomes one exercise. Do the exercise in its tab, then re-test. An item leaves this list after you get it right twice on separate sets without guessing. Misconceptions are listed first: being sure and wrong is more dangerous than not knowing.'), plan,
+            due.length > 14 ? h('p.muted', { style: { fontSize: '12px', marginTop: '8px' } }, (due.length - 14) + ' more — they appear as you clear these.') : null)) : null;
+        const hist = Store.sessions.slice(-6).reverse();
+        const histCard = hist.length ? h('section.card', { style: { marginTop: '14px' } }, h('div.card-h', h('h3', 'Sets so far')), h('div.card-b.scroll-x', h('table.tbl', h('tbody', hist.map((x) => h('tr', h('td.mono', new Date(x.t).toLocaleDateString()), h('td.mono', x.right + ' / ' + x.n), h('td.mono', Math.round((100 * x.right) / Math.max(1, x.n)) + '%'), h('td.muted', x.n >= 25 ? 'baseline' : x.n <= 3 ? 're-test' : 'practice set'))))))) : null;
         const domBtns = h('div.variants', Object.keys(DOM).map((d) => h('button.btn.sm', { type: 'button', onclick: () => start({ n: 8, domain: d }) }, DOM[d][0])));
         main.append(h('div.two',
           h('section.card', h('div.card-h', h('h2', 'Find your gaps')), h('div.card-b.prose',
@@ -5862,7 +5979,13 @@ table.tbl td { padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-
               weakest ? h('button.btn', { type: 'button', onclick: () => start({ n: 8, domain: weakest }) }, 'Drill my weakest: ' + DOM[weakest][0]) : null),
             h('h4', { style: { marginTop: '14px' } }, 'Or drill one domain (8 questions)'), domBtns)),
           h('section.card', h('div.card-h', h('h3', 'Gap map'), h('span.grow'), h('span.muted.mono', tot + ' answered'), tot ? h('button.btn.sm', { type: 'button', onclick: () => { Store.clear(); home(); } }, 'Clear') : null), h('div.card-b', gapMap(st),
-            h('p.muted', { style: { fontSize: '12px', marginTop: '10px' } }, 'Sorted weakest first. Each domain name opens its tab. ' + (Store.db ? 'History is saved with this page.' : 'History is saved in this browser.'))))));
+            h('p.muted', { style: { fontSize: '12px', marginTop: '10px' } }, 'Sorted weakest first. Each domain name opens its tab. ' + (Store.db ? 'History is saved with this page.' : 'History is saved in this browser.'))))), planCard, histCard,
+          h('section.card', { style: { marginTop: '14px' } }, h('div.card-h', h('h3', 'How to use this')), h('div.card-b.prose', h('ol', { style: { margin: 0, paddingLeft: '1.2em' } },
+            h('li', h('b', 'Baseline once. '), '30 questions gives 2–4 per domain: enough to point, not enough to grade. Treat a domain as weak only when it stays low over two sets.'),
+            h('li', h('b', 'Work the study plan, not the score. '), 'For each item do the exercise in its tab — it asks you to predict or measure something before the answer is shown — then re-test.'),
+            h('li', h('b', 'Drill the weakest domain. '), '8 fresh questions on one domain. The ECG items are regenerated, so you are practising the reading, not recalling the picture.'),
+            h('li', h('b', 'Come back in a few days. '), 'Re-test what you missed again. Getting it right after a gap is what makes it stick; right twice on separate sets clears the item.'),
+            h('li', h('b', 'Re-baseline every week or two. '), 'Compare the gap map with the last one.')))));
       }
       function start(spec) { qs = build(spec); qi = 0; items = []; review = []; ask(); }
       function ask() {
@@ -5903,7 +6026,7 @@ table.tbl td { padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-
         if (items.length) Store.save(sess);
         const st = {}; for (const it of items) { const d = (st[it.d] = st[it.d] || { n: 0, right: 0, sureWrong: 0, guessRight: 0, topics: {} }); d.n++; if (it.ok) d.right++; if (!it.ok && it.c === 2) d.sureWrong++; if (it.ok && it.c === 0) d.guessRight++; const tp = (d.topics[it.s] = d.topics[it.s] || [0, 0]); tp[0]++; if (it.ok) tp[1]++; }
         const sure = review.filter((r) => !r.ok && r.conf === 2), wrong = review.filter((r) => !r.ok && r.conf !== 2), lucky = review.filter((r) => r.ok);
-        const block = (title, note, arr) => (arr.length ? [h('h4', title), h('p.muted', { style: { fontSize: '12px' } }, note), h('div.findings', { style: { marginTop: '6px' } }, arr.map((r) => h('div.finding', h('span.pill', DOM[r.q.domain][0].split(' ')[0]), h('div', h('b', r.q.stem), r.ok ? null : h('div', { style: { color: 'var(--bad)' } }, 'You chose: ' + r.chosen), h('div', 'Answer: ' + r.q.right), h('div.muted', r.q.explain)))))] : null);
+        const block = (title, note, arr) => (arr.length ? [h('h4', title), h('p.muted', { style: { fontSize: '12px' } }, note), h('div.findings', { style: { marginTop: '6px' } }, arr.map((r) => h('div.finding', h('span.pill', DOM[r.q.domain][0].split(' ')[0]), h('div', h('b', r.q.stem), r.ok ? null : h('div', { style: { color: 'var(--bad)' } }, 'You chose: ' + r.chosen), h('div', 'Answer: ' + r.q.right), h('div.muted', r.q.explain), (() => { const d = describe({ q: r.q.id }); return d ? h('div.row', { style: { marginTop: '6px' } }, h('button.btn.sm', { type: 'button', onclick: () => EP.open(d.tab, d.focus) }, 'Practise this'), h('span.muted', { style: { fontSize: '12px' } }, d.todo)) : null; })()))))] : null);
         main.append(h('div.two',
           h('section.card', h('div.card-h', h('h2', 'This set: ' + right + ' / ' + items.length)), h('div.card-b', gapMap(st), h('div.row', { style: { marginTop: '12px' } }, h('button.btn.primary', { type: 'button', onclick: home }, 'Back to overview'), h('button.btn', { type: 'button', onclick: () => start({ n: 10 }) }, 'Another 10')))),
           h('section.card', h('div.card-h', h('h3', 'All sessions')), h('div.card-b', gapMap(Store.stats(), true)))),
@@ -5936,7 +6059,7 @@ table.tbl td { padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-
     for (const m of mods) tabs.appendChild(h('button.tab', { type: 'button', role: 'tab', id: 'tab-' + m.id, 'aria-selected': 'false', onclick: () => go(m.id, true) }, m.title));
     function go(id, push) {
       const m = mods.find((x) => x.id === id) || mods[0];
-      if (current === m.id) return;
+      if (current === m.id && !EP.pending) return;
       if (handle && handle.unmount) handle.unmount();
       current = m.id;
       for (const b of tabs.children) b.setAttribute('aria-selected', String(b.id === 'tab-' + m.id));
@@ -5947,6 +6070,8 @@ table.tbl td { padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-
       window.scrollTo(0, 0);
     }
     EP.go = go;
+    /* Open a tab focused on one item: modules read EP.pending while mounting. */
+    EP.open = (tab, focus) => { EP.pending = Object.assign({ tab }, focus || {}); go(tab, true); EP.pending = null; };
     window.addEventListener('hashchange', () => go(location.hash.replace('#', ''), false));
     // build the model after first paint so the page shows immediately
     setTimeout(() => {

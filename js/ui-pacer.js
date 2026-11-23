@@ -143,6 +143,8 @@
     id: 'pacemaker', title: 'Pacemaker',
     mount(root) {
       const state = { patient: 'chb', fault: 'none', quiz: null, pm: Object.assign({}, EP.Pacemaker.DEF, { mode: 'DDD' }) };
+      const pd = EP.pending;
+      if (pd) { if (pd.patient) state.patient = pd.patient; if (pd.fault) state.fault = pd.fault; Object.assign(state.pm, pd.pm || {}); }
       let sim, dev, live;
       const canvas = h('canvas', { 'aria-label': 'Live rhythm strip with marker channel' });
       const liveBox = h('div.live', canvas);
@@ -189,7 +191,7 @@
       const magnet = UI.check('Magnet on the generator', false, (v) => { state.pm.magnet = v; dev.set(devCfg()); });
       const patSel = UI.select(null, Object.keys(PATIENTS).filter((k) => !PATIENTS[k].hidden).map((k) => [k, PATIENTS[k].name]), state.patient, (v) => { state.patient = v; state.quiz = null; quizBox(); rebuild(); });
       patSel.setAttribute('aria-label', 'Patient rhythm'); patSel.style.width = '100%';
-      const faultSel = UI.select(null, Object.keys(FAULTS).map((k) => [k, FAULTS[k].name]), 'none', (v) => { state.fault = v; state.quiz = null; quizBox(); rebuild(); faultNote(); });
+      const faultSel = UI.select(null, Object.keys(FAULTS).map((k) => [k, FAULTS[k].name]), state.fault, (v) => { state.fault = v; state.quiz = null; quizBox(); rebuild(); faultNote(); });
       faultSel.setAttribute('aria-label', 'Fault'); faultSel.style.width = '100%';
       const faultInfo = h('div');
       function faultNote() {
@@ -269,7 +271,7 @@
           h('section.card', h('div.card-h', h('h3', 'Patient')), h('div.card-b', patSel)),
           h('section.card', h('div.card-h', h('h3', 'Programming')), h('div.card-b', ctl, magnet)),
           h('section.card', h('div.card-h', h('h3', 'Introduce a fault')), h('div.card-b', faultSel, faultInfo)))));
-      rebuild(); quizBox();
+      rebuild(); quizBox(); faultNote();
       return { unmount() { live.destroy(); if (strip.ro) strip.ro.disconnect(); } };
     },
   });

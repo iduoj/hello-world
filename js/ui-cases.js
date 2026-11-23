@@ -192,7 +192,7 @@
           h('section.card', h('div.card-h', h('h3', 'Interventions')), acts)),
           h('div.sim-main', h('section.card', h('div.card-h', h('h3', 'What happened')), h('div.card-b', log)), deb,
             h('div.note', h('b', 'The one rule. '), 'If the patient is unstable because of the rhythm — shock a tachycardia, pace a bradycardia. Drugs are for stable patients and for keeping the rhythm afterwards.'))))));
-      start(cs.id);
+      start((EP.pending && EP.pending.id) || cs.id);
       return { unmount() { live.destroy(); if (strip.ro) strip.ro.disconnect(); } };
     },
   });
