@@ -86,12 +86,18 @@ localStorage `ep.course`, db doc `course/progress` = `{units:{id:{best,last,runs
 used by `tools/course_walk.mjs`). Full authoring guide: `docs/COURSE_AUTHORING.md`.
 ### course-<track>.js — one file per track: `dev` (units 1–8, also defines the live `pacer` bench), `arr`
 (a*), `loc` (l*), `isch` (s*), `tox` (t*), `mgmt` (m*), `dev2` (d*). A track with no units is hidden.
+Benches: `ecg` (kit; used by arr, loc, isch, tox, mgmt), `pacer` (course-dev.js), and in course-dev2.js
+`tvp` / `tcp` (live temporary-pacing box and pads with an arterial trace), `icd` (live ICD with separate
+onset / stability / morphology criteria, built on a subclass of `EP.ICD`) and `film` (`EP.XRay` with a
+written fallback when three.js or WebGL is missing). Small additive exports made for the courses:
+`EP.Isch.SEG`, `EP.IcdCases`, site `lvInfLatEndo` in morph.js.
 ### app.js — modules register in `EP.Modules = [{id,title,mount(root)→{unmount}}]`; tabs + hash routing.
 
 ## Dev tools
     node tools/dev_lib.js [id]          run library rhythms, print rates/labels
     node tools/shot.mjs <url> <png> [w] [h] [waitMs] [--dark] [--full] [--eval js]
     node tools/course_walk.mjs [--track id] [--unit id]   walk course units headlessly (must print WALK OK)
+    node tools/course_dump.mjs --track id                 print a track's teaching text, questions and answers
     node tools/build.mjs                bundle → dist/ep-simulator.html (artifact) + standalone
     NODE_PATH=/opt/node-tools/node_modules node tools/dev_plot.js out.png conduction|pacing|pvc
 

@@ -304,7 +304,8 @@
   }
 
   const Course = (EP.Course = { tracks, addTrack, benches, S, T: { para, list, ol, table, fmt }, util: { pick, shuffle }, EcgBench, Prog, describe, unitById, label,
-    trackFor: (dom) => tracks.find((t) => (t.units || []).length && (t.dom === dom || t.units.some((u) => u.dom === dom))),
+    /* The course that teaches an Assessment domain (rhythm recognition is taught by the mechanisms course). */
+    trackFor: (dom) => { const d = dom === 'rhythm' ? 'mech' : dom; return tracks.find((t) => (t.units || []).length && (t.units.some((u) => u.dom === d) || (t.dom === d && t.units.some((u) => !u.dom)))); },
     note(q, ok) { const m = QID.exec(q); if (m) { Prog.mark(m[1], m[2], ok, Date.now()); Prog.save(); } } });
 
   EP.Modules = EP.Modules || [];

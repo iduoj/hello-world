@@ -37,7 +37,7 @@
     raDown: () => [[-3.6, 0.9, -1.1], [-3.8, -0.8, -1.0], [-3.6, -2.2, -1.2]],
     perforated: () => RA_IN.concat([TV(), L(4.45, 0.45, 1.8), L(4.3, 0.5, 3.6), L(3.9, 0.5, 5.3), L(3.4, 0.5, 6.9), L(3.5, 0.9, 8.1)]),
     midCardiacVein: () => [[-3.4, 0.2, -1.2], [-3.0, -1.8, -1.6], G.LM.csOs, L(2.9, 2.75, 0.6), L(2.3, 2.95, 1.9), L(1.7, 2.75, 3.3)],
-    lvViaASD: () => [[-3.3, 1.2, -1.6], G.LM.fossaOvalis, [0.2, 0.0, -3.3], G.LM.mitral, L(0.1, 0.5, 2.5), L(0.2, 1.0, 4.8), L(0.3, 1.5, 6.2)],
+    lvViaASD: () => [[-3.3, 1.2, -1.6], G.LM.fossaOvalis, [0.2, 0.0, -3.3], G.LM.mitral, L(0.1, 0.5, 2.5), L(-0.5, 1.2, 3.6), L(-1.2, 2.0, 4.5)],   // tip on the inferolateral LV endocardium (site lvInfLatEndo)
     csBackInRA: () => [[-3.4, 0.2, -1.2], [-3.0, -1.8, -1.6], G.LM.csOs, V.addS(G.ringPoint(G.ANNULI.mitral, (50 * Math.PI) / 180, 1.95), G.A, -0.45)],
     anteriorVein: () => {
       const p = [[-3.4, 0.2, -1.2], [-3.0, -1.8, -1.6], G.LM.csOs];
@@ -47,7 +47,7 @@
     },
     tvpCoiled: () => [[-3.5, 0.8, -1.1], [-4.4, -0.8, -0.6], [-3.6, -2.0, 0.2], [-2.4, -1.0, 0.4], [-2.9, 0.6, -0.2], [-4.0, 0.2, -0.6]],
   });
-  HW.sites = { rvApex: 'rvApex', rvSeptal: 'rvMidSeptum', rvot: 'rvotSeptal', lbb: 'lbbArea', midCardiacVein: 'midCardiacVein', lvViaASD: 'lvInfApical', cs: 'lvLatEpi', anteriorVein: 'lvAntWall' };
+  HW.sites = { rvApex: 'rvApex', rvSeptal: 'rvMidSeptum', rvot: 'rvotSeptal', lbb: 'lbbArea', midCardiacVein: 'midCardiacVein', lvViaASD: 'lvInfLatEndo', cs: 'lvLatEpi', anteriorVein: 'lvAntWall' };
 
   /* parts: { gen:'pm'|'icd'|'crt'|null, access:'left'|'ij', leads:[{route, name, coil:[fromEnd0,fromEnd1], svcCoil, gap}], caps:[{name, tip, from, len}],
    *          sicd, evicd, pads, twiddler, genAt } */

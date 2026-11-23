@@ -168,60 +168,71 @@ generic, not manufacturer-specific; no external benchmark yet. Suggested check: 
 tracings / board-style device questions before and after.
 
 ### Round 5 (user: "build the same course format for those other areas … expand it to the high yield
-areas that we have covered") — IN PROGRESS
-Context: the Assessment covers ten domains, but only devices had teach → predict → calculate → do →
+areas that we have covered") — done
+Context: the Assessment covered ten domains, but only devices had teach → predict → calculate → do →
 diagnose with spaced review. Everything else was recognition MCQ from small pools.
 
-Plan (tick as done):
-- [x] 1. Split the course into an engine and content. `js/course-kit.js` = runner, step types, bench
-      registry (`pacer` live bench, `ecg` static parameter-driven bench), progress store, home, tab
-      module. One content file per track, registered with `EP.Course.addTrack`.
-      `js/course-dev.js` = the existing eight device units (ids 1–8 unchanged, stored answers stay valid).
-- [x] 2. `tools/course_walk.mjs` = headless walker (answers every step correctly, proves each `do` step
-      fails before and passes after its `solve`, lints options). `docs/COURSE_AUTHORING.md` = how to
-      write a track.
-- [ ] 3. New tracks (unit-id prefix → Assessment domain):
-      - `js/course-arr.js`  `a*` arrhythmia mechanisms → mech (AV node and block, AVNRT, AVRT/WPW,
-        AF and flutter, wide-complex tachycardia / VT, polymorphic VT / torsades / VF)
-      - `js/course-loc.js`  `l*` localisation from the 12-lead → local (bundle branch and axis rules,
-        PVC/VT origin, accessory pathway, paced QRS ↔ lead position)
-      - `js/course-isch.js` `s*` ischaemia → isch (ST vector and territories, culprit artery, posterior /
-        RV, subtle OMI incl. de Winter, Wellens, swirl, LBBB / paced + modified Sgarbossa, mimics)
-      - `js/course-tox.js`  `t*` tox and electrolytes → tox (potassium, calcium / QT, sodium-channel
-        blockade, digoxin, beta-blocker / CCB, acquired long QT)
-      - `js/course-mgmt.js` `m*` acute management → mgmt (stable vs unstable, narrow regular, AF and
-        pre-excited AF, wide-complex, polymorphic VT / storm, bradycardia)
-      - `js/course-dev2.js` `d*` more devices → temp / icd / hardware (temporary pacing, ICD detection and
-        therapy, inappropriate shocks, devices and leads on the film)
-- [ ] 4. Independent content review of every track; fix what it finds.
-- [ ] 5. Assessment links (course button per domain), docs, bundle, publish, push.
+What was built
+- `js/course-kit.js` = the engine (runner, step types look / mcq / num / do / multi, bench registry with
+  a static parameter-driven `ecg` bench, progress store, "Courses" tab). One content file per track.
+- Seven tracks, 38 units, 308 scored steps (all pass `node tools/course_walk.mjs`):
 
-Status note (update as it changes): steps 1–2 are committed. The six tracks in step 3 were handed to
-six background authors (one per file) with `docs/COURSE_AUTHORING.md` as the contract. When each
-reports back: (a) `node tools/course_walk.mjs --track <id>` must print WALK OK; (b) read the content
-with `node tools/course_dump.mjs --track <id>` and check it medically, paying most attention to the
-items the author listed as uncertain; (c) look at one screenshot per bench; (d) fix, then commit that
-track. After all six: full walk with no `--track`, Assessment links, README, bundle, publish, push.
-Track status (all reviewed by reading the full content dump and running the walker, then committed):
-tox t1–t4 (30 scored steps) · isch s1–s5 (42; adds `I.SEG` and a course-only territory `ladDistal`) ·
-arr a1–a6 (52) · loc l1–l4 (31) · mgmt m1–m6 (52). dev2 = author still working: do not commit as
-reviewed until it has reported.
-Found by the localisation author and fixed: the pacing-site notes for "LV endocardium" and "middle
-cardiac vein" said RBBB pattern while the model draws a negative V1. New site `lvInfLatEndo` (V1 +, I −,
-superior axis) now backs the "LV endocardium" entry; the middle-cardiac-vein note says it resembles RV
-apical pacing; the assessment no longer uses it as an unknown. STILL TO DO after dev2 reports: the same
-correction in the Devices tab (`ui-devices.js` variants `cs` and `asd`, and the `lvViaASD` route tip in
-`devices3d.js`), which that author may be relying on.
-Also done in this round: the device questions were rebalanced because the correct option was the
-longest in 21 of 30 (a cue for test-wise readers); the walker now fails a track above 45 %.
+  | Track (file) | Units | Scored steps | Assessment domain |
+  | --- | --- | --- | --- |
+  | Pacing and device troubleshooting (`course-dev.js`) | 1–8 | 56 | device |
+  | Arrhythmia mechanisms (`course-arr.js`) | a1–a6 | 52 | mech (also the course for rhythm) |
+  | Localisation from the 12-lead (`course-loc.js`) | l1–l4 | 31 | local |
+  | Ischaemia and occlusion MI (`course-isch.js`) | s1–s5 | 42 | isch |
+  | Drugs and electrolytes (`course-tox.js`) | t1–t4 | 30 | tox |
+  | Acute arrhythmia management (`course-mgmt.js`) | m1–m6 | 52 | mgmt |
+  | Temporary pacing, ICDs and hardware (`course-dev2.js`) | d1–d5 | 45 | temp / icd / hardware |
 
-File ownership while tracks are being written in parallel: each track file has one author; shared
-files (kit, index.html, app.js, css, docs) are edited only by the coordinating session.
+- `tools/course_walk.mjs` (must print WALK OK; also lints answer cueing), `tools/course_dump.mjs`
+  (prints a track's whole content for review), `docs/COURSE_AUTHORING.md` (how to write a track).
+- Assessment: a "Course →" button per domain in the gap map; the course home suggests the track for the
+  weakest assessed domain.
+
+How it was made, and what that means for trust
+- The engine, the device track and all integration were written in the main session. The six new tracks
+  were each written by a separate background author working to `docs/COURSE_AUTHORING.md`, then reviewed
+  in the main session by reading the complete content dump and running the walker. Fixes made on review
+  are in the track commits.
+- The content has NOT been checked by an electrophysiologist or against sources: statistics, doses,
+  energies, trial results and guideline statements were written from recall and labelled "typical"
+  where practice varies. Each author's list of statements they were less than sure of is in the
+  conversation log; the main ones are repeated to the user in the hand-over message.
+- Where the model cannot show something, the tracks say so on screen and score something it does show.
+  Rules that are scripted in a track rather than emerging from the simulator (torsades triggers, the
+  vulnerable period for shocks, drug effects in the management track, ICD discriminator thresholds)
+  are stated on screen.
+
+Fixes to the existing app found during this round
+- Device questions rebalanced: the correct option was the longest in 21 of 30 (a cue for test-wise
+  readers). The walker fails a track when this exceeds 45 %.
+- Pacing sites: "LV endocardium" and "middle cardiac vein" were described as RBBB pattern while the model
+  draws a negative V1. New site `lvInfLatEndo` (V1 +, I −, superior axis) backs the LV-endocardium entry
+  in the Localise lab and the "Lead in the left ventricle" film in the Devices tab; the Devices-tab "Lead
+  in a cardiac vein" variant now uses the lateral vein (`cs` route, `lvLatEpi`), which shows the RBBB
+  pattern its text describes; notes explain that the middle cardiac vein resembles apical pacing. The
+  Assessment no longer uses the middle cardiac vein as an unknown.
+- Engine: `EcgBench` gained `gain`, function captions and named slider values.
+
+Known gaps reported by the track authors (candidates for later work)
+- No click-to-mark on tracings ("mark the capture beat"); no amplitude calipers (ST levels are read from
+  the grid); `EP.LiveStrip` has no calipers.
+- `R.measure` exposes intervals only (no T / U / J-wave or ST amplitudes), so `do` checks in the tox track
+  use QRS width, QT and rhythm labels.
+- Model limits: partial pre-excitation does not widen the QRS gradually; nodal blockers do not accelerate
+  pre-excited AF; isolated posterior MI, Aslanger and South African flag render with extra lead
+  involvement; LV aneurysm T waves are too tall; the tricyclic terminal R in aVR is small; hemiblock axis
+  shifts are small; `sim.shock` has no vulnerable period or energy dependence; `EP.ICD` discriminators are
+  a single truth-reading switch (the dev2 track subclasses it).
 
 ### Ideas not done yet (candidates for the next round)
 - Rate response (R) and AV-search / minimised-ventricular-pacing algorithms in the pacemaker sim
-- Course follow-ons: a matching course for ICDs (zones, discriminators, inappropriate shocks) and for
-  paced-QRS ↔ lead position; calipers on the live strip; pulse-width control (strength–duration curve)
+- Course follow-ons: calipers and click-to-mark on tracings; pulse-width control (strength–duration
+  curve); score the Cases tab into the gap map; an external benchmark set to check transfer
+- Have the course content reviewed by an electrophysiologist; check quoted figures against sources
 - Intracardiac electrogram channels (A/V EGM) beside the marker channel
 - Scar-based VT circuit drawn on the 3D map (isthmus, exit) and entrainment concepts
 - LVH with strain, takotsubo, PE patterns as further STEMI mimics; Smith 4-variable formula calculator
